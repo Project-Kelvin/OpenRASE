@@ -1,2 +1,2 @@
 # SFC-Emulator
-This is an emultor built on top of Contairnet to benchmark and evaluate solutions to the NFV-RA problem.
+This is an emulator built on top of Containernet to benchmark and evaluate solutions to the NFV-RA problem.
