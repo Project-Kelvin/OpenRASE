@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "server"
+version = "0.1.0"
+description = "A simple web server based on Flask that returns \"Hello World!\" or the first argument passed to the script."
+authors = ["Theviyanthan K."]
+license = "Apache-2.0 license"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+Flask = "^3.0.0"
+sfc-emulator = { path = "../.." }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
