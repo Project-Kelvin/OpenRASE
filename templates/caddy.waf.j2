@@ -1,0 +1,17 @@
+{
+	order coraza_waf first
+}
+
+:80 {
+	coraza_waf {
+		load_owasp_crs
+		directives `
+		SecRuleEngine On
+		SecRule &REQUEST_COOKIES "@gt 0" "id:1,phase:1,deny,status:403,msg:'Cookies not allowed'"
+		`
+	}
+
+	rewrite * /tx{uri}
+
+	reverse_proxy {{SFF_NETWORK1_IP}}
+}
