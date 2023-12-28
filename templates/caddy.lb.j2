@@ -1,0 +1,5 @@
+:80 {
+    rewrite * /tx{uri}
+
+    reverse_proxy {{SFF_NETWORK1_IP}} {{SFF_NETWORK2_IP}}
+}
