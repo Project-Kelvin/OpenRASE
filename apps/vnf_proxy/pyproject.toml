@@ -1,0 +1,16 @@
+[tool.poetry]
+name = "vnf-proxy"
+version = "0.1.0"
+description = "Proxies all request to the VNF from the SFF back to the `/tx` endpoint of the SFF. This is useful in passive VNFs that just listens to the traffic on a port."
+authors = ["Theviyanthan K."]
+license = "Apache-2.0 license"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+Flask = "^3.0.0"
+requests = "^2.31.0"
+sfc-emulator = { path = "../.." }
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
