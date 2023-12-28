@@ -1,0 +1,30 @@
+sff:
+  network1:
+    networkIP: "192.168.0.0/24"
+    sffIP: "192.168.0.2"
+  network2:
+    networkIP: "172.16.0.0/24"
+    sffIP: "172.16.0.2"
+  port: 80
+
+server:
+  port: 80
+
+vnfProxy:
+  port: 80
+
+sfcClassifier:
+  port: 80
+
+general:
+  requestTimeout: 5
+
+repoAbsolutePath: "/home/thivi/SFC-Emulator"
+
+templates:
+  - "daemon.json.j2:docker/files/dind/shared/daemon.json"
+  - "default.vcl.j2:docker/files/ha/shared/conf/default.vcl"
+  - "suricata.ids.yaml.j2:docker/files/ids/shared/conf/suricata.yaml"
+  - "suricata.ips.yaml.j2:docker/files/ips/shared/conf/suricata.yaml"
+  - "caddy.lb.j2:docker/files/lb/shared/Caddyfile"
+  - "caddy.waf.j2:docker/files/waf/shared/Caddyfile"
