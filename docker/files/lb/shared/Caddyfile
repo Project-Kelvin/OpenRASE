@@ -1,0 +1,5 @@
+:80 {
+    rewrite * /tx{uri}
+
+    reverse_proxy 172.16.0.2 192.168.0.2
+}
