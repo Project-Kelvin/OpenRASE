@@ -1,0 +1,3 @@
+rejectboth http any any -> any any (msg:"Wrong content type detected!"; content:"GET"; http_method; content: "Content-Type: application/json"; http_header; sid:3;)
+
+alert tcp any any -> any any (msg:"Illegal method detected!"; content: "POST"; http_method;  sid:4;)
