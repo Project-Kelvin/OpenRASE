@@ -7,12 +7,12 @@ import json
 import os
 from typing import Any
 from jinja2 import Template, TemplateSyntaxError
-from docker import from_env, DockerClient, errors
-from models.template_data import TemplateData
 from shared.constants.sfc import SFC_REGISTRY
 from shared.models.config import Config
 from shared.utils.config import getConfig
-from shared.utils.container import isContainerRunning
+from shared.utils.container import isContainerRunning, doesContainerExist
+from docker import from_env, DockerClient
+from models.template_data import TemplateData
 
 client: DockerClient = from_env()
 
@@ -27,15 +27,23 @@ def buildDockerImage(name: str) -> str:
 
     Returns:
         str: The name and tag of the Docker image that was built.
+        An empty string if the image could not be built.
     """
 
-    tag: str = f"{getRegistryContainerAddr()}/{name}:latest"
+    try:
+        tag: str = f"{getRegistryContainerAddr()}/{name}:latest"
+        client.images.build(
+            path=".",
+            dockerfile=f"docker/files/{name}/Dockerfile",
+            tag=tag
+        )
+    # pylint: disable=broad-except
+    except Exception as e:
+        print("Docker image for " + name +
+              " could not be built.")
+        print(e)
 
-    client.images.build(
-        path="./",
-        dockerfile=f"docker/files/{name}/Dockerfile",
-        tag=tag
-    )
+        return ""
 
     return tag
 
@@ -48,7 +56,11 @@ def pushDockerImage(tag: str) -> None:
         tag (str): The tag of the Docker image to push.
     """
 
-    client.images.push(tag)
+    try:
+        client.images.push(tag)
+    except ConnectionError as e:
+        print("Docker image " + tag + " could not be pushed.")
+        print(e)
 
 
 def isRegistryContainerRunning() -> bool:
@@ -66,6 +78,8 @@ def startRegistryContainer() -> None:
     """
     Start the registry container.
     """
+    if doesContainerExist(SFC_REGISTRY):
+        client.containers.get(SFC_REGISTRY).remove()
 
     client.containers.run(
         "registry:2",
@@ -79,7 +93,8 @@ def startRegistryContainer() -> None:
             f"{getConfig()['repoAbsolutePath']}/docker/registry": {
                 "bind": "/data",
                 "mode": "rw"
-            }}
+            }},
+        auto_remove=True
     ).start()
 
 
@@ -193,6 +208,23 @@ def generateConfigFilesFromTemplates() -> None:
             print(e)
 
 
+def symLinkConfig() -> None:
+    """
+    Create a symlink to the config file in every app directory.
+    """
+
+    config: Config = getConfig()
+
+    try:
+        for directory in os.listdir(f"{config['repoAbsolutePath']}/apps/"):
+            os.symlink(
+                f"{config['repoAbsolutePath']}/config.yaml",
+                f"{config['repoAbsolutePath']}/apps/{directory}/config.yaml"
+            )
+    except FileExistsError:
+        pass
+
+
 def main() -> None:
     """
     The main function.
@@ -214,18 +246,18 @@ def main() -> None:
     # Generate config files from templates.
     generateConfigFilesFromTemplates()
 
+    print("Creating symlinks to config file...")
+    # Create symlink to config file.
+    symLinkConfig()
+
     print("Building and pushing Docker images...")
     # Build and push Docker images.
     for directory in os.listdir(f"{config['repoAbsolutePath']}/docker/files"):
-        try:
-            print("Building Docker image for " + directory)
-            name: str = buildDockerImage(directory)
+        print("Building Docker image for " + directory)
+        name: str = buildDockerImage(directory)
+        if name != "":
             print("Pushing Docker image " + name)
             pushDockerImage(name)
-        except errors.DockerException as e:
-            print("Docker image for " + directory +
-                  " could not be built/pushed.")
-            print(e)
 
 
 main()
