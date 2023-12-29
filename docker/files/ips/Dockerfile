@@ -23,8 +23,7 @@ RUN curl -sSL https://install.python-poetry.org | python3 -
 
 WORKDIR /home
 RUN mkdir sfc-emulator
-COPY ./shared/ /home/sfc-emulator/shared/
-COPY poetry.lock pyproject.toml /home/sfc-emulator/
+COPY ./packages/ /home/sfc-emulator/packages/
 
 COPY ./apps/vnf_proxy/ /home/sfc-emulator/apps/vnf_proxy/
 COPY config.yaml /home/sfc-emulator/apps/vnf_proxy/

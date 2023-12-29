@@ -24,3 +24,21 @@ def isContainerRunning(name: str)-> bool:
         return registry.status == "running"
     except errors.NotFound:
         return False
+
+def doesContainerExist(name: str) -> bool:
+    """
+    Check whether the given container exists.
+
+    Parameters:
+        name (str): The name of the container to be checked.
+
+    Returns:
+        bool: True if the container exists, False otherwise.
+    """
+
+    try:
+        client.containers.get(name)
+    except errors.NotFound:
+        return False
+
+    return True
