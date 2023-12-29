@@ -21,6 +21,6 @@ def isContainerRunning(name: str)-> bool:
     try:
         registry: Any = client.containers.get(name)
 
-        return registry.status != "running"
+        return registry.status == "running"
     except errors.NotFound:
         return False
