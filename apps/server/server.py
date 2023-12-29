@@ -12,7 +12,7 @@ from shared.utils.config import getConfig
 app: Flask = Flask(__name__)
 
 
-@app.route("/tx")
+@app.route("/")
 def default() -> str:
     """ Default endpoint that returns "Hello World!" or the first argument passed to the script."""
 
