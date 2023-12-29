@@ -5,7 +5,8 @@ description = "This is an emulator built on top of Containernet to benchmark and
 authors = ["Theviyanthan K."]
 license = "Apache-2.0 license"
 packages = [
-    { include = "shared" }
+    { include = "models", from = "src" },
+    { include = "shared", from = "packages"}
 ]
 
 [tool.poetry.dependencies]
