@@ -10,7 +10,7 @@ class TemplateData(TypedDict):
     Defines the `TemplateData` dictionary type.
     """
     # pylint: disable=invalid-name
-    SFC_REGISTRY_IP: str
+    SFC_REGISTRY_TAG: str
     SFF_NETWORK1_IP: str
     SFF_NETWORK2_IP: str
     SFF_PORT: str
