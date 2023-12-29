@@ -165,5 +165,6 @@ docker/files/ids/shared/conf/suricata.yaml
 docker/files/ips/shared/conf/suricata.yaml
 docker/files/lb/shared/Caddyfile
 docker/files/waf/shared/Caddyfile
+docker/compose/tester/tester.yaml
 
 apps/**/config.yaml

@@ -28,3 +28,4 @@ templates:
   - "suricata.ips.yaml.j2:docker/files/ips/shared/conf/suricata.yaml"
   - "caddy.lb.j2:docker/files/lb/shared/Caddyfile"
   - "caddy.waf.j2:docker/files/waf/shared/Caddyfile"
+  - "tester.yaml.j2:docker/compose/tester/tester.yaml"

@@ -13,7 +13,7 @@ services:
     - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
     - GF_AUTH_ANONYMOUS_ENABLED=true
     - GF_AUTH_BASIC_ENABLED=false
-    image: 172.20.0.2:5000/grafana:latest
+    image: {{SFC_REGISTRY_TAG}}/grafana:latest
     networks:
       tester:
         ipv4_address: 1.0.0.3
