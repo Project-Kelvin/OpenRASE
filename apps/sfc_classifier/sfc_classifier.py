@@ -13,7 +13,7 @@ from flask import Flask, Response, request
 import requests
 from shared.models.config import Config
 
-from shared.models.forwarding_graph import ForwardingGraph, ForwardingGraphs
+from shared.models.forwarding_graph import VNF, ForwardingGraph, ForwardingGraphs
 from shared.utils.config import getConfig
 from shared.utils.encoder_decoder import sfcEncode
 
@@ -62,14 +62,14 @@ def default():
     """
 
     try:
-        sfc: ForwardingGraph = {}
+        sfc: VNF = {}
         if len(sys.argv) > 2:
             if request.remote_addr == sys.argv[1]:
-                sfc = forwardingGraphs[0]
+                sfc = forwardingGraphs[0]["vnfs"]
             elif request.remote_addr == sys.argv[2]:
-                sfc = forwardingGraphs[1]
+                sfc = forwardingGraphs[1]["vnfs"]
         else:
-            sfc = forwardingGraphs[0]
+            sfc = forwardingGraphs[0]["vnfs"]
 
         sfcBase64: Any = sfcEncode(sfc)
 
@@ -81,7 +81,7 @@ def default():
 
         response = requests.request(
             method=request.method,
-            url=request.url.replace(request.host_url, f'{sfc["host"]}/rx'),
+            url=request.url.replace(request.host_url, f'{sfc["host"]["ip"]}/rx'),
             data=request.get_data(),
             cookies=request.cookies,
             allow_redirects=False,
