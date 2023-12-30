@@ -44,13 +44,12 @@ def extractAndValidateSFCHeader(requestObj: Request) -> VNF:
                                         "Please add the host IP address using the `/add-host` endpoint.\n")
 
     if sfcBase64 == "" or sfcBase64 is None:
-        print("3")
         raise ValueError(f"The SFF running on\n {', '.join(hosts)}\n" +
                                         " could not find the SFC header " +
                                         f"attribute request from:\n{requestObj.host_url}.\n")
-    sfc: str = sfcDecode(sfcBase64)
+    sfc: VNF = sfcDecode(sfcBase64)
 
-    if sfc["host"] not in hosts:
+    if sfc["host"]["ip"] not in hosts:
         raise RuntimeError("This request arrived at the wrong host.\n" +
                                         "This host has the following IP addresses:\n" +
                                         f"{', '.join(hosts)}.\n" +
@@ -69,9 +68,9 @@ def rx() -> Response:
         sfc: VNF = extractAndValidateSFCHeader(request)
 
         if "isTraversed" in sfc and sfc["isTraversed"] is True:
-            return f"VNF {sfc['vnf']} has already processed this request.", 400
+            return f"VNF {sfc['vnf']['id']} has already processed this request.", 400
 
-        vnfIP: str = sfc["vnf"]
+        vnfIP: str = sfc["vnf"]["ip"]
 
         response: Response = requests.request(
             method=request.method,
@@ -115,9 +114,9 @@ def tx() -> Response:
 
         # Handles branching of SFC.
         if isinstance(sfc["next"], list):
-            network1IP: str = getConfig(
-            )["sff"]["network1"]["networkIP"]
-            if checkIPBelongsToNetwork(request.remote_addr.startswith, network1IP):
+            network1IP: str = getConfig()["sff"]["network1"]["networkIP"]
+
+            if checkIPBelongsToNetwork(request.remote_addr, network1IP):
                 sfc = sfc["next"][0]
             else:
                 sfc = sfc["next"][1]
@@ -126,12 +125,12 @@ def tx() -> Response:
 
         # Makes forwarding decision.
         nextDest: str = ""
-        if sfcUpdated["host"] == sfc["host"]:
+        if sfcUpdated["host"]["id"] == sfc["host"]["id"]:
             nextDest = sfc["vnf"]
         elif sfc["next"] == "terminal":
-            nextDest = sfc["host"]
+            nextDest = sfc["host"]["ip"]
         else:
-            nextDest = f'{sfc["host"]}/rx'
+            nextDest = f'{sfc["host"]["ip"]}/rx'
 
         # Updates header.
         sfc["isTraversed"] = False
