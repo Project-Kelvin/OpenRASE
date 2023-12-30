@@ -47,12 +47,23 @@ class SFCClassifier(TypedDict):
 
     port: int
 
+
 class General(TypedDict):
     """
     Defines the `General` dictionary type.
     """
 
     port: int
+
+
+
+class IPRange(TypedDict):
+    """
+    Defines the `IPRange` dictionary type.
+    """
+
+    mask: int
+
 
 class Config(TypedDict):
     """
@@ -66,3 +77,4 @@ class Config(TypedDict):
     general: General
     repoAbsolutePath: str
     templates: "list[str]"
+    ipRange: IPRange
