@@ -28,7 +28,7 @@ class VNF(TypedDict):
     Defines the `VNF` dictionary type.
     """
 
-    node: ChainEntity
+    host: ChainEntity
     vnf: ChainEntity
     next: "VNF | list[VNF] | str | list[str]"
     isTraversed: Optional[bool]
