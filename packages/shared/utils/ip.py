@@ -6,42 +6,6 @@ Provides utils replated IP address operations.
 from typing import Literal, TypedDict
 from ipaddress import IPv4Network, ip_address, ip_network
 
-def getMaskFromIP(ip: str) -> int:
-    """
-    Get the network mask from the given IP address.
-
-    Parameters:
-        ip (str): The IP address to get the network mask from.
-
-    Returns:
-        int: The network mask.
-    """
-
-    mask: str = ip.split("/")[1]
-
-    return int(mask)
-
-
-def getNetworkPartFromIP(ip: str) -> str:
-    """
-    Get the network part of the IP from the given IP address.
-    Assumes that the mask is a multiple of 8.
-
-    Parameters:
-        ip (str): The IP address to get the network IP from.
-
-    Returns:
-        str: The network part of the IP.
-    """
-
-    networkIP: str = ip.split("/")[0]
-    mask: int = getMaskFromIP(ip)
-    ipBlocks: "list[str]" = networkIP.split(".")
-    networkPart: str = ".".join(ipBlocks[0:mask // 8])
-
-    return networkPart
-
-
 def checkIPBelongsToNetwork(ip: str, networkIP: str) -> bool:
     """
     Check whether the given IP address belongs to the given network.
@@ -54,9 +18,7 @@ def checkIPBelongsToNetwork(ip: str, networkIP: str) -> bool:
         bool: True if the IP address belongs to the network, False otherwise.
     """
 
-    networkPart: str = getNetworkPartFromIP(networkIP)
-
-    return ip.startswith(networkPart)
+    return ip_address(ip) in ip_network(networkIP)
 
 
 def generateLocalNetworkIP(mask: int, existingIPs: "list[IPv4Network]") -> IPv4Network:
