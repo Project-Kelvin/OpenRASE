@@ -3,7 +3,8 @@ Defines the class that corresponds to teh Virtualized Infrastructure Manager in 
 """
 
 from ipaddress import IPv4Address, IPv4Network
-from typing import Any, Tuple, TypedDict
+from time import sleep
+from typing import Any, Iterator, Tuple, TypedDict
 from shared.models.config import Config
 from shared.utils.config import getConfig
 
@@ -12,7 +13,9 @@ from mininet.node import Ryu, Host
 from mininet.net import Containernet
 from shared.models.forwarding_graph import VNF, ForwardingGraph
 from shared.models.topology import Topology
+from mininet.cli import CLI
 
+from sfc.sdn_controller import SDNController
 
 class InfraManager():
     """
@@ -23,19 +26,20 @@ class InfraManager():
     ryu: Ryu = None
     topology: Topology = None
     networkIPs: "list[IPv4Network]" = []
-    hostGateways: "TypedDict[str, IPv4Address]" = {}
-    hosts: "list[Host]" = []
-    switches: "list[Host]" = []
+    hosts: "TypedDict[str, Host]" = {}
+    switches: "TypedDict[str, OVSKernelSwitch]" = {}
+    sdnController: SDNController = None
 
     def __init__(self) -> None:
         """
         Constructor for the class.
         """
+
+        self.sdnController = SDNController(self)
         self.net = Containernet()
         self.ryu = Ryu('ryu', ryuArgs="ryu.app.rest_router",
                        command="ryu-manager")
         self.net.addController(self.ryu)
-        self.net.start()
 
     def generateIP(self) -> "Tuple[IPv4Network, IPv4Address, IPv4Address]":
         """
@@ -50,8 +54,9 @@ class InfraManager():
 
         ip: IPv4Network = generateLocalNetworkIP(mask, self.networkIPs)
         self.networkIPs.append(ip)
-        ip1: IPv4Address = next(ip.hosts())
-        ip2: IPv4Address = next(ip.hosts())
+        hosts: "Iterator[IPv4Address]" = ip.hosts()
+        ip1: IPv4Address = next(hosts)
+        ip2: IPv4Address = next(hosts)
 
         return (ip, ip1, ip2)
 
@@ -65,28 +70,37 @@ class InfraManager():
 
         self.topology = topology
         cpuPeriod: int = 100000  # Docker default
+        config: Config = getConfig()
+        hostGateways: "TypedDict[str, IPv4Address]" = {}
 
         for host in topology['hosts']:
             ip: "Tuple[IPv4Address, IPv4Address]" = self.generateIP()
-            self.hostGateways[host['id']] = ip[1]
-            host: Host = self.net.addHost(
+            hostGateways[host['id']] = ip[1]
+
+            hostNode: Host = self.net.addHost(
                 host['id'],
-                ip=ip[2],
+                ip=f"{str(ip[2])}/{config['ipRange']['mask']}",
                 cpu_quota=host['cpu'] * cpuPeriod,
                 mem_limit=host['memory'],
                 memswap_limit=host['memory']
             )
-            self.hosts.append(host)
-            host.cmd(f"ip route add default via {ip[1]}")
-
+            self.hosts[host["id"]]=hostNode
+            hostNode.cmd(f"ip route add default via {str(ip[1])}")
 
         for switch in topology['switches']:
-            self.switches.append(self.net.addSwitch(
-                switch['id'], protocols='OpenFlow13'))
+            switchNode: "OVSKernelSwitch" = self.net.addSwitch(switch['id'])
+            self.switches[switch["id"]] = switchNode
+            switchNode.start([self.ryu])
 
         for link in topology['links']:
             self.net.addLink(
-                link['source'], link['destination'], bw=link['bandwidth'])
+                self.net.get(link['source']), self.net.get(link['destination']), bw=link['bandwidth'])
+
+        self.net.start()
+        sleep(5)
+
+        self.sdnController.assignSwitchIPs(topology, self.switches, hostGateways)
+
 
     def getNode(self, name: str) -> Host:
         """
@@ -141,15 +155,19 @@ class InfraManager():
             shouldContinue: bool = True
 
             while shouldContinue:
-                ipAddr: "Tuple[IPv4Address, IPv4Address]" = self.generateIP()
+                if vnfs["host"]["id"] in vnfHosts:
+                    vnfs["host"]["ip"] = vnfHosts[vnfs["host"]["id"]][2]
+                else:
+                    ipAddr: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = self.generateIP()
 
-                vnfs['host']['ip'] = ipAddr[2]
-                vnfHosts[vnfs['host']['id']] = ipAddr
+                    vnfs['host']['ip'] = str(ipAddr[2])
+                    vnfHosts[vnfs['host']['id']] = ipAddr
 
-                # Assign IP to the host
-                self.net.get(vnfs['host']['id']).cmd(
-                    f"ip addr add {ipAddr[2]} dev {vnfs['host']['id']}-eth0")
-                # TODO: Assign ipAddr[1] to the switch
+                    # Assign IP to the host
+                    self.net.get(vnfs['host']['id']).cmd(
+                        f"ip addr add {str(ipAddr[2])}/{ipAddr[0].prefixlen} dev {vnfs['host']['id']}-eth0")
+
+                    self.sdnController.assignGatewayIP(self.topology, vnfs['host']['id'], ipAddr[1], self.switches)
 
                 if isinstance(vnfs['next'], list):
                     for nextVnf in vnfs['next']:
@@ -167,8 +185,11 @@ class InfraManager():
         # Add gateways
         for name, ips in vnfHosts.items():
             host: Host = self.net.get(name)
-            for name1, ips2 in vnfHosts.items():
+            for name1, ips1 in vnfHosts.items():
                 if name != name1:
-                    host.cmd(f"ip route add {str(ips2[0])} via {ips[1]}")
+                    host.cmd(f"ip route add {str(ips1[0])} via {ips[1]}")
+
+        CLI(self.net)
+        self.net.stop()
 
         return fg
