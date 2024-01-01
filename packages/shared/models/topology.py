@@ -11,7 +11,6 @@ class Host(TypedDict):
     """
 
     id: str
-    ip: Optional["list[str]"]
     cpu: int
     """
     This is the number of CPUs to use. This is equal to CPU Quota / CPU Period.
