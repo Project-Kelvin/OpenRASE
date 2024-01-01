@@ -143,13 +143,13 @@ class InfraManager():
         vnfs: VNF = fg['vnfs']
         vnfHosts: "TypedDict[str, Tuple[IPv4Address, IPv4Address]]" = {}
 
-        def traverseVNF(vnfs: VNF, vnfHosts: "TypedDict[str, Tuple[IPv4Address, IPv4Address]]"):
+        def traverseVNF(vnfs: VNF, vnfHosts: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]"):
             """
             Traverse the VNFs in the forwarding graph and assigns IPs to the hosts.
 
             Parameters:
             vnfs (VNF): The VNF to be traversed.
-            vnfHosts (list[str]): The list of hosts in the VNF.
+            vnfHosts (TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]): The list of hosts in the VNF.
             """
 
             shouldContinue: bool = True
@@ -189,6 +189,7 @@ class InfraManager():
                 if name != name1:
                     host.cmd(f"ip route add {str(ips1[0])} via {ips[1]}")
 
+        self.sdnController.installFlows(fg, vnfHosts, self.switches)
         CLI(self.net)
         self.net.stop()
 
