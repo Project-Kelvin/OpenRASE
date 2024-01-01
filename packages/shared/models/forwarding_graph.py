@@ -21,6 +21,7 @@ class ForwardingLink:
 
     source: ChainEntity
     destination: ChainEntity
+    links: "list[str]"
 
 
 class VNF(TypedDict):
