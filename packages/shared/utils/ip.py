@@ -20,6 +20,21 @@ def checkIPBelongsToNetwork(ip: str, networkIP: str) -> bool:
 
     return ip_address(ip) in ip_network(networkIP)
 
+def incrementNetworkIP(ip: IPv4Network) -> IPv4Network:
+    """
+    Increment the given IP address.
+
+    Parameters:
+        ip (IPv4Network): The IP address to be incremented.
+
+    Returns:
+        IPv4Network: The incremented IP address.
+    """
+
+    ipInt: int = int(ip.network_address)
+    incrementor: int = 2 ** (32 - ip.prefixlen)
+
+    return ip_network((ipInt + incrementor, ip.prefixlen))
 
 def generateLocalNetworkIP(mask: int, existingIPs: "list[IPv4Network]") -> IPv4Network:
     """
@@ -46,25 +61,18 @@ def generateLocalNetworkIP(mask: int, existingIPs: "list[IPv4Network]") -> IPv4N
     ClassRange = TypedDict(
         "ClassRange", {"start": IPv4Network, "end": IPv4Network})
 
-    classAEnd = int(ip_address("10.255.255.255")) - \
-        2 ** (32 - mask) + 1
-    classBEnd = int(ip_address("172.31.255.255")) - \
-        2 ** (32 - mask) + 1
-    classCEnd = int(ip_address(
-        "192.168.255.255")) - 2 ** (32 - mask) + 1
-
     classRanges: "dict[Literal['A', 'B', 'C'], ClassRange]" = {
         "A": {
             "start": ip_network(("10.0.0.0", mask)),
-            "end": ip_network((classAEnd, mask))
+            "end": ip_network(("10.255.255.255", mask), strict=False)
         },
         "B": {
             "start": ip_network(("172.16.0.0", mask)),
-            "end": ip_network((classBEnd, mask))
+            "end": ip_network(("172.31.255.255", mask), strict=False)
         },
         "C": {
             "start": ip_network(("192.168.0.0", mask)),
-            "end": ip_network((classCEnd, mask))
+            "end": ip_network(("192.168.255.255", mask), strict=False)
         }
     }
 
@@ -75,14 +83,10 @@ def generateLocalNetworkIP(mask: int, existingIPs: "list[IPv4Network]") -> IPv4N
     if len(existingIPs) == 0:
         ipAddr = classRanges["A"]["start"]
         currentIPClass = "A"
-        ipInt: int = int(ipAddr.network_address)
-        nextIP: IPv4Network = ip_network((ipInt, mask))
+        nextIP = ipAddr
     else:
         ipAddr = existingIPs[-1]
-        ipInt: int = int(ipAddr.network_address)
-        incrementor: int = 2 ** (32 - mask)
-        nextIP: IPv4Network = ip_network(
-            (ipInt + incrementor, mask))
+        nextIP = incrementNetworkIP(ipAddr)
 
         if (ipAddr >= classRanges["A"]["start"] and ipAddr <= classRanges["A"]["end"]):
             currentIPClass = "A"
