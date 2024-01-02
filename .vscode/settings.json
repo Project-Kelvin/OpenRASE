@@ -1,10 +1,13 @@
 {
     "cSpell.words": [
+        "Caddyfile",
         "dcmd",
         "dimage",
         "dind",
+        "dpid",
         "ROOTDIRECTORY",
         "SFCC",
+        "suricata",
         "vnfs"
     ]
 }
