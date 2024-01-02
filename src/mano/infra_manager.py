@@ -15,7 +15,7 @@ from mininet.net import Containernet
 from mininet.cli import CLI
 from sfc.sdn_controller import SDNController
 from constants.topology import SERVER, SFCC, SFCC_SWITCH, TRAFFIC_GENERATOR
-from constants.docker import DIND, SERVER_IMAGE
+from constants.container import DIND, SERVER_IMAGE
 
 class InfraManager():
     """
