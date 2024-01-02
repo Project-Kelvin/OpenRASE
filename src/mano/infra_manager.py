@@ -7,14 +7,12 @@ from time import sleep
 from typing import Any, Iterator, Tuple, TypedDict
 from shared.models.config import Config
 from shared.utils.config import getConfig
-
 from shared.utils.ip import generateLocalNetworkIP
-from mininet.node import Ryu, Host
-from mininet.net import Containernet
-from shared.models.forwarding_graph import VNF, ForwardingGraph
 from shared.models.topology import Topology
+from shared.models.forwarding_graph import VNF, ForwardingGraph
+from mininet.node import Ryu, Host, OVSKernelSwitch
+from mininet.net import Containernet
 from mininet.cli import CLI
-
 from sfc.sdn_controller import SDNController
 from constants.topology import SERVER, SFCC, SFCC_SWITCH, TRAFFIC_GENERATOR
 from constants.docker import DIND, SERVER_IMAGE
@@ -91,7 +89,7 @@ class InfraManager():
         )
 
         # Add SFCC Switch
-        sfccTGSwitch: "OVSKernelSwitch" = self.net.addSwitch(SFCC_SWITCH)
+        sfccTGSwitch: OVSKernelSwitch = self.net.addSwitch(SFCC_SWITCH)
         sfccTGSwitch.start([self.ryu])
 
         # Add SFCC Switch-TG Link
@@ -150,13 +148,16 @@ class InfraManager():
             self.hosts[host["id"]]=hostNode
 
         for switch in topology['switches']:
-            switchNode: "OVSKernelSwitch" = self.net.addSwitch(switch['id'])
+            switchNode: OVSKernelSwitch = self.net.addSwitch(switch['id'])
             self.switches[switch["id"]] = switchNode
             switchNode.start([self.ryu])
 
         for link in topology['links']:
             self.net.addLink(
-                self.net.get(link['source']), self.net.get(link['destination']), bw=link['bandwidth'] if 'bandwidth' in link else None)
+                self.net.get(
+                    link['source']),
+                    self.net.get(link['destination']),
+                    bw=link['bandwidth'] if 'bandwidth' in link else None)
 
         self.net.start()
         sleep(5)
@@ -170,11 +171,11 @@ class InfraManager():
         sfcc.cmd(f"ip route add {str(ipTG[0])} via {str(ipSFCCTG[1])}")
         tg.cmd(f"ip route add {str(ipSFCCTG[0])} via {str(ipTG[1])}")
 
-        for host in self.hosts:
-            for host1 in self.hosts:
-                if self.hosts[host].name != self.hosts[host1].name:
-                    self.hosts[host].cmd(
-                        f"ip route add {str(self.hostIPs[host1][0])} via {str(self.hostIPs[host][1])}")
+        for name, host in self.hosts.items():
+            for name1, host1 in self.hosts.items():
+                if host.name != host1.name:
+                    host.cmd(
+                        f"ip route add {str(self.hostIPs[name1][0])} via {str(self.hostIPs[name][1])}")
 
         # Add SFCC switch ip addresses
         self.sdnController.assignIP(ipSFCCTG[1], sfccTGSwitch)
