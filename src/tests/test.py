@@ -1,7 +1,11 @@
+"""
+This file is used to test the functionality of the SFC Emulator.
+"""
+
 from shared.models.forwarding_graph import ForwardingGraph
 from shared.models.topology import Topology
 from mano.infra_manager import InfraManager
-from constants.topology import TRAFFIC_GENERATOR, SFCC_SWITCH, SERVER, SFCC
+from constants.topology import SERVER, SFCC
 
 infraManager = InfraManager()
 topo: Topology = {
