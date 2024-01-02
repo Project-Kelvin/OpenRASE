@@ -160,9 +160,9 @@ class SDNController():
 
         for link in links:
             sourceNetwork: IPv4Network = vnfHosts[link["source"]["id"]][0]
-            link["source"]["ip"] = vnfHosts[link["source"]["id"]][2]
+            link["source"]["ip"] = str(vnfHosts[link["source"]["id"]][2])
             destinationNetwork: IPv4Network = vnfHosts[link["destination"]["id"]][0]
-            link["destination"]["ip"] = vnfHosts[link["destination"]["id"]][2]
+            link["destination"]["ip"] = str(vnfHosts[link["destination"]["id"]][2])
 
             for index, switch in enumerate(link["links"]):
                 nextSwitch: str = link["links"][index + 1] if index < len(link["links"]) - 1 else None
