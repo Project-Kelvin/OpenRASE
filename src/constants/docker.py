@@ -2,7 +2,7 @@
 Defines constants related to Docker.
 """
 
-from utils.docker import getRegistryContainerTag
+from shared.utils.container import getRegistryContainerTag
 
 
 TAG = getRegistryContainerTag()
