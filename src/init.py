@@ -10,10 +10,10 @@ from jinja2 import Template, TemplateSyntaxError
 from shared.constants.sfc import SFC_REGISTRY
 from shared.models.config import Config
 from shared.utils.config import getConfig
-from shared.utils.container import isContainerRunning, doesContainerExist
+from shared.utils.container import getRegistryContainerTag, isContainerRunning, doesContainerExist
 from docker import from_env, DockerClient
 from models.template_data import TemplateData
-from utils.docker import getRegistryContainerTag
+
 
 client: DockerClient = from_env()
 
