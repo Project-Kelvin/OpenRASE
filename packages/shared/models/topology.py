@@ -2,7 +2,7 @@
 Defines the `Topology` dictionary type and its associated types.
 """
 
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 
 class Host(TypedDict):
