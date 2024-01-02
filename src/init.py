@@ -13,6 +13,7 @@ from shared.utils.config import getConfig
 from shared.utils.container import isContainerRunning, doesContainerExist
 from docker import from_env, DockerClient
 from models.template_data import TemplateData
+from utils.docker import getRegistryContainerTag
 
 client: DockerClient = from_env()
 
@@ -31,7 +32,7 @@ def buildDockerImage(name: str) -> str:
     """
 
     try:
-        tag: str = f"{getRegistryContainerAddr()}/{name}:latest"
+        tag: str = f"{getRegistryContainerTag()}/{name}:latest"
         client.images.build(
             path=".",
             dockerfile=f"docker/files/{name}/Dockerfile",
@@ -107,35 +108,13 @@ def stopRegistryContainer() -> None:
     client.containers.get(SFC_REGISTRY).remove()
 
 
-def getRegistryContainerIP() -> str:
-    """
-    Get the IP address of the registry container.
-
-    Returns:
-        str: The IP address of the registry container.
-    """
-
-    return client.containers.get(SFC_REGISTRY).attrs["NetworkSettings"]["IPAddress"]
-
-
-def getRegistryContainerAddr() -> str:
-    """
-    Get the tag of the registry container.
-
-    Returns:
-        str: The tag of the registry container.
-    """
-
-    return f"{getRegistryContainerIP()}:5000"
-
-
 def addRegistryToInsecureRegistries() -> None:
     """
     Add the registry to the list of insecure registries
     in the Docker daemon.json file (/etc/docker/daemon.json).
     """
 
-    addr: str = getRegistryContainerAddr()
+    addr: str = getRegistryContainerTag()
 
     try:
         with open("/etc/docker/daemon.json", "r+", encoding="utf-8") as f:
@@ -170,7 +149,7 @@ def generateTemplateData() -> TemplateData:
     config: Any = getConfig()
 
     return TemplateData(
-        SFC_REGISTRY_TAG=getRegistryContainerAddr(),
+        SFC_REGISTRY_TAG=getRegistryContainerTag(),
         SFF_NETWORK1_IP=config["sff"]["network1"]["sffIP"],
         SFF_NETWORK2_IP=config["sff"]["network2"]["sffIP"],
         SFF_NETWORK1_NETWORK_IP=config["sff"]["network1"]["networkIP"],
