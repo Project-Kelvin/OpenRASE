@@ -3,6 +3,7 @@ Provides util functions related to Docker.
 """
 
 from typing import Any
+from shared.constants.sfc import SFC_REGISTRY
 from docker import from_env, DockerClient, errors
 
 client: DockerClient = from_env()
@@ -42,3 +43,25 @@ def doesContainerExist(name: str) -> bool:
         return False
 
     return True
+
+
+def getRegistryContainerIP() -> str:
+    """
+    Get the IP address of the registry container.
+
+    Returns:
+        str: The IP address of the registry container.
+    """
+
+    return client.containers.get(SFC_REGISTRY).attrs["NetworkSettings"]["IPAddress"]
+
+
+def getRegistryContainerTag() -> str:
+    """
+    Get the tag of the registry container.
+
+    Returns:
+        str: The tag of the registry container.
+    """
+
+    return f"{getRegistryContainerIP()}:5000"
