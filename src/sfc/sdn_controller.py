@@ -12,8 +12,8 @@ from shared.models.topology import Link
 from shared.models.config import Config
 from shared.utils.config import getConfig
 from shared.models.topology import Topology
+from mininet.node import OVSKernelSwitch
 from utils.ryu import getRyuRestUrl
-
 
 class SDNController():
     """
@@ -30,7 +30,7 @@ class SDNController():
 
         self.infraManager = infraManager
 
-    def assignIP(self, ip: IPv4Address, switch: "OVSKernelSwitch") -> None:
+    def assignIP(self, ip: IPv4Address, switch: OVSKernelSwitch) -> None:
         """
         Assign an IP address to a switch.
 
@@ -58,7 +58,7 @@ class SDNController():
             raise RuntimeError(
                 f"Failed to assign IP address {str(ip)} to switch {switch.name}.\n{response.json()}")
 
-    def installFlow(self, destination: IPv4Network, gateway: IPv4Address, switch: "OVSKernelSwitch") -> None:
+    def installFlow(self, destination: IPv4Network, gateway: IPv4Address, switch: OVSKernelSwitch) -> None:
         """
         Install a flow in a switch.
 
@@ -98,8 +98,8 @@ class SDNController():
 
         Parameters:
         topology (Topology): The topology to assign IP addresses to.
-        switches ("list[OVSKernelSwitch]"): The switches to assign IP addresses to.
-        hostIPs ("TypedDict[str, (IPv4Network, IPv4Address, IPv4Address)]"):
+        switches (TypedDict[str, OVSKernelSwitch]): The switches to assign IP addresses to.
+        hostIPs (TypedDict[str, (IPv4Network, IPv4Address, IPv4Address)]):
         The gateways of the hosts in the topology.
         """
 
@@ -129,7 +129,7 @@ class SDNController():
         topology (Topology): The topology to assign IP addresses to.
         host (str): The host to assign the gateway IP address to.
         ip (IPv4Address): The IP address to assign.
-        switches ("TypedDict[str, OVSKernelSwitch]"): The switches to assign IP addresses to.
+        switches (TypedDict[str, OVSKernelSwitch]): The switches to assign IP addresses to.
         """
 
         links: "list[Link]" = topology["links"]
@@ -150,7 +150,7 @@ class SDNController():
         fg (ForwardingGraph): The forwarding graph to install flows in.
         vnfHosts (TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
         The hosts of the VNFs in the forwarding graph.
-        switches ("TypedDict[str, OVSKernelSwitch]"): The switches to install flows in.
+        switches (TypedDict[str, OVSKernelSwitch]"): The switches to install flows in.
 
         Returns:
         ForwardingGraph: The forwarding graph with the flows installed.
