@@ -13,6 +13,12 @@ class ChainEntity(TypedDict):
     id: str
     ip: Optional[str]
 
+class VNFEntity(ChainEntity):
+    """
+    Defines the `VNFEntity` dictionary type.
+    """
+
+    name: Optional[str]
 
 class ForwardingLink:
     """
@@ -30,7 +36,7 @@ class VNF(TypedDict):
     """
 
     host: ChainEntity
-    vnf: ChainEntity
+    vnf: VNFEntity
     next: "VNF | list[VNF] | str | list[str]"
     isTraversed: Optional[bool]
 
