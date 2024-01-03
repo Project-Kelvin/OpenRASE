@@ -15,18 +15,18 @@ class SFCEmulator():
     Class that emulates SFC and allows users to run experiments.
     """
 
-    mano: MANO = None
-    sfcRequestGenerator: SFCRequestGenerator = None
-    trafficGenerator: TrafficGenerator = None
+    _mano: MANO = None
+    _sfcRequestGenerator: SFCRequestGenerator = None
+    _trafficGenerator: TrafficGenerator = None
 
     def __init__(self) -> None:
         """
         Constructor for the class.
         """
 
-        self.mano = MANO()
-        self.sfcRequestGenerator = SFCRequestGenerator(self.mano.getOrchestrator())
-        self.trafficGenerator = TrafficGenerator()
+        self._mano = MANO()
+        self._sfcRequestGenerator = SFCRequestGenerator(self._mano.getOrchestrator())
+        self._trafficGenerator = TrafficGenerator()
 
     def startTest(self, topology: Topology, trafficDesign, sfcRequestDesign, evolver: Type[Evolver]) -> None:
         """
@@ -39,11 +39,11 @@ class SFCEmulator():
             evolver (Evolver): The evolver.
         """
 
-        self.mano.getInfraManager().installTopology(topology)
-        self.mano.getVNFManager().deploySFF()
-        self.sfcRequestGenerator.setDesign(sfcRequestDesign)
-        self.trafficGenerator.setDesign(trafficDesign)
+        self._mano.getInfraManager().installTopology(topology)
+        self._mano.getVNFManager().deploySFF()
+        self._sfcRequestGenerator.setDesign(sfcRequestDesign)
+        self._trafficGenerator.setDesign(trafficDesign)
 
-        evolver(self.mano.getOrchestrator(), self.trafficGenerator)
+        evolver(self._mano.getOrchestrator(), self._trafficGenerator)
 
-        self.sfcRequestGenerator.generateRequests()
+        self._sfcRequestGenerator.generateRequests()
