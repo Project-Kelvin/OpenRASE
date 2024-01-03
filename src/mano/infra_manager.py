@@ -14,8 +14,8 @@ from mininet.node import Ryu, Host, OVSKernelSwitch
 from mininet.net import Containernet
 from mininet.cli import CLI
 from sfc.sdn_controller import SDNController
-from constants.topology import SERVER, SFCC, SFCC_SWITCH, TRAFFIC_GENERATOR
-from constants.container import DIND, SERVER_IMAGE
+from constants.topology import SERVER, SFCC, SFCC_SWITCH, TERMINAL, TRAFFIC_GENERATOR
+from constants.container import DIND_IMAGE, SERVER_IMAGE, SFCC_IMAGE
 
 class InfraManager():
     """
@@ -47,7 +47,7 @@ class InfraManager():
         Generate an IP address for the network.
 
         Returns:
-        "Tuple[IPv4Network, IPv4Address, IPv4Address]": The generated IP address and the first two host IPs.
+            Tuple[IPv4Network, IPv4Address, IPv4Address]: The generated IP address and the first two host IPs.
         """
 
         config: Config = getConfig()
@@ -66,7 +66,7 @@ class InfraManager():
         Spin up the provided topology virtually using Mininet (Containernet).
 
         Parameters:
-        topology (Topology): The topology to be spun up.
+            topology (Topology): The topology to be spun up.
         """
 
         self.topology = topology
@@ -79,7 +79,7 @@ class InfraManager():
         tg: Host = self.net.addDocker(
             TRAFFIC_GENERATOR,
             ip=f"{ipTG[2]}/{ipTG[0].prefixlen}",
-            dimage=DIND,
+            dimage=DIND_IMAGE,
             privileged=True,
             dcmd="dockerd",
             volumes=[
@@ -101,13 +101,8 @@ class InfraManager():
         sfcc: Host = self.net.addDocker(
             SFCC,
             ip=f"{ipSFCCTG[2]}/{ipSFCCTG[0].prefixlen}",
-            dimage=DIND,
-            privileged=True,
-            dcmd="dockerd",
-            volumes=[
-                config["repoAbsolutePath"]
-                + "/docker/compose:/home/docker"
-            ]
+            dimage=SFCC_IMAGE,
+            dcmd="poetry run python sfc_classifier.py",
         )
         self.hosts[SFCC]=sfcc
 
@@ -122,7 +117,6 @@ class InfraManager():
             SERVER,
             ip=f"{ipServer[2]}/{ipServer[0].prefixlen}",
             dimage=SERVER_IMAGE,
-            privileged=True,
             dcmd="poetry run python server.py"
         )
         self.hosts[SERVER]=server
@@ -137,12 +131,14 @@ class InfraManager():
                 cpu_quota=host['cpu'] * cpuPeriod,
                 mem_limit=host['memory'],
                 memswap_limit=host['memory'],
-                dimage=DIND,
+                dimage=DIND_IMAGE,
                 privileged=True,
                 dcmd="dockerd",
                 volumes=[
                     config["repoAbsolutePath"]
-                    + "/docker/files:/home/docker"
+                    + "/docker/files:/home/docker/files",
+                    config["repoAbsolutePath"]
+                    + "/docker/compose:/home/docker/compose"
                 ]
             )
             self.hosts[host["id"]]=hostNode
@@ -189,10 +185,10 @@ class InfraManager():
         Get the node with the given name in the topology.
 
         Parameters:
-        name (str): The name of the node to be returned.
+            name (str): The name of the node to be returned.
 
         Returns:
-        Host: The node with the given name in the topology.
+            Host: The node with the given name in the topology.
         """
 
         return self.net.get(name)
@@ -204,22 +200,22 @@ class InfraManager():
 
         return self.switches
 
-    def getHosts(self) -> Any:
+    def getHostIPs(self) -> "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]":
         """
-        Get the hosts in the topology.
+        Get the IPs of the hosts in the topology.
         """
 
-        return self.hosts
+        return self.hostIPs
 
     def assignIPs(self, fg: ForwardingGraph) -> ForwardingGraph:
         """
         Assign IPs to the hosts in the topology.
 
         Parameters:
-        fg (ForwardingGraph): The forwarding graph to be used to assign IPs.
+            fg (ForwardingGraph): The forwarding graph to be used to assign IPs.
 
         Returns:
-        ForwardingGraph: The forwarding graph with the IPs assigned.
+            ForwardingGraph: The forwarding graph with the IPs assigned.
         """
 
         vnfs: VNF = fg['vnfs']
@@ -232,8 +228,9 @@ class InfraManager():
             Traverse the VNFs in the forwarding graph and assigns IPs to the hosts.
 
             Parameters:
-            vnfs (VNF): The VNF to be traversed.
-            vnfHosts (TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]): The list of hosts in the VNF.
+                vnfs (VNF): The VNF to be traversed.
+                vnfHosts (TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
+                    The list of hosts in the VNF.
             """
 
             shouldContinue: bool = True
@@ -261,7 +258,7 @@ class InfraManager():
                 else:
                     vnfs = vnfs['next']
 
-                if vnfs == "terminal":
+                if vnfs == TERMINAL:
                     shouldContinue = False
 
         traverseVNF(vnfs, vnfHosts)
@@ -275,7 +272,18 @@ class InfraManager():
 
         fg = self.sdnController.installFlows(fg, vnfHosts, self.switches)
 
-        CLI(self.net)
+        return fg
+
+    def stopNetwork(self) -> None:
+        """
+        Stop the network.
+        """
+
         self.net.stop()
 
-        return fg
+    def startCLI(self) -> None:
+        """
+        Start the CLI.
+        """
+
+        CLI(self.net)
