@@ -21,7 +21,7 @@ class SDNController():
     Class that communicates with the Ryu SDN controller.
     """
 
-    switchLinks: "TypedDict[str, IPv4Address]" = {}
+    _switchLinks: "TypedDict[str, IPv4Address]" = {}
 
     def assignIP(self, ip: IPv4Address, switch: OVSKernelSwitch) -> None:
         """
@@ -51,7 +51,7 @@ class SDNController():
             raise RuntimeError(
                 f"Failed to assign IP address {str(ip)} to switch {switch.name}.\n{response.json()}")
 
-    def installFlow(self, destination: IPv4Network, gateway: IPv4Address, switch: OVSKernelSwitch) -> None:
+    def _installFlow(self, destination: IPv4Network, gateway: IPv4Address, switch: OVSKernelSwitch) -> None:
         """
         Install a flow in a switch.
 
@@ -104,15 +104,15 @@ class SDNController():
                 _networkAddr, addr1, addr2 = generateIP(existingIPs)
                 self.assignIP(addr1, switches[link["source"]])
                 self.assignIP(addr2, switches[link["destination"]])
-                self.switchLinks[f'{link["source"]}-{link["destination"]}'] = addr1
-                self.switchLinks[f'{link["destination"]}-{link["source"]}'] = addr2
+                self._switchLinks[f'{link["source"]}-{link["destination"]}'] = addr1
+                self._switchLinks[f'{link["destination"]}-{link["source"]}'] = addr2
             else:
                 if link["source"] in switches:
                     self.assignIP(hostIPs[link["destination"]][1], switches[link["source"]])
-                    self.switchLinks[f'{link["source"]}-{link["destination"]}'] = hostIPs[link["destination"]][1]
+                    self._switchLinks[f'{link["source"]}-{link["destination"]}'] = hostIPs[link["destination"]][1]
                 elif link["destination"] in switches:
                     self.assignIP(hostIPs[link["source"]][1], switches[link["destination"]])
-                    self.switchLinks[f'{link["source"]}-{link["destination"]}'] = hostIPs[link["source"]][1]
+                    self._switchLinks[f'{link["source"]}-{link["destination"]}'] = hostIPs[link["source"]][1]
 
     def assignGatewayIP(self, topology: Topology, host: str, ip: IPv4Address,
                         switches: "TypedDict[str, OVSKernelSwitch]") -> None:
@@ -163,10 +163,10 @@ class SDNController():
                 prevSwitch: str = link["links"][index - 1] if index > 0 else None
 
                 if nextSwitch is not None:
-                    self.installFlow(destinationNetwork, self.switchLinks[f"{nextSwitch}-{switch}"],
+                    self._installFlow(destinationNetwork, self._switchLinks[f"{nextSwitch}-{switch}"],
                                      switches[switch])
                 if prevSwitch is not None:
-                    self.installFlow(sourceNetwork, self.switchLinks[f"{prevSwitch}-{switch}"],
+                    self._installFlow(sourceNetwork, self._switchLinks[f"{prevSwitch}-{switch}"],
                                      switches[switch])
 
         return fg
