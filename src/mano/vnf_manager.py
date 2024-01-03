@@ -18,6 +18,7 @@ from docker.types import IPAMConfig, IPAMPool
 from docker.models.containers import Container
 from docker import DockerClient, from_env
 
+
 class VNFManager():
     """
     Class that corresponds to the VNF Manager in the NFV architecture.
@@ -67,19 +68,21 @@ class VNFManager():
         def deploySFFinNode(host: str):
             dindClient: DockerClient = self.connectToDind(host)
             dindClient.networks.create(DIND_NETWORK1,
-                                        ipam=IPAMConfig(pool_configs=[IPAMPool(subnet=DIND_NW1_IP)]))
+                                       ipam=IPAMConfig(pool_configs=[IPAMPool(subnet=DIND_NW1_IP)]))
             dindClient.networks.create(DIND_NETWORK2,
-                                        ipam=IPAMConfig(pool_configs=[IPAMPool(subnet=DIND_NW2_IP)]))
+                                       ipam=IPAMConfig(pool_configs=[IPAMPool(subnet=DIND_NW2_IP)]))
 
             container: Any = dindClient.containers.run(
                 SFF_IMAGE,
                 detach=True,
                 name=SFF,
-                ports={80:80}
+                ports={80: 80}
             )
 
-            dindClient.networks.get(DIND_NETWORK1).connect(container.id, ipv4_address=SFF_IP1)
-            dindClient.networks.get(DIND_NETWORK2).connect(container.id, ipv4_address=SFF_IP2)
+            dindClient.networks.get(DIND_NETWORK1).connect(
+                container.id, ipv4_address=SFF_IP1)
+            dindClient.networks.get(DIND_NETWORK2).connect(
+                container.id, ipv4_address=SFF_IP2)
 
         for host in hostIPs:
             if host != SERVER and host != SFCC:
@@ -103,7 +106,8 @@ class VNFManager():
         vnfs: VNF = updatedFG["vnfs"]
         sfcId: str = updatedFG["sfcID"]
         vnfList: "list[str]" = []
-        sharedVolumes: "TypedDict[str, list[str]]" = getConfig()["vnfs"]["sharedVolumes"]
+        sharedVolumes: "TypedDict[str, list[str]]" = getConfig()[
+            "vnfs"]["sharedVolumes"]
         threads: "list[Thread]" = []
 
         def deployVNF(vnfs: VNF):
@@ -170,5 +174,25 @@ class VNFManager():
 
         traverseVNF(vnfs)
         self.forwardingGraphs.append(updatedFG)
+
+    def deployForwardingGraphs(self, fgs: "list[ForwardingGraph]") -> None:
+        """
+        Deploy the forwarding graphs.
+
+        Parameters:
+            fgs (list[ForwardingGraph]): The forwarding graphs to be deployed.
+        """
+
+        threads: "list[Thread]" = []
+        for fg in fgs:
+            thread: Thread = Thread(
+                target=self.deployForwardingGraph, args=(fg,))
+            thread.start()
+
+            threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
         self.infraManager.startCLI()
         self.infraManager.stopNetwork()
