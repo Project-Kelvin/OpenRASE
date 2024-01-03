@@ -15,18 +15,18 @@ class Orchestrator():
     Class that corresponds to the Orchestrator class in the NFV architecture.
     """
 
-    sfcRequests: "list[SFCRequest]" = []
-    infraManager: InfraManager = None
-    vnfManager: VNFManager = None
-    sdnController: SDNController = None
+    _sfcRequests: "list[SFCRequest]" = []
+    _infraManager: InfraManager = None
+    _vnfManager: VNFManager = None
+    _sdnController: SDNController = None
 
     def __init__(self,
                  infraManager: InfraManager,
                  vnfManager: VNFManager,
                  sdnController: SDNController) -> None:
-        self.infraManager = infraManager
-        self.vnfManager = vnfManager
-        self.sdnController = sdnController
+        self._infraManager = infraManager
+        self._vnfManager = vnfManager
+        self._sdnController = sdnController
 
     def sendSFCRequests(self, sfcRequests: "list[SFCRequest]") -> None:
         """
@@ -47,18 +47,18 @@ class Orchestrator():
             fgs (list[ForwardingGraph]): The list of forwarding graphs.
         """
 
-        self.vnfManager.deployForwardingGraphs(fgs)
+        self._vnfManager.deployForwardingGraphs(fgs)
 
     def getTopology(self) -> Topology:
         """
         Get the topology from the infrastructure manager.
         """
 
-        self.infraManager.getTopology()
+        self._infraManager.getTopology()
 
     def getTelemetry(self) -> None:
         """
         Get the telemetry from the infrastructure manager.
         """
 
-        self.infraManager.getTelemetry()
+        self._infraManager.getTelemetry()
