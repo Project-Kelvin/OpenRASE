@@ -4,6 +4,7 @@ This file is used to test the functionality of the SFC Emulator.
 
 from time import sleep
 from shared.models.forwarding_graph import ForwardingGraph
+from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from mano.infra_manager import InfraManager
 from mano.vnf_manager import VNFManager
@@ -111,6 +112,13 @@ fg: ForwardingGraph = {
             "links": ["s2"]
         }
     ]
+}
+
+sfcRequest: SFCRequest = {
+    "sfcrID": "sfcr1",
+    "latency": 100,
+    "vnfs": ["lb, ha, tm, waf"],
+    "strictOrder": ["waf, ha"],
 }
 
 infraManager.installTopology(topo)
