@@ -65,3 +65,16 @@ def getRegistryContainerTag() -> str:
     """
 
     return f"{getRegistryContainerIP()}:5000"
+
+def getVNFContainerTag(vnf: str) -> str:
+    """
+    Get the tag of the VNF container.
+
+    Parameters:
+        vnf (str): The name of the VNF.
+
+    Returns:
+        str: The tag of the VNF container.
+    """
+
+    return f"{getRegistryContainerTag()}/{vnf}:latest"
