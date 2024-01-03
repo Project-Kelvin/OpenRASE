@@ -5,6 +5,8 @@
         "dimage",
         "dind",
         "dpid",
+        "IPAM",
+        "ncap",
         "ROOTDIRECTORY",
         "SFCC",
         "suricata",
