@@ -2,12 +2,14 @@
 This file is used to test the functionality of the SFC Emulator.
 """
 
+from time import sleep
 from shared.models.forwarding_graph import ForwardingGraph
 from shared.models.topology import Topology
 from mano.infra_manager import InfraManager
-from constants.topology import SERVER, SFCC
+from mano.vnf_manager import VNFManager
+from constants.topology import SERVER, SFCC, TERMINAL
 
-infraManager = InfraManager()
+infraManager: InfraManager = InfraManager()
 topo: Topology = {
     "hosts": [
         {
@@ -63,20 +65,20 @@ fg: ForwardingGraph = {
             "id": "h1"
         },
         "vnf": {
-            "id": "vnf1"
+            "id": "waf"
         },
         "next": {
             "host": {
                 "id": "h2"
             },
             "vnf": {
-                "id": "vnf2"
+                "id": "ha"
             },
             "next": {
                 "host":{
                     "id": SERVER
                 },
-                "next": "terminal"
+                "next": TERMINAL
             }
         }
     },
@@ -112,4 +114,7 @@ fg: ForwardingGraph = {
 }
 
 infraManager.installTopology(topo)
-print(infraManager.assignIPs(fg))
+vnfManager: VNFManager = VNFManager(infraManager)
+sleep(10)
+vnfManager.deploySFF()
+vnfManager.deployForwardingGraph(fg)
