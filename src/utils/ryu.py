@@ -9,10 +9,10 @@ def getRyuRestUrl(switchID: str) -> str:
     Get the URL of the Ryu REST API.
 
     Parameters:
-    switchID (str): The ID of the switch.
+        switchID (str): The ID of the switch.
 
     Returns:
-    str: The URL of the Ryu REST API.
+        str: The URL of the Ryu REST API.
     """
 
 
