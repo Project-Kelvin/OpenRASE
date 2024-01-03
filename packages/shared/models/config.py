@@ -56,13 +56,20 @@ class General(TypedDict):
     port: int
 
 
-
 class IPRange(TypedDict):
     """
     Defines the `IPRange` dictionary type.
     """
 
     mask: int
+
+
+class VNFs(TypedDict):
+    """
+    Defines the `VNFs` dictionary type.
+    """
+
+    sharedVolumes: "TypedDict[str, list[str]]"
 
 
 class Config(TypedDict):
@@ -78,3 +85,4 @@ class Config(TypedDict):
     repoAbsolutePath: str
     templates: "list[str]"
     ipRange: IPRange
+    vnfs: VNFs
