@@ -23,27 +23,27 @@ class InfraManager():
     Class that corresponds to the Virtualized Infrastructure Manager in the NFV architecture.
     """
 
-    net: Any = None
-    ryu: Ryu = None
-    topology: Topology = None
-    networkIPs: "list[IPv4Network]" = []
-    hosts: "TypedDict[str, Host]" = {}
-    switches: "TypedDict[str, OVSKernelSwitch]" = {}
-    sdnController: SDNController = None
-    hostIPs: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = {}
-    telemetry: Telemetry = None
+    _net: Any = None
+    _ryu: Ryu = None
+    _topology: Topology = None
+    _networkIPs: "list[IPv4Network]" = []
+    _hosts: "TypedDict[str, Host]" = {}
+    _switches: "TypedDict[str, OVSKernelSwitch]" = {}
+    _sdnController: SDNController = None
+    _hostIPs: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = {}
+    _telemetry: Telemetry = None
 
     def __init__(self, sdnController: SDNController) -> None:
         """
         Constructor for the class.
         """
 
-        self.sdnController = sdnController
-        self.net = Containernet()
-        self.ryu = Ryu('ryu', ryuArgs="ryu.app.rest_router",
+        self._sdnController = sdnController
+        self._net = Containernet()
+        self._ryu = Ryu('ryu', ryuArgs="ryu.app.rest_router",
                        command="ryu-manager")
-        self.net.addController(self.ryu)
-        self.telemetry = Telemetry()
+        self._net.addController(self._ryu)
+        self._telemetry = Telemetry()
 
     def installTopology(self, topology: Topology) -> None:
         """
@@ -53,14 +53,14 @@ class InfraManager():
             topology (Topology): The topology to be spun up.
         """
 
-        self.topology = topology
+        self._topology = topology
         cpuPeriod: int = 100000  # Docker default
         config: Config = getConfig()
 
         # Add traffic generator
-        ipTG: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(self.networkIPs)
+        ipTG: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(self._networkIPs)
 
-        tg: Host = self.net.addDocker(
+        tg: Host = self._net.addDocker(
             TRAFFIC_GENERATOR,
             ip=f"{ipTG[2]}/{ipTG[0].prefixlen}",
             dimage=DIND_IMAGE,
@@ -73,46 +73,46 @@ class InfraManager():
         )
 
         # Add SFCC Switch
-        sfccTGSwitch: OVSKernelSwitch = self.net.addSwitch(SFCC_SWITCH)
-        sfccTGSwitch.start([self.ryu])
+        sfccTGSwitch: OVSKernelSwitch = self._net.addSwitch(SFCC_SWITCH)
+        sfccTGSwitch.start([self._ryu])
 
         # Add SFCC Switch-TG Link
-        self.net.addLink(tg, sfccTGSwitch)
+        self._net.addLink(tg, sfccTGSwitch)
 
         # Add SFCC
         ipSFCCTG: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
-            self.networkIPs)
+            self._networkIPs)
 
-        sfcc: Host = self.net.addDocker(
+        sfcc: Host = self._net.addDocker(
             SFCC,
             ip=f"{ipSFCCTG[2]}/{ipSFCCTG[0].prefixlen}",
             dimage=SFCC_IMAGE,
             dcmd="poetry run python sfc_classifier.py",
         )
-        self.hosts[SFCC]=sfcc
+        self._hosts[SFCC]=sfcc
 
         # Add SFCC Link
-        self.net.addLink(sfccTGSwitch, sfcc)
+        self._net.addLink(sfccTGSwitch, sfcc)
 
         # Add server
         ipServer: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
-            self.networkIPs)
-        self.hostIPs[SERVER] = ipServer
+            self._networkIPs)
+        self._hostIPs[SERVER] = ipServer
 
-        server: Host = self.net.addDocker(
+        server: Host = self._net.addDocker(
             SERVER,
             ip=f"{ipServer[2]}/{ipServer[0].prefixlen}",
             dimage=SERVER_IMAGE,
             dcmd="poetry run python server.py"
         )
-        self.hosts[SERVER]=server
+        self._hosts[SERVER]=server
 
         for host in topology['hosts']:
             ip: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
-                self.networkIPs)
-            self.hostIPs[host["id"]] = ip
+                self._networkIPs)
+            self._hostIPs[host["id"]] = ip
 
-            hostNode: Host = self.net.addDocker(
+            hostNode: Host = self._net.addDocker(
                 host['id'],
                 ip=f"{str(ip[2])}/{ip[0].prefixlen}",
                 cpu_quota=host['cpu'] * cpuPeriod,
@@ -128,72 +128,51 @@ class InfraManager():
                     + "/docker/compose:/home/docker/compose"
                 ]
             )
-            self.hosts[host["id"]]=hostNode
+            self._hosts[host["id"]]=hostNode
 
         for switch in topology['switches']:
-            switchNode: OVSKernelSwitch = self.net.addSwitch(switch['id'])
-            self.switches[switch["id"]] = switchNode
-            switchNode.start([self.ryu])
+            switchNode: OVSKernelSwitch = self._net.addSwitch(switch['id'])
+            self._switches[switch["id"]] = switchNode
+            switchNode.start([self._ryu])
 
         for link in topology['links']:
-            self.net.addLink(
-                self.net.get(
+            self._net.addLink(
+                self._net.get(
                     link['source']),
-                    self.net.get(link['destination']),
+                    self._net.get(link['destination']),
                     bw=link['bandwidth'] if 'bandwidth' in link else None)
 
-        self.net.start()
+        self._net.start()
         sleep(5)
 
         # Add ip to SFCC's interface connecting to the switch that connects to the rest of the topology.
         ipSFCCTopo: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
-            self.networkIPs)
+            self._networkIPs)
         sfcc.setIP(str(ipSFCCTopo[2]), prefixLen=ipSFCCTopo[0].prefixlen, intf=f"{sfcc.name}-eth1")
-        self.hostIPs[SFCC] = ipSFCCTopo
+        self._hostIPs[SFCC] = ipSFCCTopo
 
         # Add routes
         sfcc.cmd(f"ip route add {str(ipTG[0])} via {str(ipSFCCTG[1])}")
         tg.cmd(f"ip route add {str(ipSFCCTG[0])} via {str(ipTG[1])}")
 
-        for name, host in self.hosts.items():
-            for name1, host1 in self.hosts.items():
+        for name, host in self._hosts.items():
+            for name1, host1 in self._hosts.items():
                 if host.name != host1.name:
                     host.cmd(
-                        f"ip route add {str(self.hostIPs[name1][0])} via {str(self.hostIPs[name][1])}")
+                        f"ip route add {str(self._hostIPs[name1][0])} via {str(self._hostIPs[name][1])}")
 
         # Add SFCC switch ip addresses
-        self.sdnController.assignIP(ipSFCCTG[1], sfccTGSwitch)
-        self.sdnController.assignIP(ipTG[1], sfccTGSwitch)
+        self._sdnController.assignIP(ipSFCCTG[1], sfccTGSwitch)
+        self._sdnController.assignIP(ipTG[1], sfccTGSwitch)
 
-        self.sdnController.assignSwitchIPs(topology, self.switches, self.hostIPs, self.networkIPs)
-
-
-    def getNode(self, name: str) -> Host:
-        """
-        Get the node with the given name in the topology.
-
-        Parameters:
-            name (str): The name of the node to be returned.
-
-        Returns:
-            Host: The node with the given name in the topology.
-        """
-
-        return self.net.get(name)
-
-    def getSwitches(self) -> Any:
-        """
-        Get the switches in the topology.
-        """
-
-        return self.switches
+        self._sdnController.assignSwitchIPs(topology, self._switches, self._hostIPs, self._networkIPs)
 
     def getHostIPs(self) -> "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]":
         """
         Get the IPs of the hosts in the topology.
         """
 
-        return self.hostIPs
+        return self._hostIPs
 
     def assignIPs(self, fg: ForwardingGraph) -> ForwardingGraph:
         """
@@ -208,7 +187,7 @@ class InfraManager():
 
         vnfs: VNF = fg['vnfs']
         vnfHosts: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = {
-            SFCC: self.hostIPs[SFCC]
+            SFCC: self._hostIPs[SFCC]
         }
 
         def traverseVNF(vnfs: VNF, vnfHosts: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]"):
@@ -228,16 +207,16 @@ class InfraManager():
                     vnfs["host"]["ip"] = vnfHosts[vnfs["host"]["id"]][2]
                 else:
                     ipAddr: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
-                        self.networkIPs)
+                        self._networkIPs)
 
                     vnfs['host']['ip'] = str(ipAddr[2])
                     vnfHosts[vnfs['host']['id']] = ipAddr
 
                     # Assign IP to the host
-                    self.net.get(vnfs['host']['id']).cmd(
+                    self._net.get(vnfs['host']['id']).cmd(
                         f"ip addr add {str(ipAddr[2])}/{ipAddr[0].prefixlen} dev {vnfs['host']['id']}-eth0")
 
-                    self.sdnController.assignGatewayIP(self.topology, vnfs['host']['id'], ipAddr[1], self.switches)
+                    self._sdnController.assignGatewayIP(self._topology, vnfs['host']['id'], ipAddr[1], self._switches)
 
                 if isinstance(vnfs['next'], list):
                     for nextVnf in vnfs['next']:
@@ -254,12 +233,12 @@ class InfraManager():
 
         # Add routes
         for name, ips in vnfHosts.items():
-            host: Host = self.net.get(name)
+            host: Host = self._net.get(name)
             for name1, ips1 in vnfHosts.items():
                 if name != name1:
                     host.cmd(f"ip route add {str(ips1[0])} via {ips[1]}")
 
-        fg = self.sdnController.installFlows(fg, vnfHosts, self.switches)
+        fg = self._sdnController.installFlows(fg, vnfHosts, self._switches)
 
         return fg
 
@@ -268,25 +247,25 @@ class InfraManager():
         Stop the network.
         """
 
-        self.net.stop()
+        self._net.stop()
 
     def startCLI(self) -> None:
         """
         Start the CLI.
         """
 
-        CLI(self.net)
+        CLI(self._net)
 
     def getTopology(self) -> Topology:
         """
         Get the topology.
         """
 
-        return self.topology
+        return self._topology
 
     def getTelemetry(self) -> Telemetry:
         """
         Get the telemetry.
         """
 
-        return self.telemetry
+        return self._telemetry
