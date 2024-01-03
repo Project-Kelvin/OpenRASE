@@ -13,21 +13,21 @@ class MANO():
     Class that performs Management and Operations functions.
     """
 
-    infraManager: InfraManager = None
-    vnfManager: VNFManager = None
-    sdnController: SDNController = None
-    orchestrator: Orchestrator = None
+    _infraManager: InfraManager = None
+    _vnfManager: VNFManager = None
+    _sdnController: SDNController = None
+    _orchestrator: Orchestrator = None
 
     def __init__(self) -> None:
         """
         Constructor for the class.
         """
 
-        self.sdnController = SDNController()
-        self.infraManager = InfraManager(self.sdnController)
-        self.vnfManager = VNFManager(self.infraManager)
-        self.orchestrator = Orchestrator(
-            self.infraManager, self.vnfManager, self.sdnController)
+        self._sdnController = SDNController()
+        self._infraManager = InfraManager(self._sdnController)
+        self._vnfManager = VNFManager(self._infraManager)
+        self._orchestrator = Orchestrator(
+            self._infraManager, self._vnfManager, self._sdnController)
 
     def getInfraManager(self) -> InfraManager:
         """
@@ -37,7 +37,7 @@ class MANO():
             InfraManager: The infrastructure manager.
         """
 
-        return self.infraManager
+        return self._infraManager
 
     def getVNFManager(self) -> VNFManager:
         """
@@ -47,7 +47,7 @@ class MANO():
             VNFManager: The VNF manager.
         """
 
-        return self.vnfManager
+        return self._vnfManager
 
     def getSDNController(self) -> SDNController:
         """
@@ -57,7 +57,7 @@ class MANO():
             SDNController: The SDN controller.
         """
 
-        return self.sdnController
+        return self._sdnController
 
     def getOrchestrator(self) -> Orchestrator:
         """
@@ -67,4 +67,4 @@ class MANO():
             Orchestrator: The orchestrator.
         """
 
-        return self.orchestrator
+        return self._orchestrator
