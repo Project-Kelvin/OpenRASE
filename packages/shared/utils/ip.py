@@ -3,8 +3,11 @@ Provides utils replated IP address operations.
 """
 
 
-from typing import Literal, TypedDict
-from ipaddress import IPv4Network, ip_address, ip_network
+from typing import Iterator, Literal, Tuple, TypedDict
+from ipaddress import IPv4Address, IPv4Network, ip_address, ip_network
+
+from shared.models.config import Config
+from shared.utils.config import getConfig
 
 def checkIPBelongsToNetwork(ip: str, networkIP: str) -> bool:
     """
@@ -103,3 +106,26 @@ def generateLocalNetworkIP(mask: int, existingIPs: "list[IPv4Network]") -> IPv4N
                 (classRanges[classes[classes.index(currentIPClass) + 1]]["start"].network_address, mask))
 
     return nextIP
+
+
+def generateIP(existingIPs: "list[IPv4Network]") -> "Tuple[IPv4Network, IPv4Address, IPv4Address]":
+    """
+    Generate an IP address for the network.
+
+    Parameters:
+        existingIPs (list[IPv4Network]): The list of existing IPs in the network.
+
+    Returns:
+        Tuple[IPv4Network, IPv4Address, IPv4Address]: The generated IP address and the first two host IPs.
+    """
+
+    config: Config = getConfig()
+    mask: int = config['ipRange']['mask']
+
+    ip: IPv4Network = generateLocalNetworkIP(mask,existingIPs)
+    existingIPs.append(ip)
+    hosts: "Iterator[IPv4Address]" = ip.hosts()
+    ip1: IPv4Address = next(hosts)
+    ip2: IPv4Address = next(hosts)
+
+    return (ip, ip1, ip2)

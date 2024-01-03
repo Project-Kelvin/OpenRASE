@@ -1,19 +1,20 @@
 """
-Defines the class that corresponds to teh Virtualized Infrastructure Manager in the NFV architecture.
+Defines the class that corresponds to the Virtualized Infrastructure Manager in the NFV architecture.
 """
 
 from ipaddress import IPv4Address, IPv4Network
 from time import sleep
-from typing import Any, Iterator, Tuple, TypedDict
+from typing import Any, Tuple, TypedDict
 from shared.models.config import Config
 from shared.utils.config import getConfig
-from shared.utils.ip import generateLocalNetworkIP
+from shared.utils.ip import generateIP
 from shared.models.topology import Topology
 from shared.models.forwarding_graph import VNF, ForwardingGraph
 from mininet.node import Ryu, Host, OVSKernelSwitch
 from mininet.net import Containernet
 from mininet.cli import CLI
-from sfc.sdn_controller import SDNController
+from mano.sdn_controller import SDNController
+from mano.telemetry import Telemetry
 from constants.topology import SERVER, SFCC, SFCC_SWITCH, TERMINAL, TRAFFIC_GENERATOR
 from constants.container import DIND_IMAGE, SERVER_IMAGE, SFCC_IMAGE
 
@@ -30,36 +31,19 @@ class InfraManager():
     switches: "TypedDict[str, OVSKernelSwitch]" = {}
     sdnController: SDNController = None
     hostIPs: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = {}
+    telemetry: Telemetry = None
 
-    def __init__(self) -> None:
+    def __init__(self, sdnController: SDNController) -> None:
         """
         Constructor for the class.
         """
 
-        self.sdnController = SDNController(self)
+        self.sdnController = sdnController
         self.net = Containernet()
         self.ryu = Ryu('ryu', ryuArgs="ryu.app.rest_router",
                        command="ryu-manager")
         self.net.addController(self.ryu)
-
-    def generateIP(self) -> "Tuple[IPv4Network, IPv4Address, IPv4Address]":
-        """
-        Generate an IP address for the network.
-
-        Returns:
-            Tuple[IPv4Network, IPv4Address, IPv4Address]: The generated IP address and the first two host IPs.
-        """
-
-        config: Config = getConfig()
-        mask: int = config['ipRange']['mask']
-
-        ip: IPv4Network = generateLocalNetworkIP(mask, self.networkIPs)
-        self.networkIPs.append(ip)
-        hosts: "Iterator[IPv4Address]" = ip.hosts()
-        ip1: IPv4Address = next(hosts)
-        ip2: IPv4Address = next(hosts)
-
-        return (ip, ip1, ip2)
+        self.telemetry = Telemetry()
 
     def installTopology(self, topology: Topology) -> None:
         """
@@ -74,7 +58,7 @@ class InfraManager():
         config: Config = getConfig()
 
         # Add traffic generator
-        ipTG: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = self.generateIP()
+        ipTG: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(self.networkIPs)
 
         tg: Host = self.net.addDocker(
             TRAFFIC_GENERATOR,
@@ -96,7 +80,8 @@ class InfraManager():
         self.net.addLink(tg, sfccTGSwitch)
 
         # Add SFCC
-        ipSFCCTG: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = self.generateIP()
+        ipSFCCTG: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
+            self.networkIPs)
 
         sfcc: Host = self.net.addDocker(
             SFCC,
@@ -110,7 +95,8 @@ class InfraManager():
         self.net.addLink(sfccTGSwitch, sfcc)
 
         # Add server
-        ipServer: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = self.generateIP()
+        ipServer: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
+            self.networkIPs)
         self.hostIPs[SERVER] = ipServer
 
         server: Host = self.net.addDocker(
@@ -122,7 +108,8 @@ class InfraManager():
         self.hosts[SERVER]=server
 
         for host in topology['hosts']:
-            ip: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = self.generateIP()
+            ip: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
+                self.networkIPs)
             self.hostIPs[host["id"]] = ip
 
             hostNode: Host = self.net.addDocker(
@@ -158,8 +145,9 @@ class InfraManager():
         self.net.start()
         sleep(5)
 
-        # Add ip to SFCC's interface connecting to the switch that connects to the rest of teh topology.
-        ipSFCCTopo: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = self.generateIP()
+        # Add ip to SFCC's interface connecting to the switch that connects to the rest of the topology.
+        ipSFCCTopo: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
+            self.networkIPs)
         sfcc.setIP(str(ipSFCCTopo[2]), prefixLen=ipSFCCTopo[0].prefixlen, intf=f"{sfcc.name}-eth1")
         self.hostIPs[SFCC] = ipSFCCTopo
 
@@ -177,7 +165,7 @@ class InfraManager():
         self.sdnController.assignIP(ipSFCCTG[1], sfccTGSwitch)
         self.sdnController.assignIP(ipTG[1], sfccTGSwitch)
 
-        self.sdnController.assignSwitchIPs(topology, self.switches, self.hostIPs)
+        self.sdnController.assignSwitchIPs(topology, self.switches, self.hostIPs, self.networkIPs)
 
 
     def getNode(self, name: str) -> Host:
@@ -239,7 +227,8 @@ class InfraManager():
                 if vnfs["host"]["id"] in vnfHosts:
                     vnfs["host"]["ip"] = vnfHosts[vnfs["host"]["id"]][2]
                 else:
-                    ipAddr: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = self.generateIP()
+                    ipAddr: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
+                        self.networkIPs)
 
                     vnfs['host']['ip'] = str(ipAddr[2])
                     vnfHosts[vnfs['host']['id']] = ipAddr
@@ -287,3 +276,17 @@ class InfraManager():
         """
 
         CLI(self.net)
+
+    def getTopology(self) -> Topology:
+        """
+        Get the topology.
+        """
+
+        return self.topology
+
+    def getTelemetry(self) -> Telemetry:
+        """
+        Get the telemetry.
+        """
+
+        return self.telemetry
