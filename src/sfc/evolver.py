@@ -13,14 +13,14 @@ class Evolver(ABC):
     Abstract class that defines the interface for the evolver.
     """
 
-    sfcRequests: "list[SFCRequest]" = []
-    trafficGenerator: TrafficGenerator = None
-    orchestrator: Orchestrator = None
+    _sfcRequests: "list[SFCRequest]" = []
+    _trafficGenerator: TrafficGenerator = None
+    _orchestrator: Orchestrator = None
 
     def __init__(self, orchestrator: Orchestrator, trafficGenerator: TrafficGenerator) -> None:
         super().__init__()
-        self.orchestrator = orchestrator
-        self.trafficGenerator = trafficGenerator
+        self._orchestrator = orchestrator
+        self._trafficGenerator = trafficGenerator
 
     @abstractmethod
     def generateForwardingGraphs(self, sfcRequests: "list[SFCRequest]") -> None:
@@ -31,6 +31,6 @@ class Evolver(ABC):
             sfcRequests (list[SFCRequest]): The list of SFC requests.
         """
 
-        self.sfcRequests.append(sfcRequests)
+        self._sfcRequests.append(sfcRequests)
 
         pass
