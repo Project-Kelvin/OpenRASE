@@ -11,14 +11,14 @@ class SFCRequestGenerator():
     Class that generates SFC requests.
     """
 
-    orchestrator: Orchestrator = None
+    _orchestrator: Orchestrator = None
 
     def __init__(self, orchestrator: Orchestrator) -> None:
         """
         Constructor for the class.
         """
 
-        self.orchestrator = orchestrator
+        self._orchestrator = orchestrator
 
     def setDesign(self, design) -> None:
         """
@@ -36,4 +36,4 @@ class SFCRequestGenerator():
         """
 
         sfcRequests: "list[SFCRequest]" = []
-        self.orchestrator.sendSFCRequests(sfcRequests)
+        self._orchestrator.sendSFCRequests(sfcRequests)
