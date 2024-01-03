@@ -35,11 +35,11 @@ class SDNController():
         Assign an IP address to a switch.
 
         Parameters:
-        ip (str): The IP address to assign.
-        switch (OVSKernelSwitch): The switch to assign the IP address to.
+            ip (str): The IP address to assign.
+            switch (OVSKernelSwitch): The switch to assign the IP address to.
 
         Raises:
-        RuntimeError: If the IP address could not be assigned.
+            RuntimeError: If the IP address could not be assigned.
         """
         config: Config = getConfig()
 
@@ -63,12 +63,12 @@ class SDNController():
         Install a flow in a switch.
 
         Parameters:
-        destination (IPv4Network): The destination of the flow.
-        gateway (IPv4Address): The gateway of the flow.
-        switch (OVSKernelSwitch): The switch to install the flow in.
+            destination (IPv4Network): The destination of the flow.
+            gateway (IPv4Address): The gateway of the flow.
+            switch (OVSKernelSwitch): The switch to install the flow in.
 
         Raises:
-        RuntimeError: If the flow could not be installed.
+            RuntimeError: If the flow could not be installed.
         """
 
         config: Config = getConfig()
@@ -97,10 +97,10 @@ class SDNController():
         Assign IP addresses to the switches in the topology.
 
         Parameters:
-        topology (Topology): The topology to assign IP addresses to.
-        switches (TypedDict[str, OVSKernelSwitch]): The switches to assign IP addresses to.
-        hostIPs (TypedDict[str, (IPv4Network, IPv4Address, IPv4Address)]):
-        The gateways of the hosts in the topology.
+            topology (Topology): The topology to assign IP addresses to.
+            switches (TypedDict[str, OVSKernelSwitch]): The switches to assign IP addresses to.
+            hostIPs (TypedDict[str, (IPv4Network, IPv4Address, IPv4Address)]):
+                The gateways of the hosts in the topology.
         """
 
         links: "list[Link]" = topology["links"]
@@ -126,10 +126,10 @@ class SDNController():
         Assign IP addresses to the gateways of the hosts in the topology.
 
         Parameters:
-        topology (Topology): The topology to assign IP addresses to.
-        host (str): The host to assign the gateway IP address to.
-        ip (IPv4Address): The IP address to assign.
-        switches (TypedDict[str, OVSKernelSwitch]): The switches to assign IP addresses to.
+            topology (Topology): The topology to assign IP addresses to.
+            host (str): The host to assign the gateway IP address to.
+            ip (IPv4Address): The IP address to assign.
+            switches (TypedDict[str, OVSKernelSwitch]): The switches to assign IP addresses to.
         """
 
         links: "list[Link]" = topology["links"]
@@ -147,13 +147,13 @@ class SDNController():
         Install flows in the switches in the topology.
 
         Parameters:
-        fg (ForwardingGraph): The forwarding graph to install flows in.
-        vnfHosts (TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
-        The hosts of the VNFs in the forwarding graph.
-        switches (TypedDict[str, OVSKernelSwitch]"): The switches to install flows in.
+            fg (ForwardingGraph): The forwarding graph to install flows in.
+            vnfHosts (TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
+            The hosts of the VNFs in the forwarding graph.
+            switches (TypedDict[str, OVSKernelSwitch]"): The switches to install flows in.
 
         Returns:
-        ForwardingGraph: The forwarding graph with the flows installed.
+            ForwardingGraph: The forwarding graph with the flows installed.
         """
 
         links: "list[ForwardingLink]" = fg["links"]
