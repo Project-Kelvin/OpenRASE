@@ -24,8 +24,8 @@ class VNFManager():
     Class that corresponds to the VNF Manager in the NFV architecture.
     """
 
-    infraManager: InfraManager = None
-    forwardingGraphs: "list[ForwardingGraph]" = []
+    _infraManager: InfraManager = None
+    _forwardingGraphs: "list[ForwardingGraph]" = []
 
     def __init__(self, infraManager: InfraManager) -> None:
         """
@@ -35,9 +35,9 @@ class VNFManager():
             infraManager (InfraManager): The infrastructure manager.
         """
 
-        self.infraManager = infraManager
+        self._infraManager = infraManager
 
-    def connectToDind(self, hostName: str) -> DockerClient:
+    def _connectToDind(self, hostName: str) -> DockerClient:
         """
         Get the IP address of the host.
 
@@ -62,11 +62,11 @@ class VNFManager():
         Deploy the SFF.
         """
 
-        hostIPs: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = self.infraManager.getHostIPs()
+        hostIPs: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = self._infraManager.getHostIPs()
         threads: "list[Thread]" = []
 
         def deploySFFinNode(host: str):
-            dindClient: DockerClient = self.connectToDind(host)
+            dindClient: DockerClient = self._connectToDind(host)
             dindClient.networks.create(DIND_NETWORK1,
                                        ipam=IPAMConfig(pool_configs=[IPAMPool(subnet=DIND_NW1_IP)]))
             dindClient.networks.create(DIND_NETWORK2,
@@ -94,7 +94,7 @@ class VNFManager():
         for thread in threads:
             thread.join()
 
-    def deployForwardingGraph(self, fg: ForwardingGraph) -> None:
+    def _deployForwardingGraph(self, fg: ForwardingGraph) -> None:
         """
         Deploy the forwarding graph.
 
@@ -102,7 +102,7 @@ class VNFManager():
             fg (ForwardingGraph): The forwarding graph to be deployed.
         """
 
-        updatedFG: ForwardingGraph = self.infraManager.assignIPs(fg)
+        updatedFG: ForwardingGraph = self._infraManager.assignIPs(fg)
         vnfs: VNF = updatedFG["vnfs"]
         sfcId: str = updatedFG["sfcID"]
         vnfList: "list[str]" = []
@@ -119,7 +119,7 @@ class VNFManager():
             vnf["name"] = vnfName
 
             if host["id"] != SERVER:
-                dindClient: DockerClient = self.connectToDind(host["id"])
+                dindClient: DockerClient = self._connectToDind(host["id"])
 
                 volumes = {}
                 for vol in sharedVolumes[vnf["id"]]:
@@ -173,7 +173,7 @@ class VNFManager():
             thread.join()
 
         traverseVNF(vnfs)
-        self.forwardingGraphs.append(updatedFG)
+        self._forwardingGraphs.append(updatedFG)
 
     def deployForwardingGraphs(self, fgs: "list[ForwardingGraph]") -> None:
         """
@@ -186,7 +186,7 @@ class VNFManager():
         threads: "list[Thread]" = []
         for fg in fgs:
             thread: Thread = Thread(
-                target=self.deployForwardingGraph, args=(fg,))
+                target=self._deployForwardingGraph, args=(fg,))
             thread.start()
 
             threads.append(thread)
@@ -194,5 +194,5 @@ class VNFManager():
         for thread in threads:
             thread.join()
 
-        self.infraManager.startCLI()
-        self.infraManager.stopNetwork()
+        self._infraManager.startCLI()
+        self._infraManager.stopNetwork()
