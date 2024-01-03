@@ -40,6 +40,7 @@ class SFCEmulator():
         """
 
         self.mano.getInfraManager().installTopology(topology)
+        self.mano.getVNFManager().deploySFF()
         self.sfcRequestGenerator.setDesign(sfcRequestDesign)
         self.trafficGenerator.setDesign(trafficDesign)
 
