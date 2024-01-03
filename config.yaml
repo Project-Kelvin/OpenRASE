@@ -32,3 +32,22 @@ templates:
 
 ipRange:
   mask: 24
+
+vnfs:
+  sharedVolumes:
+    waf:
+      - "/home/docker/files/waf/shared/Caddyfile:/etc/caddy/Caddyfile"
+    ids:
+      - "/home/docker/files/ids/shared/logs:/var/log/suricata"
+      - "/home/docker/files/ids/shared/conf/suricata.yaml:/etc/suricata/suricata.yaml"
+      - "/home/docker/files/ids/shared/rules/suricata.rules:/var/lib/suricata/rules/suricata.rules"
+    ips:
+      - "/home/docker/files/ips/shared/logs:/var/log/suricata"
+      - "/home/docker/files/ips/shared/conf/suricata.yaml:/etc/suricata/suricata.yaml"
+      - "/home/docker/files/ips/shared/rules/suricata.rules:/var/lib/suricata/rules/suricata.rules"
+    dpi:
+      - "/home/docker/files/dpi/shared/logs:/home/ncap"
+    ha:
+      - "/home/docker/files/ha/shared/conf/default.vcl:/etc/varnish/default.vcl"
+    lb:
+      - "/home/docker/files/lb/shared/Caddyfile:/etc/caddy/Caddyfile"
