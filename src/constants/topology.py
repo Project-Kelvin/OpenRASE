@@ -2,8 +2,8 @@
 Defines the constants used in the SFC topology.
 """
 
-SFCC = "sfcc"
-TRAFFIC_GENERATOR = "tg"
-SERVER = "server"
-SFCC_SWITCH = "s10000"
-TERMINAL = "terminal"
+SFCC: str = "sfcc"
+TRAFFIC_GENERATOR: str = "tg"
+SERVER: str = "server"
+SFCC_SWITCH: str = "s10000"
+TERMINAL: str = "terminal"
