@@ -2,15 +2,17 @@
 This file is used to test the functionality of the SFC Emulator.
 """
 
-from time import sleep
+from shared.constants.forwarding_graph import TERMINAL
 from shared.models.forwarding_graph import ForwardingGraph
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from mano.infra_manager import InfraManager
+from mano.sdn_controller import SDNController
 from mano.vnf_manager import VNFManager
-from constants.topology import SERVER, SFCC, TERMINAL
+from constants.topology import SERVER, SFCC
 
-infraManager: InfraManager = InfraManager()
+
+infraManager: InfraManager = InfraManager(SDNController())
 topo: Topology = {
     "hosts": [
         {
@@ -121,8 +123,10 @@ sfcRequest: SFCRequest = {
     "strictOrder": ["waf, ha"],
 }
 
-infraManager.installTopology(topo)
 vnfManager: VNFManager = VNFManager(infraManager)
-sleep(10)
-vnfManager.deploySFF()
+infraManager.installTopology(topo)
 vnfManager.deployForwardingGraphs([fg])
+print(infraManager.getTelemetry().getHostData())
+print(infraManager.getTelemetry().getSwitchData())
+infraManager.startCLI()
+infraManager.stopNetwork()

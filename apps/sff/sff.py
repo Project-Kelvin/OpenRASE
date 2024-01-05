@@ -5,6 +5,8 @@ SFF/VNF in the Service Function Chain.
 """
 
 from wsgiref.headers import Headers
+
+from shared.constants.forwarding_graph import TERMINAL
 from flask import Flask, Response, request, Request
 import requests
 from shared.models.config import Config
@@ -127,7 +129,7 @@ def tx() -> Response:
         nextDest: str = ""
         if sfcUpdated["host"]["id"] == sfc["host"]["id"]:
             nextDest = sfc["vnf"]
-        elif sfc["next"] == "terminal":
+        elif sfc["next"] == TERMINAL:
             nextDest = sfc["host"]["ip"]
         else:
             nextDest = f'{sfc["host"]["ip"]}/rx'

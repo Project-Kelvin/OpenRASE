@@ -3,9 +3,8 @@ Defines utils related to the forwarding graph.
 """
 
 from typing import Callable
+from shared.constants.forwarding_graph import TERMINAL
 from shared.models.forwarding_graph import VNF
-
-from constants.topology import TERMINAL
 
 
 def traverseVNF(vnfs: VNF, callback: Callable[[VNF], None], *args, shouldParseTerminal: bool = True) -> None:
