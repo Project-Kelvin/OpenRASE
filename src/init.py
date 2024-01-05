@@ -79,6 +79,7 @@ def startRegistryContainer() -> None:
     """
     Start the registry container.
     """
+
     if doesContainerExist(SFC_REGISTRY):
         client.containers.get(SFC_REGISTRY).remove()
 
