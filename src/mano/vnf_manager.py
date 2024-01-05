@@ -9,17 +9,21 @@ from shared.models.forwarding_graph import VNF, ForwardingGraph, VNFEntity
 from shared.models.topology import Host as TopoHost
 from shared.utils.config import getConfig
 from shared.utils.container import getVNFContainerTag
-from constants.topology import SERVER, SFCC, TERMINAL
+from constants.notification import FORWARDING_GRAPH_DEPLOYED, TOPOLOGY_INSTALLED
+from constants.topology import SERVER, SFCC
 from constants.container import DIND_NETWORK1, \
-    DIND_NETWORK2, DIND_NW1_IP, DIND_NW2_IP, DIND_TCP_PORT, MININET_PREFIX, \
+    DIND_NETWORK2, DIND_NW1_IP, DIND_NW2_IP, \
     SFF, SFF_IMAGE, SFF_IP1, SFF_IP2
 from mano.infra_manager import InfraManager
+from mano.notification_system import NotificationSystem, Subscriber
 from docker.types import IPAMConfig, IPAMPool
-from docker.models.containers import Container
-from docker import DockerClient, from_env
+from docker import DockerClient
+from utils.container import connectToDind
+
+from utils.forwarding_graph import traverseVNF
 
 
-class VNFManager():
+class VNFManager(Subscriber):
     """
     Class that corresponds to the VNF Manager in the NFV architecture.
     """
@@ -36,28 +40,9 @@ class VNFManager():
         """
 
         self._infraManager = infraManager
+        NotificationSystem.subscribe(TOPOLOGY_INSTALLED, self)
 
-    def _connectToDind(self, hostName: str) -> DockerClient:
-        """
-        Get the IP address of the host.
-
-        Parameters:
-            hostName (str): The name of the host.
-
-        Returns:
-            DockerClient: The Docker client.
-        """
-        client: DockerClient = from_env()
-        hostContainer: Container = client.containers.get(
-            f"{MININET_PREFIX}.{hostName}")
-        hostIP: str = hostContainer.attrs["NetworkSettings"]["IPAddress"]
-
-        dindClient: DockerClient = DockerClient(
-            base_url=f"tcp://{hostIP}:{DIND_TCP_PORT}")
-
-        return dindClient
-
-    def deploySFF(self):
+    def _deploySFF(self):
         """
         Deploy the SFF.
         """
@@ -66,7 +51,7 @@ class VNFManager():
         threads: "list[Thread]" = []
 
         def deploySFFinNode(host: str):
-            dindClient: DockerClient = self._connectToDind(host)
+            dindClient: DockerClient = connectToDind(host)
             dindClient.networks.create(DIND_NETWORK1,
                                        ipam=IPAMConfig(pool_configs=[IPAMPool(subnet=DIND_NW1_IP)]))
             dindClient.networks.create(DIND_NETWORK2,
@@ -85,7 +70,7 @@ class VNFManager():
                 container.id, ipv4_address=SFF_IP2)
 
         for host in hostIPs:
-            if host != SERVER and host != SFCC:
+            if host not in (SERVER, SFCC):
                 thread: Thread = Thread(target=deploySFFinNode, args=(host,))
                 thread.start()
 
@@ -119,7 +104,7 @@ class VNFManager():
             vnf["name"] = vnfName
 
             if host["id"] != SERVER:
-                dindClient: DockerClient = self._connectToDind(host["id"])
+                dindClient: DockerClient = connectToDind(host["id"])
 
                 volumes = {}
                 for vol in sharedVolumes[vnf["id"]]:
@@ -140,40 +125,27 @@ class VNFManager():
 
                 vnf["ip"] = container.attrs["NetworkSettings"]["Networks"][DIND_NETWORK1]["IPAddress"]
 
-        def traverseVNF(vnfs: VNF):
+        def traverseCallback(vnfs: VNF) -> None:
             """
-            Traverse the VNFs in the forwarding graph and deploys them.
+            Callback function for the traverseVNF function.
 
             Parameters:
-                vnfs (VNF): The VNF to be traversed.
+                vnfs (VNF): The VNF.
             """
 
-            nonlocal vnfList
+            thread: Thread = Thread(target=deployVNF, args=(vnfs,))
+            thread.start()
 
-            shouldContinue: bool = True
+            threads.append(thread)
 
-            while shouldContinue:
-                if vnfs["next"] == TERMINAL:
-                    break
-
-                thread: Thread = Thread(target=deployVNF, args=(vnfs,))
-                thread.start()
-
-                threads.append(thread)
-
-                if isinstance(vnfs['next'], list):
-                    for nextVnf in vnfs['next']:
-                        traverseVNF(nextVnf)
-
-                    shouldContinue = False
-                else:
-                    vnfs = vnfs['next']
+        traverseVNF(vnfs, traverseCallback, shouldParseTerminal=False)
 
         for thread in threads:
             thread.join()
 
-        traverseVNF(vnfs)
         self._forwardingGraphs.append(updatedFG)
+
+        NotificationSystem.publish(FORWARDING_GRAPH_DEPLOYED, updatedFG)
 
     def deployForwardingGraphs(self, fgs: "list[ForwardingGraph]") -> None:
         """
@@ -194,5 +166,13 @@ class VNFManager():
         for thread in threads:
             thread.join()
 
-        self._infraManager.startCLI()
-        self._infraManager.stopNetwork()
+    def receive(self, topic, *args: "list[Any]") -> None:
+        """
+        Receive a notification.
+
+        Parameters:
+            topic (str): The topic of the notification.
+            args (list[Any]): The arguments of the notification.
+        """
+        if topic == TOPOLOGY_INSTALLED:
+            self._deploySFF()
