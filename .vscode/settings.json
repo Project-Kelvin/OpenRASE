@@ -2,16 +2,27 @@
     "cSpell.words": [
         "Caddyfile",
         "dcmd",
+        "DGRAM",
         "dimage",
         "dind",
         "dpid",
+        "ifinoctets",
+        "ifname",
+        "ifoutoctets",
+        "intfs",
         "IPAM",
         "ncap",
+        "ntoa",
         "precpu",
         "ROOTDIRECTORY",
         "SFCC",
         "sfcr",
+        "Sflow",
+        "SIOCGIFCONF",
+        "srcdst",
         "suricata",
-        "vnfs"
+        "tobytes",
+        "vnfs",
+        "vsctl"
     ]
 }
