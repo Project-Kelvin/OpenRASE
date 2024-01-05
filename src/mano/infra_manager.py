@@ -13,10 +13,13 @@ from shared.models.forwarding_graph import VNF, ForwardingGraph
 from mininet.node import Ryu, Host, OVSKernelSwitch
 from mininet.net import Containernet
 from mininet.cli import CLI
+from constants.notification import TOPOLOGY_INSTALLED
+from constants.topology import SERVER, SFCC, SFCC_SWITCH, TRAFFIC_GENERATOR
+from constants.container import CPU_PERIOD, DIND_IMAGE, SERVER_IMAGE, SFCC_IMAGE
+from mano.notification_system import NotificationSystem
 from mano.sdn_controller import SDNController
 from mano.telemetry import Telemetry
-from constants.topology import SERVER, SFCC, SFCC_SWITCH, TERMINAL, TRAFFIC_GENERATOR
-from constants.container import DIND_IMAGE, SERVER_IMAGE, SFCC_IMAGE
+from utils.forwarding_graph import traverseVNF
 
 class InfraManager():
     """
@@ -38,12 +41,12 @@ class InfraManager():
         Constructor for the class.
         """
 
+        Telemetry.runSflow()
         self._sdnController = sdnController
         self._net = Containernet()
         self._ryu = Ryu('ryu', ryuArgs="ryu.app.rest_router",
                        command="ryu-manager")
         self._net.addController(self._ryu)
-        self._telemetry = Telemetry()
 
     def installTopology(self, topology: Topology) -> None:
         """
@@ -54,7 +57,8 @@ class InfraManager():
         """
 
         self._topology = topology
-        cpuPeriod: int = 100000  # Docker default
+        self._telemetry = Telemetry(self._topology)
+
         config: Config = getConfig()
 
         # Add traffic generator
@@ -115,7 +119,7 @@ class InfraManager():
             hostNode: Host = self._net.addDocker(
                 host['id'],
                 ip=f"{str(ip[2])}/{ip[0].prefixlen}",
-                cpu_quota=host['cpu'] * cpuPeriod,
+                cpu_quota=host['cpu'] * CPU_PERIOD,
                 mem_limit=host['memory'],
                 memswap_limit=host['memory'],
                 dimage=DIND_IMAGE,
@@ -167,6 +171,10 @@ class InfraManager():
 
         self._sdnController.assignSwitchIPs(topology, self._switches, self._hostIPs, self._networkIPs)
 
+        # Notify
+        sleep(10)
+        NotificationSystem.publish(TOPOLOGY_INSTALLED)
+
     def getHostIPs(self) -> "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]":
         """
         Get the IPs of the hosts in the topology.
@@ -190,46 +198,33 @@ class InfraManager():
             SFCC: self._hostIPs[SFCC]
         }
 
-        def traverseVNF(vnfs: VNF, vnfHosts: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]"):
+        def traverseCallback(vnfs: VNF,
+                             vnfHosts: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]") -> None:
             """
-            Traverse the VNFs in the forwarding graph and assigns IPs to the hosts.
+            Callback function for the traverseVNF function.
 
             Parameters:
-                vnfs (VNF): The VNF to be traversed.
+                vnfs (VNF): The VNF.
                 vnfHosts (TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
-                    The list of hosts in the VNF.
+                The hosts of the VNFs in the forwarding graph.
             """
 
-            shouldContinue: bool = True
+            if vnfs["host"]["id"] in vnfHosts:
+                vnfs["host"]["ip"] = vnfHosts[vnfs["host"]["id"]][2]
+            else:
+                ipAddr: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
+                    self._networkIPs)
 
-            while shouldContinue:
-                if vnfs["host"]["id"] in vnfHosts:
-                    vnfs["host"]["ip"] = vnfHosts[vnfs["host"]["id"]][2]
-                else:
-                    ipAddr: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
-                        self._networkIPs)
+                vnfs['host']['ip'] = str(ipAddr[2])
+                vnfHosts[vnfs['host']['id']] = ipAddr
 
-                    vnfs['host']['ip'] = str(ipAddr[2])
-                    vnfHosts[vnfs['host']['id']] = ipAddr
+                # Assign IP to the host
+                self._net.get(vnfs['host']['id']).cmd(
+                    f"ip addr add {str(ipAddr[2])}/{ipAddr[0].prefixlen} dev {vnfs['host']['id']}-eth0")
 
-                    # Assign IP to the host
-                    self._net.get(vnfs['host']['id']).cmd(
-                        f"ip addr add {str(ipAddr[2])}/{ipAddr[0].prefixlen} dev {vnfs['host']['id']}-eth0")
+                self._sdnController.assignGatewayIP(self._topology, vnfs['host']['id'], ipAddr[1], self._switches)
 
-                    self._sdnController.assignGatewayIP(self._topology, vnfs['host']['id'], ipAddr[1], self._switches)
-
-                if isinstance(vnfs['next'], list):
-                    for nextVnf in vnfs['next']:
-                        traverseVNF(nextVnf, vnfHosts)
-
-                    shouldContinue = False
-                else:
-                    vnfs = vnfs['next']
-
-                if vnfs == TERMINAL:
-                    shouldContinue = False
-
-        traverseVNF(vnfs, vnfHosts)
+        traverseVNF(vnfs, traverseCallback, vnfHosts)
 
         # Add routes
         for name, ips in vnfHosts.items():
