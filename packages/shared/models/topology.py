@@ -11,7 +11,7 @@ class Host(TypedDict):
     """
 
     id: str
-    cpu: int
+    cpu: float
     """
     This is the number of CPUs to use. This is equal to CPU Quota / CPU Period.
     The default CPU Period is 100000. So, in a 4-core machine, a CPU Quota of 200000
