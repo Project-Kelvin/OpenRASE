@@ -1,16 +1,17 @@
 """
-Defines the abstractEVolver class.
+Defines the abstract Solver class.
 """
 
 from abc import ABC, abstractmethod
 
 from shared.models.sfc_request import SFCRequest
-from manager.orchestrator import Orchestrator
-from manager.traffic_generator import TrafficGenerator
+from mano.orchestrator import Orchestrator
+from sfc.traffic_generator import TrafficGenerator
 
-class Evolver(ABC):
+
+class Solver(ABC):
     """
-    Abstract class that defines the interface for the evolver.
+    Abstract class that defines the interface for the Solver.
     """
 
     _sfcRequests: "list[SFCRequest]" = []
@@ -22,6 +23,16 @@ class Evolver(ABC):
         self._orchestrator = orchestrator
         self._trafficGenerator = trafficGenerator
 
+    def sendSFCRequests(self, sfcRequests: "list[SFCRequest]") -> None:
+        """
+        Send the SFC requests to the orchestrator.
+
+        Parameters:
+            sfcRequests (list[SFCRequest]): The list of SFC requests.
+        """
+
+        self._sfcRequests.append(sfcRequests)
+
     @abstractmethod
     def generateForwardingGraphs(self, sfcRequests: "list[SFCRequest]") -> None:
         """
@@ -30,7 +41,3 @@ class Evolver(ABC):
         Parameters:
             sfcRequests (list[SFCRequest]): The list of SFC requests.
         """
-
-        self._sfcRequests.append(sfcRequests)
-
-        pass
