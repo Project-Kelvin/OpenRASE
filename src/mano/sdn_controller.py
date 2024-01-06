@@ -12,8 +12,8 @@ from shared.models.topology import Link
 from shared.models.config import Config
 from shared.utils.config import getConfig
 from shared.models.topology import Topology
-from mininet.node import OVSKernelSwitch
 from shared.utils.ip import generateIP
+from mininet.node import OVSKernelSwitch
 from utils.ryu import getRyuRestUrl
 
 class SDNController():
