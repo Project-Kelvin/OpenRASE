@@ -5,6 +5,8 @@ Defines the class that corresponds to the Virtualized Infrastructure Manager in 
 from ipaddress import IPv4Address, IPv4Network
 from time import sleep
 from typing import Any, Tuple, TypedDict
+import requests
+from shared.constants.forwarding_graph import TERMINAL
 from shared.models.config import Config
 from shared.utils.config import getConfig
 from shared.utils.ip import generateIP
@@ -19,6 +21,7 @@ from constants.container import CPU_PERIOD, DIND_IMAGE, SERVER_IMAGE, SFCC_IMAGE
 from mano.notification_system import NotificationSystem
 from mano.sdn_controller import SDNController
 from mano.telemetry import Telemetry
+from utils.container import getContainerIP
 from utils.forwarding_graph import traverseVNF
 
 class InfraManager():
@@ -210,7 +213,7 @@ class InfraManager():
             """
 
             if vnfs["host"]["id"] in vnfHosts:
-                vnfs["host"]["ip"] = vnfHosts[vnfs["host"]["id"]][2]
+                vnfs["host"]["ip"] = str(vnfHosts[vnfs["host"]["id"]][2])
             else:
                 ipAddr: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
                     self._networkIPs)
@@ -223,6 +226,14 @@ class InfraManager():
                     f"ip addr add {str(ipAddr[2])}/{ipAddr[0].prefixlen} dev {vnfs['host']['id']}-eth0")
 
                 self._sdnController.assignGatewayIP(self._topology, vnfs['host']['id'], ipAddr[1], self._switches)
+
+                # Add ip to SFF
+                hostIP: str = getContainerIP(vnfs["host"]["id"])
+
+                if not vnfs["next"] == TERMINAL:
+                    requests.post(f"http://{hostIP}:{getConfig()['sff']['port']}/add-host",
+                                json={"hostIP": str(ipAddr[2])},
+                                timeout=getConfig()["general"]["requestTimeout"])
 
         traverseVNF(vnfs, traverseCallback, vnfHosts)
 
