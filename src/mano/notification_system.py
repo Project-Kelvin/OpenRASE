@@ -38,8 +38,10 @@ class NotificationSystem():
             subscriber (object): The subscriber.
         """
 
-        cls.topics[topic] = cls.topics[topic].append(
-            subscriber) if topic in cls.topics else [subscriber]
+        if topic in cls.topics:
+            cls.topics[topic].append(subscriber)
+        else:
+            cls.topics[topic] = [subscriber]
 
 
 class Subscriber(ABC):
