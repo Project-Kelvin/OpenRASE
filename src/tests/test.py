@@ -2,17 +2,19 @@
 This file is used to test the functionality of the SFC Emulator.
 """
 
+from typing import Any
 from shared.constants.forwarding_graph import TERMINAL
 from shared.models.forwarding_graph import ForwardingGraph
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
+from constants.notification import SFF_DEPLOYED
+from constants.topology import SERVER, SFCC
 from mano.infra_manager import InfraManager
+from mano.notification_system import NotificationSystem, Subscriber
 from mano.sdn_controller import SDNController
 from mano.vnf_manager import VNFManager
-from constants.topology import SERVER, SFCC
 
 
-infraManager: InfraManager = InfraManager(SDNController())
 topo: Topology = {
     "hosts": [
         {
@@ -78,7 +80,7 @@ fg: ForwardingGraph = {
                 "id": "ha"
             },
             "next": {
-                "host":{
+                "host": {
                     "id": SERVER
                 },
                 "next": TERMINAL
@@ -123,10 +125,45 @@ sfcRequest: SFCRequest = {
     "strictOrder": ["waf, ha"],
 }
 
-vnfManager: VNFManager = VNFManager(infraManager)
-infraManager.installTopology(topo)
-vnfManager.deployForwardingGraphs([fg])
-print(infraManager.getTelemetry().getHostData())
-print(infraManager.getTelemetry().getSwitchData())
-infraManager.startCLI()
-infraManager.stopNetwork()
+
+class Test(Subscriber):
+    """
+    Test class.
+    """
+
+    def __init__(self):
+        self._infraManager: InfraManager = InfraManager(SDNController())
+        self._vnfManager: VNFManager = VNFManager(self._infraManager)
+        NotificationSystem.subscribe(SFF_DEPLOYED, self)
+
+    def startTest(self):
+        """
+        Start the test.
+        """
+
+        self._infraManager.installTopology(topo)
+
+    def receiveNotification(self, topic: str, *args: "list[Any]"):
+        if topic == SFF_DEPLOYED:
+            self._vnfManager.deployForwardingGraphs([fg])
+
+    def getData(self):
+        """
+        Get the data.
+        """
+
+        print(self._infraManager.getTelemetry().getHostData())
+        print(self._infraManager.getTelemetry().getSwitchData())
+
+    def wait(self):
+        """
+        Wait for the test to finish.
+        """
+
+        self._infraManager.startCLI()
+        self._infraManager.stopNetwork()
+
+test = Test()
+test.startTest()
+test.getData()
+test.wait()
