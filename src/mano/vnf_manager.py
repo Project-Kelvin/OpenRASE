@@ -3,6 +3,7 @@ Defines the VNFManager class that corresponds to the VNF Manager in the NFV arch
 """
 
 from ipaddress import IPv4Address, IPv4Network
+from time import sleep
 from typing import Any, Tuple, TypedDict
 from threading import Thread
 from shared.models.forwarding_graph import VNF, ForwardingGraph, VNFEntity
@@ -78,6 +79,7 @@ class VNFManager(Subscriber):
         for thread in threads:
             thread.join()
 
+        sleep(10)
         NotificationSystem.publish(SFF_DEPLOYED)
 
     def _deployForwardingGraph(self, fg: ForwardingGraph) -> None:
