@@ -7,14 +7,14 @@ SFF/VNF in the Service Function Chain.
 from wsgiref.headers import Headers
 
 from shared.constants.forwarding_graph import TERMINAL
-from flask import Flask, Response, request, Request
-import requests
 from shared.models.config import Config
 from shared.models.forwarding_graph import VNF
 from shared.constants.sfc import SFC_HEADER, SFC_TRAVERSED_HEADER
 from shared.utils.encoder_decoder import sfcDecode, sfcEncode
 from shared.utils.config import getConfig
 from shared.utils.ip import checkIPBelongsToNetwork
+from flask import Flask, Response, request, Request
+import requests
 
 
 app: Flask = Flask(__name__)
