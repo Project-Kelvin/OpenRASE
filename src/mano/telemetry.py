@@ -205,7 +205,7 @@ class Telemetry(Subscriber):
                 "vnfs": {}
             }
 
-            if len(self._vnfsInHosts[host["id"]]) > 0:
+            if host["id"] in self._vnfsInHosts and len(self._vnfsInHosts[host["id"]]) > 0:
                 for vnf in self._vnfsInHosts[host["id"]]:
                     container: Container = dindClient.containers.get(
                         vnf["name"])
