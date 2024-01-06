@@ -1,39 +1,30 @@
 """
-Defines the SFCRequestGenerator class.
+Defines the SFCRequestGenerator abstract class.
 """
 
-from shared.models.sfc_request import SFCRequest
-from mano.orchestrator import Orchestrator
+from abc import ABC, abstractmethod
+from sfc.solver import Solver
 
 
-class SFCRequestGenerator():
+class SFCRequestGenerator(ABC):
     """
-    Class that generates SFC requests.
+    Abstract class for generating SFC requests.
     """
 
-    _orchestrator: Orchestrator = None
+    _solver: Solver = None
 
-    def __init__(self, orchestrator: Orchestrator) -> None:
+    def __init__(self, solver: Solver) -> None:
         """
         Constructor for the class.
-        """
-
-        self._orchestrator = orchestrator
-
-    def setDesign(self, design) -> None:
-        """
-        Set the design of the SFC request generator.
 
         Parameters:
-            design (dict): The design of the SFC request generator.
+            solver (Solver): The solver.
         """
 
-        pass
+        self._solver = solver
 
+    @abstractmethod
     def generateRequests(self) -> None:
         """
         Generate SFC requests.
         """
-
-        sfcRequests: "list[SFCRequest]" = []
-        self._orchestrator.sendSFCRequests(sfcRequests)
