@@ -25,7 +25,7 @@ class NotificationSystem():
         """
         if topic in cls.topics:
             for sub in cls.topics[topic]:
-                sub.receive(topic, *args)
+                sub.receiveNotification(topic, *args)
 
     @classmethod
     def subscribe(cls, topic: str, subscriber: object) -> None:
@@ -47,7 +47,7 @@ class Subscriber(ABC):
     """
 
     @abstractmethod
-    def receive(self, topic, *args: "list[Any]") -> None:
+    def receiveNotification(self, topic, *args: "list[Any]") -> None:
         """
         Receive a notification.
 

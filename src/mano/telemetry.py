@@ -421,7 +421,7 @@ class Telemetry(Subscriber):
 
         traverseVNF(vnfs, traverseCallback, shouldParseTerminal=False)
 
-    def receive(self, topic, *args: "list[Any]") -> None:
+    def receiveNotification(self, topic, *args: "list[Any]") -> None:
         """
         Receive a notification.
 
