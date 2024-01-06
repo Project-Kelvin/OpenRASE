@@ -53,7 +53,7 @@ class General(TypedDict):
     Defines the `General` dictionary type.
     """
 
-    port: int
+    requestTimeout: int
 
 
 class IPRange(TypedDict):
