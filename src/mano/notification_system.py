@@ -23,7 +23,8 @@ class NotificationSystem():
             topic (str): The topic of the notification.
             args (list[Any]): The arguments of the notification.
         """
-        if topic in cls.topics:
+
+        if topic in cls.topics and cls.topics[topic] is not None:
             for sub in cls.topics[topic]:
                 sub.receiveNotification(topic, *args)
 
