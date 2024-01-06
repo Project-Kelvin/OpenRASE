@@ -76,7 +76,7 @@ def rx() -> Response:
 
         response: Response = requests.request(
             method=request.method,
-            url=request.url.replace(f'{request.host_url}rx', vnfIP),
+            url=request.url.replace(f'{request.host_url}rx', f"http://{vnfIP}"),
             headers=request.headers,
             data=request.get_data(),
             cookies=request.cookies,
@@ -128,11 +128,11 @@ def tx() -> Response:
         # Makes forwarding decision.
         nextDest: str = ""
         if sfcUpdated["host"]["id"] == sfc["host"]["id"]:
-            nextDest = sfc["vnf"]
+            nextDest = f"http://{sfc['vnf']}"
         elif sfc["next"] == TERMINAL:
-            nextDest = sfc["host"]["ip"]
+            nextDest = f'http://{sfc["host"]["ip"]}'
         else:
-            nextDest = f'{sfc["host"]["ip"]}/rx'
+            nextDest = f'http://{sfc["host"]["ip"]}/rx'
 
         # Updates header.
         sfc["isTraversed"] = False
