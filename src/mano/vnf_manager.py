@@ -9,7 +9,7 @@ from shared.models.forwarding_graph import VNF, ForwardingGraph, VNFEntity
 from shared.models.topology import Host as TopoHost
 from shared.utils.config import getConfig
 from shared.utils.container import getVNFContainerTag
-from constants.notification import FORWARDING_GRAPH_DEPLOYED, TOPOLOGY_INSTALLED
+from constants.notification import FORWARDING_GRAPH_DEPLOYED, SFF_DEPLOYED, TOPOLOGY_INSTALLED
 from constants.topology import SERVER, SFCC
 from constants.container import DIND_NETWORK1, \
     DIND_NETWORK2, DIND_NW1_IP, DIND_NW2_IP, \
@@ -19,7 +19,6 @@ from mano.notification_system import NotificationSystem, Subscriber
 from docker.types import IPAMConfig, IPAMPool
 from docker import DockerClient
 from utils.container import connectToDind
-
 from utils.forwarding_graph import traverseVNF
 
 
@@ -78,6 +77,8 @@ class VNFManager(Subscriber):
 
         for thread in threads:
             thread.join()
+
+        NotificationSystem.publish(SFF_DEPLOYED)
 
     def _deployForwardingGraph(self, fg: ForwardingGraph) -> None:
         """
@@ -166,7 +167,7 @@ class VNFManager(Subscriber):
         for thread in threads:
             thread.join()
 
-    def receive(self, topic, *args: "list[Any]") -> None:
+    def receiveNotification(self, topic, *args: "list[Any]") -> None:
         """
         Receive a notification.
 
