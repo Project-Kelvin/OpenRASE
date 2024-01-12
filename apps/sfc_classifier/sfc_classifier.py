@@ -6,25 +6,24 @@ Following the classification, the SFC Classifier adds the SFC metadata to the HT
 the traffic to the next SFF/VNF in the SFC.
 """
 
-import sys
-from typing import Any
+from typing import Any, TypedDict
 from wsgiref.headers import Headers
 from flask import Flask, Response, request
 import requests
-from shared.models.config import Config
-
+from shared.constants.sfc import SFC_HEADER, SFC_ID
 from shared.models.forwarding_graph import VNF, ForwardingGraph, ForwardingGraphs
+from shared.models.config import Config
 from shared.utils.config import getConfig
 from shared.utils.encoder_decoder import sfcEncode
 
 app: Flask = Flask(__name__)
 config: Config = getConfig()
 
-forwardingGraphs: ForwardingGraphs = []
+forwardingGraphs: "TypedDict[str, ForwardingGraphs]" = {}
 fgLock: bool = False
 
 
-def addForwardingGraphToMemory(forwardingGraph: ForwardingGraph):
+def addForwardingGraphToMemory(sfcID: str, forwardingGraph: ForwardingGraph):
     """
     Add the VNF Forwarding Graph to the in-memory list of VNF Forwarding Graphs.
     """
@@ -36,7 +35,7 @@ def addForwardingGraphToMemory(forwardingGraph: ForwardingGraph):
         pass
 
     fgLock = True
-    forwardingGraphs.append(forwardingGraph)
+    forwardingGraphs[sfcID] = forwardingGraph
     fgLock = False
 
 
@@ -50,7 +49,7 @@ def addFG():
     fg: ForwardingGraph = request.get_json()
     fg["isTraversed"] = False
 
-    addForwardingGraphToMemory(fg)
+    addForwardingGraphToMemory(fg["sfcID"], fg)
 
     return "The Forwarding Graph has been successfully added.\n", 201
 
@@ -62,14 +61,18 @@ def default():
     """
 
     try:
-        sfc: VNF = {}
-        if len(sys.argv) > 2:
-            if request.remote_addr == sys.argv[1]:
-                sfc = forwardingGraphs[0]["vnfs"]
-            elif request.remote_addr == sys.argv[2]:
-                sfc = forwardingGraphs[1]["vnfs"]
-        else:
-            sfc = forwardingGraphs[0]["vnfs"]
+        if SFC_ID not in request.headers:
+            return "The SFC-ID Header is missing in the request.\n", 400
+
+        sfcID: str = request.headers[SFC_ID]
+
+        if sfcID not in forwardingGraphs:
+            return (
+                "The SFC-ID is not registered with the SFC Classifier.\n"
+                "Use the `add-fg` endpoint to register it."
+            ), 400
+
+        sfc: VNF = forwardingGraphs[sfcID]["vnfs"]
 
         sfcBase64: Any = sfcEncode(sfc)
 
@@ -77,11 +80,12 @@ def default():
         for key, value in request.headers.items():
             headers[key] = value
 
-        headers["SFC"] = sfcBase64
+        headers[SFC_HEADER] = sfcBase64
 
         response = requests.request(
             method=request.method,
-            url=request.url.replace(request.host_url, f'{sfc["host"]["ip"]}/rx'),
+            url=request.url.replace(
+                request.host_url, f'http://{sfc["host"]["ip"]}/rx'),
             data=request.get_data(),
             cookies=request.cookies,
             allow_redirects=False,
@@ -93,7 +97,7 @@ def default():
 
     # pylint: disable=broad-except
     except Exception as exception:
-        return exception, 400
+        return str(exception), 400
 
 
 if __name__ == "__main__":
