@@ -13,6 +13,7 @@ from mano.infra_manager import InfraManager
 from mano.notification_system import NotificationSystem, Subscriber
 from mano.sdn_controller import SDNController
 from mano.vnf_manager import VNFManager
+from utils.container import getContainerIP
 
 
 topo: Topology = {
@@ -118,6 +119,44 @@ fg: ForwardingGraph = {
     ]
 }
 
+simpleFG: ForwardingGraph = {
+    "sfcID": "sfc2",
+    "vnfs": {
+        "host": {
+            "id": "h1"
+        },
+        "vnf": {
+            "id": "waf"
+        },
+        "next": {
+            "host": {
+                "id": SERVER
+            },
+            "next": TERMINAL
+        }
+    },
+    "links": [
+        {
+            "source": {
+                "id": SFCC
+            },
+            "destination": {
+                "id": "h1"
+            },
+            "links": ["s1"]
+        },
+        {
+            "source": {
+                "id": "h1"
+            },
+            "destination": {
+                "id": SERVER
+            },
+            "links": ["s1", "s2"]
+        }
+    ]
+}
+
 sfcRequest: SFCRequest = {
     "sfcrID": "sfcr1",
     "latency": 100,
@@ -145,7 +184,7 @@ class Test(Subscriber):
 
     def receiveNotification(self, topic: str, *args: "list[Any]"):
         if topic == SFF_DEPLOYED:
-            self._vnfManager.deployForwardingGraphs([fg])
+            self._vnfManager.deployForwardingGraphs([simpleFG])
 
     def getData(self):
         """
@@ -166,4 +205,5 @@ class Test(Subscriber):
 test = Test()
 test.startTest()
 test.getData()
+print(getContainerIP(SFCC))
 test.wait()
