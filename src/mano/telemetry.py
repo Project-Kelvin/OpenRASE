@@ -17,7 +17,7 @@ import requests
 from shared.models.forwarding_graph import VNF, ForwardingGraph, VNFEntity
 from shared.models.topology import Host, Topology
 from shared.utils.config import getConfig
-from shared.utils.container import doesContainerExist, isContainerRunning
+from shared.utils.container import doesContainerExist
 from mininet.net import Mininet
 from mininet.util import quietRun
 from constants.container import MININET_PREFIX
@@ -59,16 +59,18 @@ class Telemetry(Subscriber):
 
         client: DockerClient = from_env()
 
-        if not doesContainerExist(self._SFLOW_CONTAINER) or not isContainerRunning(self._SFLOW_CONTAINER):
-            client.containers.run(
-                self._SFLOW_IMAGE,
-                detach=True,
-                name=self._SFLOW_CONTAINER,
-                ports={
-                    8008: 8008,
-                    6343: "6343/udp"
-                }
-            )
+        if doesContainerExist(self._SFLOW_CONTAINER):
+            client.containers.get(self._SFLOW_CONTAINER).remove(force=True)
+
+        client.containers.run(
+            self._SFLOW_IMAGE,
+            detach=True,
+            name=self._SFLOW_CONTAINER,
+            ports={
+                8008: 8008,
+                6343: "6343/udp"
+            }
+        )
 
     @classmethod
     def runSflow(cls):
