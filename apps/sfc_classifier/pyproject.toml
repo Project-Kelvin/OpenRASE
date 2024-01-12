@@ -4,7 +4,6 @@ version = "0.1.0"
 description = "A Service Function Chain (SFC) Classifier that classifies the incoming traffic into different SFCs using the source IP address of the traffic."
 authors = ["Theviyanthan K."]
 license = "Apache-2.0 license"
-readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.8"
