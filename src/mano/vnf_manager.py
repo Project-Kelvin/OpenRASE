@@ -6,6 +6,7 @@ from ipaddress import IPv4Address, IPv4Network
 from time import sleep
 from typing import Any, Tuple, TypedDict
 from threading import Thread
+import requests
 from shared.models.forwarding_graph import VNF, ForwardingGraph, VNFEntity
 from shared.models.topology import Host as TopoHost
 from shared.utils.config import getConfig
@@ -19,7 +20,7 @@ from mano.infra_manager import InfraManager
 from mano.notification_system import NotificationSystem, Subscriber
 from docker.types import IPAMConfig, IPAMPool
 from docker import DockerClient
-from utils.container import connectToDind
+from utils.container import connectToDind, getContainerIP
 from utils.forwarding_graph import traverseVNF
 
 
@@ -125,7 +126,6 @@ class VNFManager(Subscriber):
                 )
 
                 dindClient.networks.get(DIND_NETWORK2).connect(container.id)
-
                 vnf["ip"] = container.attrs["NetworkSettings"]["Networks"][DIND_NETWORK1]["IPAddress"]
 
         def traverseCallback(vnfs: VNF) -> None:
@@ -147,6 +147,14 @@ class VNFManager(Subscriber):
             thread.join()
 
         self._forwardingGraphs.append(updatedFG)
+
+        sfccIP: str = getContainerIP(SFCC)
+
+        requests.post(
+            f"http://{sfccIP}/add-fg",
+            json=updatedFG,
+            timeout=getConfig()["general"]["requestTimeout"]
+        )
 
         NotificationSystem.publish(FORWARDING_GRAPH_DEPLOYED, updatedFG)
 
