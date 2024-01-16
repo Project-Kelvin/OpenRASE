@@ -126,7 +126,9 @@ class VNFManager(Subscriber):
                 )
 
                 dindClient.networks.get(DIND_NETWORK2).connect(container.id)
-                vnf["ip"] = container.attrs["NetworkSettings"]["Networks"][DIND_NETWORK1]["IPAddress"]
+
+                vnf["ip"] = dindClient.containers.get(
+                    container.id).attrs["NetworkSettings"]["Networks"][DIND_NETWORK1]["IPAddress"]
 
         def traverseCallback(vnfs: VNF) -> None:
             """
