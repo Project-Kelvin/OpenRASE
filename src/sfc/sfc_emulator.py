@@ -34,7 +34,8 @@ class SFCEmulator(Subscriber):
         self._mano = MANO()
         self._trafficGenerator = TrafficGenerator()
         self._solver = solver(self._mano.getOrchestrator(), self._trafficGenerator)
-        self._sfcRequestGenerator = sfcRequestGenerator(self._solver)
+        self._mano.getOrchestrator().injectSolver(self._solver)
+        self._sfcRequestGenerator = sfcRequestGenerator(self._mano.getOrchestrator())
         NotificationSystem.subscribe(SFF_DEPLOYED, self)
 
 
@@ -47,11 +48,11 @@ class SFCEmulator(Subscriber):
             trafficDesign (dict): The design of the traffic generator..
         """
 
-        self._mano.getInfraManager().installTopology(topology)
+        self._mano.getOrchestrator().installTopology(topology)
         self._trafficGenerator.setDesign(trafficDesign)
 
 
     def receiveNotification(self, topic, *args: "list[Any]") -> None:
         if topic == SFF_DEPLOYED:
             self._sfcRequestGenerator.generateRequests()
-            self._solver.generateForwardingGraphs()
+            self._solver.generateEmbeddingGraphs()

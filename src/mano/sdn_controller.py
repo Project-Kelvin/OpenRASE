@@ -3,11 +3,10 @@ Defines the class that manipulates the Ryu SDN controller.
 """
 
 from ipaddress import IPv4Address, IPv4Network
-from typing import Tuple, TypedDict
+from typing import Tuple
 from requests import Response
 import requests
-from shared.models.forwarding_graph import ForwardingLink
-from shared.models.forwarding_graph import ForwardingGraph
+from shared.models.embedding_graph import EmbeddingGraph, ForwardingLink
 from shared.models.topology import Link
 from shared.models.config import Config
 from shared.utils.config import getConfig
@@ -21,7 +20,7 @@ class SDNController():
     Class that communicates with the Ryu SDN controller.
     """
 
-    _switchLinks: "TypedDict[str, IPv4Address]" = {}
+    _switchLinks: "dict[str, IPv4Address]" = {}
 
     def assignIP(self, ip: IPv4Address, switch: OVSKernelSwitch) -> None:
         """
@@ -84,16 +83,16 @@ class SDNController():
                     f"Failed to install flow in switch {switch.name}.\n{response.json()}")
 
 
-    def assignSwitchIPs(self, topology: Topology, switches: "TypedDict[str, OVSKernelSwitch]",
-                        hostIPs: "TypedDict[str, (IPv4Network, IPv4Address, IPv4Address)]",
+    def assignSwitchIPs(self, topology: Topology, switches: "dict[str, OVSKernelSwitch]",
+                        hostIPs: "dict[str, (IPv4Network, IPv4Address, IPv4Address)]",
                         existingIPs: "list[IPv4Network]") -> None:
         """
         Assign IP addresses to the switches in the topology.
 
         Parameters:
             topology (Topology): The topology to assign IP addresses to.
-            switches (TypedDict[str, OVSKernelSwitch]): The switches to assign IP addresses to.
-            hostIPs (TypedDict[str, (IPv4Network, IPv4Address, IPv4Address)]):
+            switches (dict[str, OVSKernelSwitch]): The switches to assign IP addresses to.
+            hostIPs (dict[str, (IPv4Network, IPv4Address, IPv4Address)]):
                 The gateways of the hosts in the topology.
         """
 
@@ -115,7 +114,7 @@ class SDNController():
                     self._switchLinks[f'{link["source"]}-{link["destination"]}'] = hostIPs[link["source"]][1]
 
     def assignGatewayIP(self, topology: Topology, host: str, ip: IPv4Address,
-                        switches: "TypedDict[str, OVSKernelSwitch]") -> None:
+                        switches: "dict[str, OVSKernelSwitch]") -> None:
         """
         Assign IP addresses to the gateways of the hosts in the topology.
 
@@ -123,7 +122,7 @@ class SDNController():
             topology (Topology): The topology to assign IP addresses to.
             host (str): The host to assign the gateway IP address to.
             ip (IPv4Address): The IP address to assign.
-            switches (TypedDict[str, OVSKernelSwitch]): The switches to assign IP addresses to.
+            switches (dict[str, OVSKernelSwitch]): The switches to assign IP addresses to.
         """
 
         links: "list[Link]" = topology["links"]
@@ -134,20 +133,20 @@ class SDNController():
             elif link["destination"] == host:
                 self.assignIP(ip, switches[link["source"]])
 
-    def installFlows(self, fg: ForwardingGraph,
-                     vnfHosts: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]",
-                     switches: "TypedDict[str, OVSKernelSwitch]") -> ForwardingGraph:
+    def installFlows(self, fg: EmbeddingGraph,
+                     vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]",
+                     switches: "dict[str, OVSKernelSwitch]") -> EmbeddingGraph:
         """
         Install flows in the switches in the topology.
 
         Parameters:
-            fg (ForwardingGraph): The forwarding graph to install flows in.
-            vnfHosts (TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
+            fg (EmbeddingGraph): The forwarding graph to install flows in.
+            vnfHosts (dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
             The hosts of the VNFs in the forwarding graph.
-            switches (TypedDict[str, OVSKernelSwitch]"): The switches to install flows in.
+            switches (dict[str, OVSKernelSwitch]"): The switches to install flows in.
 
         Returns:
-            ForwardingGraph: The forwarding graph with the flows installed.
+            EmbeddingGraph: The forwarding graph with the flows installed.
         """
 
         links: "list[ForwardingLink]" = fg["links"]

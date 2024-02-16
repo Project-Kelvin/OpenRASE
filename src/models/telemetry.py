@@ -2,10 +2,10 @@
 Defines models related to telemetry.
 """
 
-from typing import TypedDict
 
 
-class VNFData(TypedDict):
+
+class VNFData(dict):
     """
     Represents the data of a VNF.
     """
@@ -15,7 +15,7 @@ class VNFData(TypedDict):
     networkUsage: float
 
 
-class SingleHostData(TypedDict):
+class SingleHostData(dict):
     """
     Represents the data of a single host.
     """
@@ -26,7 +26,7 @@ class SingleHostData(TypedDict):
     vnfs: "dict[str, VNFData]"
 
 
-class HostData(TypedDict):
+class HostData(dict):
     """
     Represents the data of the hosts.
     """
@@ -34,7 +34,7 @@ class HostData(TypedDict):
     hosts: "dict[str, SingleHostData]"
 
 
-class SrcDstData(TypedDict):
+class SrcDstData(dict):
     """
     Represents the data of the source and destination.
     """
@@ -44,7 +44,7 @@ class SrcDstData(TypedDict):
     value: float
 
 
-class FlowData(TypedDict):
+class FlowData(dict):
     """
     Represents the data of the flows.
     """
@@ -53,7 +53,7 @@ class FlowData(TypedDict):
     value: float
 
 
-class SwitchData(TypedDict):
+class SwitchData(dict):
     """
     Represents the data of the switches.
     """

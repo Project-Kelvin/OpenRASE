@@ -4,7 +4,7 @@ Additionally, defines an abstract class for subscribers.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, TypedDict
+from typing import Any
 
 
 class NotificationSystem():
@@ -12,7 +12,7 @@ class NotificationSystem():
     Class to handle publishing and subscribing to notifications.
     """
 
-    topics: "TypedDict[str, list[object]]" = {}
+    topics: "dict[str, list[object]]" = {}
 
     @classmethod
     def publish(cls, topic: str, *args: "list[Any]") -> None:

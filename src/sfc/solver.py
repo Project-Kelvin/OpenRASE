@@ -34,7 +34,7 @@ class Solver(ABC):
         self._sfcRequests.append(sfcRequests)
 
     @abstractmethod
-    def generateForwardingGraphs(self, sfcRequests: "list[SFCRequest]") -> None:
+    def generateEmbeddingGraphs(self, sfcRequests: "list[SFCRequest]") -> None:
         """
         Generate Forwarding Graphs for the SFC requests.
 

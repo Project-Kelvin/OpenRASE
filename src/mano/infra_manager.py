@@ -4,14 +4,14 @@ Defines the class that corresponds to the Virtualized Infrastructure Manager in 
 
 from ipaddress import IPv4Address, IPv4Network
 from time import sleep
-from typing import Any, Tuple, TypedDict
+from typing import Any, Tuple
 import requests
-from shared.constants.forwarding_graph import TERMINAL
+from shared.constants.embedding_graph import TERMINAL
 from shared.models.config import Config
 from shared.utils.config import getConfig
 from shared.utils.ip import generateIP
 from shared.models.topology import Topology
-from shared.models.forwarding_graph import VNF, ForwardingGraph
+from shared.models.embedding_graph import VNF, EmbeddingGraph
 from mininet.node import Ryu, Host, OVSKernelSwitch
 from mininet.net import Containernet
 from mininet.cli import CLI
@@ -22,7 +22,7 @@ from mano.notification_system import NotificationSystem
 from mano.sdn_controller import SDNController
 from mano.telemetry import Telemetry
 from utils.container import getContainerIP
-from utils.forwarding_graph import traverseVNF
+from utils.embedding_graph import traverseVNF
 
 class InfraManager():
     """
@@ -33,10 +33,10 @@ class InfraManager():
     _ryu: Ryu = None
     _topology: Topology = None
     _networkIPs: "list[IPv4Network]" = []
-    _hosts: "TypedDict[str, Host]" = {}
-    _switches: "TypedDict[str, OVSKernelSwitch]" = {}
+    _hosts: "dict[str, Host]" = {}
+    _switches: "dict[str, OVSKernelSwitch]" = {}
     _sdnController: SDNController = None
-    _hostIPs: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = {}
+    _hostIPs: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = {}
     _telemetry: Telemetry = None
 
     def __init__(self, sdnController: SDNController) -> None:
@@ -178,37 +178,37 @@ class InfraManager():
         sleep(10)
         NotificationSystem.publish(TOPOLOGY_INSTALLED)
 
-    def getHostIPs(self) -> "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]":
+    def getHostIPs(self) -> "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]":
         """
         Get the IPs of the hosts in the topology.
         """
 
         return self._hostIPs
 
-    def assignIPs(self, fg: ForwardingGraph) -> ForwardingGraph:
+    def embedSFC(self, fg: EmbeddingGraph) -> EmbeddingGraph:
         """
         Assign IPs to the hosts in the topology.
 
         Parameters:
-            fg (ForwardingGraph): The forwarding graph to be used to assign IPs.
+            fg (EmbeddingGraph): The forwarding graph to be used to assign IPs.
 
         Returns:
-            ForwardingGraph: The forwarding graph with the IPs assigned.
+            EmbeddingGraph: The forwarding graph with the IPs assigned.
         """
 
         vnfs: VNF = fg['vnfs']
-        vnfHosts: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = {
+        vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = {
             SFCC: self._hostIPs[SFCC]
         }
 
         def traverseCallback(vnfs: VNF,
-                             vnfHosts: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]") -> None:
+                             vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]") -> None:
             """
             Callback function for the traverseVNF function.
 
             Parameters:
                 vnfs (VNF): The VNF.
-                vnfHosts (TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
+                vnfHosts (dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
                 The hosts of the VNFs in the forwarding graph.
             """
 

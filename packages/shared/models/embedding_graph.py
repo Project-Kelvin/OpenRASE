@@ -1,11 +1,11 @@
 """
-Defines the `ForwardingGraphs` dictionary type and its associated types.
+Defines the `EmbeddingGraphs` dictionary type and its associated types.
 """
 
-from typing import Optional, TypedDict
+from typing import Optional
 
 
-class ChainEntity(TypedDict):
+class ChainEntity(dict):
     """
     Defines the `ChainEntity` dictionary type.
     """
@@ -30,7 +30,7 @@ class ForwardingLink:
     links: "list[str]"
 
 
-class VNF(TypedDict):
+class VNF(dict):
     """
     Defines the `VNF` dictionary type.
     """
@@ -41,9 +41,9 @@ class VNF(TypedDict):
     isTraversed: Optional[bool]
 
 
-class ForwardingGraph(TypedDict):
+class EmbeddingGraph(dict):
     """
-    Defines the `ForwardingGraph` dictionary type.
+    Defines the `EmbeddingGraph` dictionary type.
     """
 
     sfcID: str
@@ -51,4 +51,4 @@ class ForwardingGraph(TypedDict):
     links: "list[ForwardingLink]"
 
 # pylint: disable=invalid-name
-ForwardingGraphs = "list[ForwardingGraph]"
+EmbeddingGraphs = "list[EmbeddingGraph]"

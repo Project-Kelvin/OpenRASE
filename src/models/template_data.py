@@ -2,10 +2,10 @@
 Contains the model of the Jinja2 template data dictionary.
 """
 
-from typing import TypedDict
 
 
-class TemplateData(TypedDict):
+
+class TemplateData(dict):
     """
     Defines the `TemplateData` dictionary type.
     """

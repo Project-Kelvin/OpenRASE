@@ -5,7 +5,7 @@ Provides the encoding and decoding functions to encode/decode the SFC metadata i
 import json
 import base64
 from typing import Any
-from shared.models.forwarding_graph import VNF
+from shared.models.embedding_graph import VNF
 
 
 def sfcEncode(data: VNF) -> Any:

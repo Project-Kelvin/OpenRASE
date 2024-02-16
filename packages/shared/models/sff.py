@@ -2,9 +2,9 @@
 Defines the models related to the SFF app.
 """
 
-from typing import TypedDict
 
-class AddHostRequestBody(TypedDict):
+
+class AddHostRequestBody(dict):
     """
     Defines the `AddHostRequestBody` dictionary type.
     """

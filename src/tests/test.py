@@ -3,8 +3,8 @@ This file is used to test the functionality of the SFC Emulator.
 """
 
 from typing import Any
-from shared.constants.forwarding_graph import TERMINAL
-from shared.models.forwarding_graph import ForwardingGraph
+from shared.constants.embedding_graph import TERMINAL
+from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from constants.notification import SFF_DEPLOYED
@@ -64,7 +64,7 @@ topo: Topology = {
     ]
 }
 
-fg: ForwardingGraph = {
+fg: EmbeddingGraph = {
     "sfcID": "sfc1",
     "vnfs": {
         "host": {
@@ -119,7 +119,7 @@ fg: ForwardingGraph = {
     ]
 }
 
-simpleFG: ForwardingGraph = {
+simpleFG: EmbeddingGraph = {
     "sfcID": "sfc2",
     "vnfs": {
         "host": {
@@ -184,7 +184,7 @@ class Test(Subscriber):
 
     def receiveNotification(self, topic: str, *args: "list[Any]"):
         if topic == SFF_DEPLOYED:
-            self._vnfManager.deployForwardingGraphs([simpleFG])
+            self._vnfManager.deployEmbeddingGraphs([simpleFG])
 
     def getData(self):
         """

@@ -2,10 +2,10 @@
 Defines the `Topology` dictionary type and its associated types.
 """
 
-from typing import TypedDict
 
 
-class Host(TypedDict):
+
+class Host(dict):
     """
     Defines the `Host` dictionary type.
     """
@@ -21,7 +21,7 @@ class Host(TypedDict):
     memory: str
 
 
-class Switch(TypedDict):
+class Switch(dict):
     """
     Defines the `Switch` dictionary type.
     """
@@ -29,7 +29,7 @@ class Switch(TypedDict):
     id: str
 
 
-class Link(TypedDict):
+class Link(dict):
     """
     Defines the `Link` dictionary type.
     """
@@ -39,7 +39,7 @@ class Link(TypedDict):
     bandwidth: int
 
 
-class Topology(TypedDict):
+class Topology(dict):
     """
     Defines the `Topology` dictionary type.
     """

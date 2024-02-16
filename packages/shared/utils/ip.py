@@ -3,7 +3,7 @@ Provides utils replated IP address operations.
 """
 
 
-from typing import Iterator, Literal, Tuple, TypedDict
+from typing import Iterator, Literal, Tuple
 from ipaddress import IPv4Address, IPv4Network, ip_address, ip_network
 
 from shared.models.config import Config
@@ -61,7 +61,7 @@ def generateLocalNetworkIP(mask: int, existingIPs: "list[IPv4Network]") -> IPv4N
     classes: "list[str]" = ["A", "B", "C"]
 
     # pylint: disable=invalid-name
-    ClassRange = TypedDict(
+    ClassRange = dict(
         "ClassRange", {"start": IPv4Network, "end": IPv4Network})
 
     classRanges: "dict[Literal['A', 'B', 'C'], ClassRange]" = {

@@ -3,7 +3,7 @@ Defines the SFCRequestGenerator abstract class.
 """
 
 from abc import ABC, abstractmethod
-from sfc.solver import Solver
+from mano.orchestrator import Orchestrator
 
 
 class SFCRequestGenerator(ABC):
@@ -11,17 +11,17 @@ class SFCRequestGenerator(ABC):
     Abstract class for generating SFC requests.
     """
 
-    _solver: Solver = None
+    _orchestrator: Orchestrator = None
 
-    def __init__(self, solver: Solver) -> None:
+    def __init__(self, orchestrator: Orchestrator) -> None:
         """
         Constructor for the class.
 
         Parameters:
-            solver (Solver): The solver.
+            orchestrator (Orchestrator): The orchestrator.
         """
 
-        self._solver = solver
+        self._orchestrator = orchestrator
 
     @abstractmethod
     def generateRequests(self) -> None:

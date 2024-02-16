@@ -4,10 +4,10 @@ Defines the VNFManager class that corresponds to the VNF Manager in the NFV arch
 
 from ipaddress import IPv4Address, IPv4Network
 from time import sleep
-from typing import Any, Tuple, TypedDict
+from typing import Any, Tuple
 from threading import Thread
 import requests
-from shared.models.forwarding_graph import VNF, ForwardingGraph, VNFEntity
+from shared.models.embedding_graph import VNF, EmbeddingGraph, VNFEntity
 from shared.models.topology import Host as TopoHost
 from shared.utils.config import getConfig
 from shared.utils.container import getVNFContainerTag
@@ -21,7 +21,7 @@ from mano.notification_system import NotificationSystem, Subscriber
 from docker.types import IPAMConfig, IPAMPool
 from docker import DockerClient
 from utils.container import connectToDind, getContainerIP
-from utils.forwarding_graph import traverseVNF
+from utils.embedding_graph import traverseVNF
 
 
 class VNFManager(Subscriber):
@@ -30,7 +30,7 @@ class VNFManager(Subscriber):
     """
 
     _infraManager: InfraManager = None
-    _forwardingGraphs: "list[ForwardingGraph]" = []
+    _embeddingGraphs: "list[EmbeddingGraph]" = []
 
     def __init__(self, infraManager: InfraManager) -> None:
         """
@@ -48,7 +48,7 @@ class VNFManager(Subscriber):
         Deploy the SFF.
         """
 
-        hostIPs: "TypedDict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = self._infraManager.getHostIPs()
+        hostIPs: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = self._infraManager.getHostIPs()
         threads: "list[Thread]" = []
 
         def deploySFFinNode(host: str):
@@ -83,19 +83,19 @@ class VNFManager(Subscriber):
         sleep(10)
         NotificationSystem.publish(SFF_DEPLOYED)
 
-    def _deployForwardingGraph(self, fg: ForwardingGraph) -> None:
+    def _deployEmbeddingGraph(self, fg: EmbeddingGraph) -> None:
         """
         Deploy the forwarding graph.
 
         Parameters:
-            fg (ForwardingGraph): The forwarding graph to be deployed.
+            fg (EmbeddingGraph): The forwarding graph to be deployed.
         """
 
-        updatedFG: ForwardingGraph = self._infraManager.assignIPs(fg)
+        updatedFG: EmbeddingGraph = self._infraManager.embedSFC(fg)
         vnfs: VNF = updatedFG["vnfs"]
         sfcId: str = updatedFG["sfcID"]
         vnfList: "list[str]" = []
-        sharedVolumes: "TypedDict[str, list[str]]" = getConfig()[
+        sharedVolumes: "dict[str, list[str]]" = getConfig()[
             "vnfs"]["sharedVolumes"]
         threads: "list[Thread]" = []
 
@@ -148,7 +148,7 @@ class VNFManager(Subscriber):
         for thread in threads:
             thread.join()
 
-        self._forwardingGraphs.append(updatedFG)
+        self._embeddingGraphs.append(updatedFG)
 
         sfccIP: str = getContainerIP(SFCC)
 
@@ -160,18 +160,18 @@ class VNFManager(Subscriber):
 
         NotificationSystem.publish(FORWARDING_GRAPH_DEPLOYED, updatedFG)
 
-    def deployForwardingGraphs(self, fgs: "list[ForwardingGraph]") -> None:
+    def deployEmbeddingGraphs(self, fgs: "list[EmbeddingGraph]") -> None:
         """
         Deploy the forwarding graphs.
 
         Parameters:
-            fgs (list[ForwardingGraph]): The forwarding graphs to be deployed.
+            fgs (list[EmbeddingGraph]): The forwarding graphs to be deployed.
         """
 
         threads: "list[Thread]" = []
         for fg in fgs:
             thread: Thread = Thread(
-                target=self._deployForwardingGraph, args=(fg,))
+                target=self._deployEmbeddingGraph, args=(fg,))
             thread.start()
 
             threads.append(thread)

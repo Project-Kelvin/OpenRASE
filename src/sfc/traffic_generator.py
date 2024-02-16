@@ -4,7 +4,7 @@ Defines the TrafficGenerator class.
 
 from typing import Any
 
-from shared.models.forwarding_graph import ForwardingGraph
+from shared.models.embedding_graph import EmbeddingGraph
 from constants.notification import FORWARDING_GRAPH_DEPLOYED
 from mano.notification_system import Subscriber
 
@@ -15,7 +15,7 @@ class TrafficGenerator(Subscriber):
     """
 
     _design = None
-    _forwardingGraphs: "list[ForwardingGraph]" = []
+    _embeddingGraphs: "list[EmbeddingGraph]" = []
 
     def setDesign(self, design) -> None:
         """
@@ -43,7 +43,7 @@ class TrafficGenerator(Subscriber):
 
     def receiveNotification(self, topic, *args: "list[Any]") -> None:
         if topic == FORWARDING_GRAPH_DEPLOYED:
-            fg: ForwardingGraph = args[0]
-            self._forwardingGraphs.append(fg)
+            fg: EmbeddingGraph = args[0]
+            self._embeddingGraphs.append(fg)
 
             pass

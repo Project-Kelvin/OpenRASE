@@ -14,7 +14,7 @@ from sys import maxsize
 from typing import Any
 from urllib.request import HTTPHandler, Request, build_opener
 import requests
-from shared.models.forwarding_graph import VNF, ForwardingGraph, VNFEntity
+from shared.models.embedding_graph import VNF, EmbeddingGraph, VNFEntity
 from shared.models.topology import Host, Topology
 from shared.utils.config import getConfig
 from shared.utils.container import doesContainerExist
@@ -25,7 +25,7 @@ from constants.notification import FORWARDING_GRAPH_DEPLOYED
 from mano.notification_system import NotificationSystem, Subscriber
 from models.telemetry import HostData, SwitchData
 from utils.container import connectToDind
-from utils.forwarding_graph import traverseVNF
+from utils.embedding_graph import traverseVNF
 from docker import DockerClient, from_env
 from docker.models.containers import Container
 
@@ -398,15 +398,15 @@ class Telemetry(Subscriber):
 
         return switchData
 
-    def _mapVNFsToHosts(self, forwardingGraph: ForwardingGraph) -> None:
+    def _mapVNFsToHosts(self, embeddingGraph: EmbeddingGraph) -> None:
         """
         Map the VNFs to the hosts.
 
         Parameters:
-            forwardingGraph (ForwardingGraph): The forwarding graph.
+            embeddingGraph (EmbeddingGraph): The forwarding graph.
         """
 
-        vnfs: VNF = forwardingGraph["vnfs"]
+        vnfs: VNF = embeddingGraph["vnfs"]
 
         def traverseCallback(vnf: VNF) -> None:
             """

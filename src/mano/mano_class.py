@@ -29,36 +29,6 @@ class MANO():
         self._orchestrator = Orchestrator(
             self._infraManager, self._vnfManager, self._sdnController)
 
-    def getInfraManager(self) -> InfraManager:
-        """
-        Get the infrastructure manager.
-
-        Returns:
-            InfraManager: The infrastructure manager.
-        """
-
-        return self._infraManager
-
-    def getVNFManager(self) -> VNFManager:
-        """
-        Get the VNF manager.
-
-        Returns:
-            VNFManager: The VNF manager.
-        """
-
-        return self._vnfManager
-
-    def getSDNController(self) -> SDNController:
-        """
-        Get the SDN controller.
-
-        Returns:
-            SDNController: The SDN controller.
-        """
-
-        return self._sdnController
-
     def getOrchestrator(self) -> Orchestrator:
         """
         Get the orchestrator.

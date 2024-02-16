@@ -2,11 +2,13 @@
 Defines the class that corresponds to the Orchestrator class in the NFV architecture.
 """
 
-from shared.models.forwarding_graph import ForwardingGraph
+from shared.models.embedding_graph import EmbeddingGraph
+from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from mano.infra_manager import InfraManager
 from mano.vnf_manager import VNFManager
 from mano.sdn_controller import SDNController
+from sfc.solver import Solver
 
 
 class Orchestrator():
@@ -17,6 +19,7 @@ class Orchestrator():
     _infraManager: InfraManager = None
     _vnfManager: VNFManager = None
     _sdnController: SDNController = None
+    _solver: Solver = None
 
     def __init__(self,
                  infraManager: InfraManager,
@@ -27,15 +30,15 @@ class Orchestrator():
         self._sdnController = sdnController
 
 
-    def sendForwardingGraphs(self, fgs: "list[ForwardingGraph]") -> None:
+    def sendEmbeddingGraphs(self, fgs: "list[EmbeddingGraph]") -> None:
         """
         Send the forwarding graphs to the orchestrator.
 
         Parameters:
-            fgs (list[ForwardingGraph]): The list of forwarding graphs.
+            fgs (list[EmbeddingGraph]): The list of forwarding graphs.
         """
 
-        self._vnfManager.deployForwardingGraphs(fgs)
+        self._vnfManager.deployEmbeddingGraphs(fgs)
 
     def getTopology(self) -> Topology:
         """
@@ -50,3 +53,33 @@ class Orchestrator():
         """
 
         self._infraManager.getTelemetry()
+
+    def installTopology(self, topology: Topology) -> None:
+        """
+        Install the topology using the infrastructure manager.
+
+        Parameters:
+            topology (Topology): The topology to install.
+        """
+
+        self._infraManager.installTopology(topology)
+
+    def injectSolver(self, solver: Solver) -> None:
+        """
+        Inject the solver into the orchestrator.
+
+        Parameters:
+            solver (Solver): The solver to inject.
+        """
+
+        self._solver = solver
+
+    def sendSFCRequests(self, sfcRequests: "list[SFCRequest]") -> None:
+        """
+        Send the SFC requests to the orchestrator.
+
+        Parameters:
+            sfcRequests (list[SFCRequest]): The list of SFC requests.
+        """
+
+        self._solver.sendSFCRequests(sfcRequests)

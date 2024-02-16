@@ -2,10 +2,8 @@
 Defines the models of the `Config` dictionary type and its associated types.
 """
 
-from typing import TypedDict
 
-
-class SFFNetwork(TypedDict):
+class SFFNetwork(dict):
     """
     Defines the `SFFNetwork` dictionary type.
     """
@@ -14,7 +12,7 @@ class SFFNetwork(TypedDict):
     sffIP: str
 
 
-class SFF(TypedDict):
+class SFF(dict):
     """
     Defines the `SFF` dictionary type.
     """
@@ -24,7 +22,7 @@ class SFF(TypedDict):
     port: int
 
 
-class Server(TypedDict):
+class Server(dict):
     """
     Defines the `WebServer` dictionary type.
     """
@@ -32,7 +30,7 @@ class Server(TypedDict):
     port: int
 
 
-class VNFProxy(TypedDict):
+class VNFProxy(dict):
     """
     Defines the `VNFProxy` dictionary type.
     """
@@ -40,7 +38,7 @@ class VNFProxy(TypedDict):
     port: int
 
 
-class SFCClassifier(TypedDict):
+class SFCClassifier(dict):
     """
     Defines the `SFCClassifier` dictionary type.
     """
@@ -48,7 +46,7 @@ class SFCClassifier(TypedDict):
     port: int
 
 
-class General(TypedDict):
+class General(dict):
     """
     Defines the `General` dictionary type.
     """
@@ -56,7 +54,7 @@ class General(TypedDict):
     requestTimeout: int
 
 
-class IPRange(TypedDict):
+class IPRange(dict):
     """
     Defines the `IPRange` dictionary type.
     """
@@ -64,15 +62,15 @@ class IPRange(TypedDict):
     mask: int
 
 
-class VNFs(TypedDict):
+class VNFs(dict):
     """
     Defines the `VNFs` dictionary type.
     """
 
-    sharedVolumes: "TypedDict[str, list[str]]"
+    sharedVolumes: "dict[str, list[str]]"
 
 
-class Config(TypedDict):
+class Config(dict):
     """
     Defines the `Config` dictionary type.
     """

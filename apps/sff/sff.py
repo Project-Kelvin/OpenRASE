@@ -6,9 +6,9 @@ SFF/VNF in the Service Function Chain.
 
 from wsgiref.headers import Headers
 
-from shared.constants.forwarding_graph import TERMINAL
+from shared.constants.embedding_graph import TERMINAL
 from shared.models.config import Config
-from shared.models.forwarding_graph import VNF
+from shared.models.embedding_graph import VNF
 from shared.constants.sfc import SFC_HEADER, SFC_TRAVERSED_HEADER
 from shared.utils.encoder_decoder import sfcDecode, sfcEncode
 from shared.utils.config import getConfig

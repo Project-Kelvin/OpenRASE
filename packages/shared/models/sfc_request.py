@@ -2,10 +2,10 @@
 Defines the models associated with SFC Requests.
 """
 
-from typing import TypedDict
 
 
-class SFCRequest(TypedDict):
+
+class SFCRequest(dict):
     """
     Defines the `SFCRequest` dictionary type.
     """

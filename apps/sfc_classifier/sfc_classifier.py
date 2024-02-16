@@ -6,12 +6,12 @@ Following the classification, the SFC Classifier adds the SFC metadata to the HT
 the traffic to the next SFF/VNF in the SFC.
 """
 
-from typing import Any, TypedDict
+from typing import Any
 from wsgiref.headers import Headers
 from flask import Flask, Response, request
 import requests
 from shared.constants.sfc import SFC_HEADER, SFC_ID
-from shared.models.forwarding_graph import VNF, ForwardingGraph, ForwardingGraphs
+from shared.models.embedding_graph import VNF, EmbeddingGraph, EmbeddingGraphs
 from shared.models.config import Config
 from shared.utils.config import getConfig
 from shared.utils.encoder_decoder import sfcEncode
@@ -19,11 +19,11 @@ from shared.utils.encoder_decoder import sfcEncode
 app: Flask = Flask(__name__)
 config: Config = getConfig()
 
-forwardingGraphs: "TypedDict[str, ForwardingGraphs]" = {}
+embeddingGraphs: "dict[str, EmbeddingGraphs]" = {}
 fgLock: bool = False
 
 
-def addForwardingGraphToMemory(sfcID: str, forwardingGraph: ForwardingGraph):
+def addEmbeddingGraphToMemory(sfcID: str, embeddingGraph: EmbeddingGraph):
     """
     Add the VNF Forwarding Graph to the in-memory list of VNF Forwarding Graphs.
     """
@@ -35,7 +35,7 @@ def addForwardingGraphToMemory(sfcID: str, forwardingGraph: ForwardingGraph):
         pass
 
     fgLock = True
-    forwardingGraphs[sfcID] = forwardingGraph
+    embeddingGraphs[sfcID] = embeddingGraph
     fgLock = False
 
 
@@ -46,10 +46,10 @@ def addFG():
     adds it to the in-memory list of Forwarding Graphs.
     """
 
-    fg: ForwardingGraph = request.get_json()
+    fg: EmbeddingGraph = request.get_json()
     fg["isTraversed"] = False
 
-    addForwardingGraphToMemory(fg["sfcID"], fg)
+    addEmbeddingGraphToMemory(fg["sfcID"], fg)
 
     return "The Forwarding Graph has been successfully added.\n", 201
 
@@ -66,13 +66,13 @@ def default():
 
         sfcID: str = request.headers[SFC_ID]
 
-        if sfcID not in forwardingGraphs:
+        if sfcID not in embeddingGraphs:
             return (
                 "The SFC-ID is not registered with the SFC Classifier.\n"
                 "Use the `add-fg` endpoint to register it."
             ), 400
 
-        sfc: VNF = forwardingGraphs[sfcID]["vnfs"]
+        sfc: VNF = embeddingGraphs[sfcID]["vnfs"]
 
         sfcBase64: Any = sfcEncode(sfc)
 
