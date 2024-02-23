@@ -2,11 +2,14 @@
 Defines the abstract Solver class.
 """
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
-
+from typing import TYPE_CHECKING
 from shared.models.sfc_request import SFCRequest
-from mano.orchestrator import Orchestrator
 from sfc.traffic_generator import TrafficGenerator
+
+if TYPE_CHECKING:
+    from mano.orchestrator import Orchestrator
 
 
 class Solver(ABC):
@@ -34,10 +37,7 @@ class Solver(ABC):
         self._sfcRequests.append(sfcRequests)
 
     @abstractmethod
-    def generateEmbeddingGraphs(self, sfcRequests: "list[SFCRequest]") -> None:
+    def generateEmbeddingGraphs(self) -> None:
         """
         Generate Forwarding Graphs for the SFC requests.
-
-        Parameters:
-            sfcRequests (list[SFCRequest]): The list of SFC requests.
         """
