@@ -2,13 +2,15 @@
 Defines the SFCEmulator class.
 """
 
+from threading import Thread
 from typing import Any, Type
 from shared.models.topology import Topology
+from shared.models.traffic_design import TrafficDesign
 from constants.notification import SFF_DEPLOYED
 from mano.mano_class import MANO
 from mano.notification_system import NotificationSystem, Subscriber
 from sfc.solver import Solver
-from sfc.sfc_request_generator import SFCRequestGenerator
+from sfc.sfc_request_generator import ISFCRequestGenerator
 from sfc.traffic_generator import TrafficGenerator
 
 
@@ -18,28 +20,29 @@ class SFCEmulator(Subscriber):
     """
 
     _mano: MANO = None
-    _sfcRequestGenerator: SFCRequestGenerator = None
+    _sfcRequestGenerator: ISFCRequestGenerator = None
     _trafficGenerator: TrafficGenerator = None
     _solver: Solver = None
 
-    def __init__(self, sfcRequestGenerator: Type[SFCRequestGenerator], solver: Type[Solver]) -> None:
+    def __init__(self, sfcRequestGenerator: Type[ISFCRequestGenerator], solver: Type[Solver]) -> None:
         """
         Constructor for the class.
 
         Parameters:
-            sfcRequestGenerator (SFCRequestGenerator): The SFC request generator.
+            sfcRequestGenerator (ISFCRequestGenerator): The SFC request generator.
             solver (Type[Solver]): A child class of Solver.
         """
 
         self._mano = MANO()
         self._trafficGenerator = TrafficGenerator()
-        self._solver = solver(self._mano.getOrchestrator(), self._trafficGenerator)
+        self._solver = solver(self._mano.getOrchestrator(),
+                              self._trafficGenerator)
         self._mano.getOrchestrator().injectSolver(self._solver)
-        self._sfcRequestGenerator = sfcRequestGenerator(self._mano.getOrchestrator())
+        self._sfcRequestGenerator = sfcRequestGenerator(
+            self._mano.getOrchestrator())
         NotificationSystem.subscribe(SFF_DEPLOYED, self)
 
-
-    def startTest(self, topology: Topology, trafficDesign) -> None:
+    def startTest(self, topology: Topology, trafficDesign: "list[TrafficDesign]") -> None:
         """
         Start a test.
 
@@ -48,11 +51,25 @@ class SFCEmulator(Subscriber):
             trafficDesign (dict): The design of the traffic generator..
         """
 
-        self._mano.getOrchestrator().installTopology(topology)
         self._trafficGenerator.setDesign(trafficDesign)
-
+        self._mano.getOrchestrator().installTopology(topology)
 
     def receiveNotification(self, topic, *args: "list[Any]") -> None:
         if topic == SFF_DEPLOYED:
-            self._sfcRequestGenerator.generateRequests()
-            self._solver.generateEmbeddingGraphs()
+            Thread(target=self._sfcRequestGenerator.generateRequests).start()
+            Thread(target=self._solver.generateEmbeddingGraphs).start()
+
+    def startCLI(self) -> None:
+        """
+        Start the command line interface.
+        """
+
+        self._mano.getOrchestrator().startCLI()
+
+    def end(self) -> None:
+        """
+        End the emulator.
+        """
+
+        self._mano.getOrchestrator().end()
+        self._trafficGenerator.end()
