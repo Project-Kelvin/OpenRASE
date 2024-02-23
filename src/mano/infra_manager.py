@@ -16,7 +16,7 @@ from mininet.node import Ryu, Host, OVSKernelSwitch
 from mininet.net import Containernet
 from mininet.cli import CLI
 from constants.notification import TOPOLOGY_INSTALLED
-from constants.topology import SERVER, SFCC, SFCC_SWITCH, TRAFFIC_GENERATOR
+from constants.topology import SERVER, SFCC
 from constants.container import CPU_PERIOD, DIND_IMAGE, SERVER_IMAGE, SFCC_IMAGE
 from mano.notification_system import NotificationSystem
 from mano.sdn_controller import SDNController
@@ -64,42 +64,18 @@ class InfraManager():
 
         config: Config = getConfig()
 
-        # Add traffic generator
-        ipTG: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(self._networkIPs)
-
-        tg: Host = self._net.addDocker(
-            TRAFFIC_GENERATOR,
-            ip=f"{ipTG[2]}/{ipTG[0].prefixlen}",
-            dimage=DIND_IMAGE,
-            privileged=True,
-            dcmd="dockerd",
-            volumes=[
-                config["repoAbsolutePath"]
-                + "/docker/compose:/home/docker"
-            ]
-        )
-
-        # Add SFCC Switch
-        sfccTGSwitch: OVSKernelSwitch = self._net.addSwitch(SFCC_SWITCH)
-        sfccTGSwitch.start([self._ryu])
-
-        # Add SFCC Switch-TG Link
-        self._net.addLink(tg, sfccTGSwitch)
-
         # Add SFCC
-        ipSFCCTG: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
+        ipSFCC: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
             self._networkIPs)
 
         sfcc: Host = self._net.addDocker(
             SFCC,
-            ip=f"{ipSFCCTG[2]}/{ipSFCCTG[0].prefixlen}",
+            ip=f"{ipSFCC[2]}/{ipSFCC[0].prefixlen}",
             dimage=SFCC_IMAGE,
             dcmd="poetry run python sfc_classifier.py",
         )
         self._hosts[SFCC]=sfcc
-
-        # Add SFCC Link
-        self._net.addLink(sfccTGSwitch, sfcc)
+        self._hostIPs[SFCC] = ipSFCC
 
         # Add server
         ipServer: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
@@ -152,25 +128,11 @@ class InfraManager():
         self._net.start()
         sleep(5)
 
-        # Add ip to SFCC's interface connecting to the switch that connects to the rest of the topology.
-        ipSFCCTopo: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
-            self._networkIPs)
-        sfcc.setIP(str(ipSFCCTopo[2]), prefixLen=ipSFCCTopo[0].prefixlen, intf=f"{sfcc.name}-eth1")
-        self._hostIPs[SFCC] = ipSFCCTopo
-
-        # Add routes
-        sfcc.cmd(f"ip route add {str(ipTG[0])} via {str(ipSFCCTG[1])}")
-        tg.cmd(f"ip route add {str(ipSFCCTG[0])} via {str(ipTG[1])}")
-
         for name, host in self._hosts.items():
             for name1, host1 in self._hosts.items():
                 if host.name != host1.name:
                     host.cmd(
                         f"ip route add {str(self._hostIPs[name1][0])} via {str(self._hostIPs[name][1])}")
-
-        # Add SFCC switch ip addresses
-        self._sdnController.assignIP(ipSFCCTG[1], sfccTGSwitch)
-        self._sdnController.assignIP(ipTG[1], sfccTGSwitch)
 
         self._sdnController.assignSwitchIPs(topology, self._switches, self._hostIPs, self._networkIPs)
 
