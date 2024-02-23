@@ -2,19 +2,15 @@
 This file is used to test the functionality of the SFC Emulator.
 """
 
-from typing import Any
 from shared.constants.embedding_graph import TERMINAL
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
-from constants.notification import SFF_DEPLOYED
+from shared.models.traffic_design import TrafficDesign
 from constants.topology import SERVER, SFCC
-from mano.infra_manager import InfraManager
-from mano.notification_system import NotificationSystem, Subscriber
-from mano.sdn_controller import SDNController
-from mano.vnf_manager import VNFManager
-from utils.container import getContainerIP
-
+from sfc.sfc_emulator import SFCEmulator
+from sfc.sfc_request_generator import ISFCRequestGenerator
+from sfc.solver import Solver
 
 topo: Topology = {
     "hosts": [
@@ -160,50 +156,41 @@ simpleFG: EmbeddingGraph = {
 sfcRequest: SFCRequest = {
     "sfcrID": "sfcr1",
     "latency": 100,
-    "vnfs": ["lb, ha, tm, waf"],
-    "strictOrder": ["waf, ha"],
+    "vnfs": ["lb", "ha", "tm", "waf"],
+    "strictOrder": ["waf", "ha"],
 }
 
+trafficDesign: "list[TrafficDesign]" = [
+    [
+        {
+            "target": 100,
+            "duration": "5m"
+        }
+    ]
+]
 
-class Test(Subscriber):
+class SFCRequestGenerator(ISFCRequestGenerator):
     """
-    Test class.
+    SFC Request Generator.
     """
 
-    def __init__(self):
-        self._infraManager: InfraManager = InfraManager(SDNController())
-        self._vnfManager: VNFManager = VNFManager(self._infraManager)
-        NotificationSystem.subscribe(SFF_DEPLOYED, self)
+    def generateRequests(self) -> None:
 
-    def startTest(self):
+        return self._orchestrator.sendSFCRequests([sfcRequest])
+
+class SFCSolver(Solver):
+    """
+    SFC Solver.
+    """
+
+    def generateEmbeddingGraphs(self) -> None:
         """
-        Start the test.
-        """
-
-        self._infraManager.installTopology(topo)
-
-    def receiveNotification(self, topic: str, *args: "list[Any]"):
-        if topic == SFF_DEPLOYED:
-            self._vnfManager.deployEmbeddingGraphs([simpleFG])
-
-    def getData(self):
-        """
-        Get the data.
+        Generate the embedding graphs.
         """
 
-        print(self._infraManager.getTelemetry().getHostData())
-        print(self._infraManager.getTelemetry().getSwitchData())
+        return self._orchestrator.sendEmbeddingGraphs([fg])
 
-    def wait(self):
-        """
-        Wait for the test to finish.
-        """
-
-        self._infraManager.startCLI()
-        self._infraManager.stopNetwork()
-
-test = Test()
-test.startTest()
-test.getData()
-print(getContainerIP(SFCC))
-test.wait()
+sfcEmulator = SFCEmulator(SFCRequestGenerator, SFCSolver)
+sfcEmulator.startTest(topo, trafficDesign)
+sfcEmulator.startCLI()
+sfcEmulator.end()
