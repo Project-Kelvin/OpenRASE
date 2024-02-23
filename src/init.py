@@ -141,7 +141,7 @@ def addRegistryToInsecureRegistries() -> None:
 def generateTemplateData() -> TemplateData:
     """
     Generate the template data for the templates.
-    This is a dictionary that contains the data te replace the placeholders in the templates.
+    This is a dictionary that contains the data to replace the placeholders in the templates with.
 
     Returns:
         TemplateData: The template data.

@@ -187,5 +187,6 @@ class VNFManager(Subscriber):
             topic (str): The topic of the notification.
             args (list[Any]): The arguments of the notification.
         """
+
         if topic == TOPOLOGY_INSTALLED:
             self._deploySFF()
