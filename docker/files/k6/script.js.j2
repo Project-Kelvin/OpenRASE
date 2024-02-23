@@ -1,0 +1,28 @@
+import http from "k6/http";
+import { check } from "k6";
+
+export const options = {
+    scenarios: {
+        default: {
+            executor: "ramping-arrival-rate",
+            timeUnit: "1m",
+            startRate: 100,
+            preAllocatedVUs: 1,
+            stages: {{DESIGN}}
+        }
+    }
+};
+
+export default function () {
+    const res = http.get(`http://${ __ENV.MY_HOSTNAME }/`, {
+        headers:{
+            "SFC-ID": __ENV.SFC_ID
+        },
+        tags: {
+            sfcID: __ENV.SFC_ID
+        }
+    });
+    check(res, {
+        "is status 200": (r) => r.status === 200
+    });
+}
