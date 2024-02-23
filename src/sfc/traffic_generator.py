@@ -89,16 +89,6 @@ class TrafficGenerator(Subscriber):
             sfcID (str): The ID of the SFC.
         """
 
-        self._deployK6(sfcID)
-
-    def _deployK6(self, sfcID: str) -> None:
-        """
-        Deploy K6.
-
-        Parameters:
-            sfcID (str): The ID of the SFC.
-        """
-
         # Select a design randomly from the list of designs.
         random.seed()
         design: TrafficDesign = self._design[random.randint(
