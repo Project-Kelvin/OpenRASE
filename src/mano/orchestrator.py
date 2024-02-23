@@ -83,3 +83,17 @@ class Orchestrator():
         """
 
         self._solver.sendSFCRequests(sfcRequests)
+
+    def end(self) -> None:
+        """
+        End the orchestrator.
+        """
+
+        self._infraManager.stopNetwork()
+
+    def startCLI(self) -> None:
+        """
+        Start the CLI.
+        """
+
+        self._infraManager.startCLI()
