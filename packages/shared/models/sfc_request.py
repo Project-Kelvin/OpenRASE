@@ -3,8 +3,6 @@ Defines the models associated with SFC Requests.
 """
 
 
-
-
 class SFCRequest(dict):
     """
     Defines the `SFCRequest` dictionary type.
