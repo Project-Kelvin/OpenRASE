@@ -30,6 +30,10 @@ from docker import DockerClient, from_env
 from docker.models.containers import Container
 
 
+SFLOW_CONTAINER: str = "sflow"
+SFLOW_IMAGE: str = "sflow/sflow-rt"
+
+
 class Telemetry(Subscriber):
     """
     Class that collects and sends telemetry data of the topology.
@@ -37,8 +41,6 @@ class Telemetry(Subscriber):
 
     _topology: Topology = None
     _vnfsInHosts: "dict[str, list[VNFEntity]]" = {}
-    _SFLOW_CONTAINER: str = "sflow"
-    _SFLOW_IMAGE: str = "sflow/sflow-rt"
 
     def __init__(self, topology: Topology) -> None:
         """
@@ -59,13 +61,13 @@ class Telemetry(Subscriber):
 
         client: DockerClient = from_env()
 
-        if doesContainerExist(self._SFLOW_CONTAINER):
-            client.containers.get(self._SFLOW_CONTAINER).remove(force=True)
+        if doesContainerExist(SFLOW_CONTAINER):
+            client.containers.get(SFLOW_CONTAINER).remove(force=True)
 
         client.containers.run(
-            self._SFLOW_IMAGE,
+            SFLOW_IMAGE,
             detach=True,
-            name=self._SFLOW_CONTAINER,
+            name=SFLOW_CONTAINER,
             ports={
                 8008: 8008,
                 6343: "6343/udp"
@@ -165,7 +167,8 @@ class Telemetry(Subscriber):
             def result(*args, **kwargs):
                 res = fn(*args, **kwargs)
                 net = args[0]
-                ip = from_env().containers.get(cls._SFLOW_CONTAINER).attrs["NetworkSettings"]["IPAddress"]
+                ip = from_env().containers.get(
+                    SFLOW_CONTAINER).attrs["NetworkSettings"]["IPAddress"]
                 sampling = 10
                 polling = 10
                 (ifname, agent) = getIfInfo(ip)
@@ -300,7 +303,7 @@ class Telemetry(Subscriber):
         Get the data of the switches.
         """
 
-        sflow: Container = from_env().containers.get(self._SFLOW_CONTAINER)
+        sflow: Container = from_env().containers.get(SFLOW_CONTAINER)
         ip: str = sflow.attrs["NetworkSettings"]["IPAddress"]
         sflowGatewayIP = sflow.attrs["NetworkSettings"]["Gateway"]
         sflowUrl = f"http://{ip}:8008"
@@ -335,13 +338,14 @@ class Telemetry(Subscriber):
             "accept": "*/*"
         }
 
+        # pylint: disable=invalid-name
         SRC_DST: str = "srcdst"
         resp: Any = requests.get(
             f"{sflowUrl}/flow/json", timeout=timeout)
         if SRC_DST not in resp.json():
             # srcdst flow not enabled. Enabling it.
             requests.put(f"{sflowUrl}/flow/{SRC_DST}/json",
-                        json=requestData, headers=requestHeaders, timeout=timeout)
+                         json=requestData, headers=requestHeaders, timeout=timeout)
 
         switchData: SwitchData = {
             "ipSrcDst": [],
