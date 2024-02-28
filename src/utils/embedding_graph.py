@@ -1,5 +1,5 @@
 """
-Defines utils related to the forwarding graph.
+Defines utils related to the embedding graph.
 """
 
 from typing import Callable

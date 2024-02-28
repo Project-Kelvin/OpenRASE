@@ -2,6 +2,7 @@
 This file is used to test the functionality of the SFC Emulator.
 """
 
+from time import sleep
 from shared.constants.embedding_graph import TERMINAL
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
@@ -60,7 +61,7 @@ topo: Topology = {
     ]
 }
 
-fg: EmbeddingGraph = {
+eg: EmbeddingGraph = {
     "sfcID": "sfc1",
     "vnfs": {
         "host": {
@@ -115,7 +116,7 @@ fg: EmbeddingGraph = {
     ]
 }
 
-simpleFG: EmbeddingGraph = {
+simpleEG: EmbeddingGraph = {
     "sfcID": "sfc2",
     "vnfs": {
         "host": {
@@ -153,6 +154,44 @@ simpleFG: EmbeddingGraph = {
     ]
 }
 
+simpleEGUpdated: EmbeddingGraph = {
+    "sfcID": "sfc2",
+    "vnfs": {
+        "host": {
+            "id": "h2"
+        },
+        "vnf": {
+            "id": "waf"
+        },
+        "next": {
+            "host": {
+                "id": SERVER
+            },
+            "next": TERMINAL
+        }
+    },
+    "links": [
+        {
+            "source": {
+                "id": SFCC
+            },
+            "destination": {
+                "id": "h2"
+            },
+            "links": ["s1", "s2"]
+        },
+        {
+            "source": {
+                "id": "h2"
+            },
+            "destination": {
+                "id": SERVER
+            },
+            "links": ["s2"]
+        }
+    ]
+}
+
 sfcRequest: SFCRequest = {
     "sfcrID": "sfcr1",
     "latency": 100,
@@ -176,7 +215,7 @@ class SFCRequestGenerator(ISFCRequestGenerator):
 
     def generateRequests(self) -> None:
 
-        return self._orchestrator.sendSFCRequests([sfcRequest])
+        self._orchestrator.sendSFCRequests([sfcRequest])
 
 class SFCSolver(Solver):
     """
@@ -188,7 +227,9 @@ class SFCSolver(Solver):
         Generate the embedding graphs.
         """
 
-        return self._orchestrator.sendEmbeddingGraphs([fg])
+        self._orchestrator.sendEmbeddingGraphs([simpleEG])
+        sleep(120)
+        self._orchestrator.sendEmbeddingGraphs([simpleEGUpdated])
 
 sfcEmulator = SFCEmulator(SFCRequestGenerator, SFCSolver)
 sfcEmulator.startTest(topo, trafficDesign)

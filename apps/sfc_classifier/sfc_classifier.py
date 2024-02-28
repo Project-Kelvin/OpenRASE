@@ -11,7 +11,7 @@ from wsgiref.headers import Headers
 from flask import Flask, Response, request
 import requests
 from shared.constants.sfc import SFC_HEADER, SFC_ID
-from shared.models.embedding_graph import VNF, EmbeddingGraph, EmbeddingGraphs
+from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.config import Config
 from shared.utils.config import getConfig
 from shared.utils.encoder_decoder import sfcEncode
@@ -19,8 +19,8 @@ from shared.utils.encoder_decoder import sfcEncode
 app: Flask = Flask(__name__)
 config: Config = getConfig()
 
-embeddingGraphs: "dict[str, EmbeddingGraphs]" = {}
-fgLock: bool = False
+embeddingGraphs: "dict[str, EmbeddingGraph]" = {}
+egLock: bool = False
 
 
 def addEmbeddingGraphToMemory(sfcID: str, embeddingGraph: EmbeddingGraph):
@@ -29,27 +29,27 @@ def addEmbeddingGraphToMemory(sfcID: str, embeddingGraph: EmbeddingGraph):
     """
 
     # pylint: disable=global-statement
-    global fgLock
+    global egLock
 
-    while fgLock is True:
+    while egLock is True:
         pass
 
-    fgLock = True
+    egLock = True
     embeddingGraphs[sfcID] = embeddingGraph
-    fgLock = False
+    egLock = False
 
 
-@app.route("/add-fg", methods=['POST'], strict_slashes=False)
-def addFG():
+@app.route("/add-eg", methods=['POST'], strict_slashes=False)
+def addEG():
     """
     The endpoint that receives the Forwarding Graph as a JSON object and
     adds it to the in-memory list of Forwarding Graphs.
     """
 
-    fg: EmbeddingGraph = request.get_json()
-    fg["isTraversed"] = False
+    eg: EmbeddingGraph = request.get_json()
+    eg["isTraversed"] = False
 
-    addEmbeddingGraphToMemory(fg["sfcID"], fg)
+    addEmbeddingGraphToMemory(eg["sfcID"], eg)
 
     return "The Forwarding Graph has been successfully added.\n", 201
 
@@ -69,7 +69,7 @@ def default():
         if sfcID not in embeddingGraphs:
             return (
                 "The SFC-ID is not registered with the SFC Classifier.\n"
-                "Use the `add-fg` endpoint to register it."
+                "Use the `add-eg` endpoint to register it."
             ), 400
 
         sfc: VNF = embeddingGraphs[sfcID]["vnfs"]

@@ -1,5 +1,5 @@
 """
-Defines constants related to the forwarding graph.
+Defines constants related to the embedding graph.
 """
 
 TERMINAL: str = "terminal"

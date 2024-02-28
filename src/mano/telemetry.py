@@ -21,7 +21,7 @@ from shared.utils.container import doesContainerExist
 from mininet.net import Mininet
 from mininet.util import quietRun
 from constants.container import MININET_PREFIX
-from constants.notification import FORWARDING_GRAPH_DEPLOYED
+from constants.notification import EMBEDDING_GRAPH_DEPLOYED
 from mano.notification_system import NotificationSystem, Subscriber
 from models.telemetry import HostData, SwitchData
 from utils.container import connectToDind
@@ -51,7 +51,7 @@ class Telemetry(Subscriber):
         """
 
         self._topology = topology
-        NotificationSystem.subscribe(FORWARDING_GRAPH_DEPLOYED, self)
+        NotificationSystem.subscribe(EMBEDDING_GRAPH_DEPLOYED, self)
         self._startSflow()
 
     def _startSflow(self):
@@ -407,7 +407,7 @@ class Telemetry(Subscriber):
         Map the VNFs to the hosts.
 
         Parameters:
-            embeddingGraph (EmbeddingGraph): The forwarding graph.
+            embeddingGraph (EmbeddingGraph): The embedding graph.
         """
 
         vnfs: VNF = embeddingGraph["vnfs"]
@@ -436,5 +436,5 @@ class Telemetry(Subscriber):
             args (list[Any]): The arguments of the notification.
         """
 
-        if topic == FORWARDING_GRAPH_DEPLOYED:
+        if topic == EMBEDDING_GRAPH_DEPLOYED:
             self._mapVNFsToHosts(args[0])

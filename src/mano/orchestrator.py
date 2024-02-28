@@ -30,15 +30,15 @@ class Orchestrator():
         self._sdnController = sdnController
 
 
-    def sendEmbeddingGraphs(self, fgs: "list[EmbeddingGraph]") -> None:
+    def sendEmbeddingGraphs(self, egs: "list[EmbeddingGraph]") -> None:
         """
-        Send the forwarding graphs to the orchestrator.
+        Send the embedding graphs to the orchestrator.
 
         Parameters:
-            fgs (list[EmbeddingGraph]): The list of forwarding graphs.
+            egs (list[EmbeddingGraph]): The list of embedding graphs.
         """
 
-        self._vnfManager.deployEmbeddingGraphs(fgs)
+        self._vnfManager.deployEmbeddingGraphs(egs)
 
     def getTopology(self) -> Topology:
         """
