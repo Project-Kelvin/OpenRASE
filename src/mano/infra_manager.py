@@ -38,6 +38,7 @@ class InfraManager():
     _sdnController: SDNController = None
     _hostIPs: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = {}
     _telemetry: Telemetry = None
+    _sfcHostIPs: "dict[str, dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]]" = {}
 
     def __init__(self, sdnController: SDNController) -> None:
         """
@@ -147,21 +148,35 @@ class InfraManager():
 
         return self._hostIPs
 
-    def embedSFC(self, fg: EmbeddingGraph) -> EmbeddingGraph:
+    def deleteSFC(self, eg: EmbeddingGraph) -> None:
+        """
+        Delete the SFC.
+
+        Parameters:
+            eg (EmbeddingGraph): The SFC to be deleted.
+        """
+
+        self._sdnController.deleteFlows(eg, self._sfcHostIPs[eg["sfcID"]], self._switches)
+
+    def embedSFC(self, eg: EmbeddingGraph) -> EmbeddingGraph:
         """
         Assign IPs to the hosts in the topology.
 
         Parameters:
-            fg (EmbeddingGraph): The forwarding graph to be used to assign IPs.
+            eg (EmbeddingGraph): The embedding graph to be used to assign IPs.
 
         Returns:
-            EmbeddingGraph: The forwarding graph with the IPs assigned.
+            EmbeddingGraph: The embedding graph with the IPs assigned.
         """
 
-        vnfs: VNF = fg['vnfs']
-        vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = {
-            SFCC: self._hostIPs[SFCC]
-        }
+        vnfs: VNF = eg['vnfs']
+
+        if eg["sfcID"] in self._sfcHostIPs:
+            vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = self._sfcHostIPs[eg["sfcID"]]
+        else:
+            vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = {
+                SFCC: self._hostIPs[SFCC]
+            }
 
         def traverseCallback(vnfs: VNF,
                              vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]") -> None:
@@ -171,7 +186,7 @@ class InfraManager():
             Parameters:
                 vnfs (VNF): The VNF.
                 vnfHosts (dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
-                The hosts of the VNFs in the forwarding graph.
+                The hosts of the VNFs in the embedding graph.
             """
 
             if vnfs["host"]["id"] in vnfHosts:
@@ -206,9 +221,10 @@ class InfraManager():
                 if name != name1:
                     host.cmd(f"ip route add {str(ips1[0])} via {ips[1]}")
 
-        fg = self._sdnController.installFlows(fg, vnfHosts, self._switches)
+        eg = self._sdnController.installFlows(eg, vnfHosts, self._switches)
+        self._sfcHostIPs[eg["sfcID"]] = vnfHosts
 
-        return fg
+        return eg
 
     def stopNetwork(self) -> None:
         """

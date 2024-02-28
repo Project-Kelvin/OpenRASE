@@ -11,7 +11,7 @@ from shared.models.embedding_graph import VNF, EmbeddingGraph, VNFEntity
 from shared.models.topology import Host as TopoHost
 from shared.utils.config import getConfig
 from shared.utils.container import getVNFContainerTag
-from constants.notification import FORWARDING_GRAPH_DEPLOYED, SFF_DEPLOYED, TOPOLOGY_INSTALLED
+from constants.notification import EMBEDDING_GRAPH_DELETED, EMBEDDING_GRAPH_DEPLOYED, SFF_DEPLOYED, TOPOLOGY_INSTALLED
 from constants.topology import SERVER, SFCC
 from constants.container import DIND_NETWORK1, \
     DIND_NETWORK2, DIND_NW1_IP, DIND_NW2_IP, \
@@ -30,7 +30,8 @@ class VNFManager(Subscriber):
     """
 
     _infraManager: InfraManager = None
-    _embeddingGraphs: "list[EmbeddingGraph]" = []
+    _embeddingGraphs: "dict[str, EmbeddingGraph]" = {}
+    _vnfHosts: "dict[str, ]"
 
     def __init__(self, infraManager: InfraManager) -> None:
         """
@@ -83,17 +84,20 @@ class VNFManager(Subscriber):
         sleep(10)
         NotificationSystem.publish(SFF_DEPLOYED)
 
-    def _deployEmbeddingGraph(self, fg: EmbeddingGraph) -> None:
+    def _deployEmbeddingGraph(self, eg: EmbeddingGraph) -> None:
         """
-        Deploy the forwarding graph.
+        Deploy the embedding graph.
 
         Parameters:
-            fg (EmbeddingGraph): The forwarding graph to be deployed.
+            eg (EmbeddingGraph): The embedding graph to be deployed.
         """
 
-        updatedFG: EmbeddingGraph = self._infraManager.embedSFC(fg)
-        vnfs: VNF = updatedFG["vnfs"]
-        sfcId: str = updatedFG["sfcID"]
+        if eg["sfcID"] in self._embeddingGraphs:
+            self._deleteEmbeddingGraph(self._embeddingGraphs[eg["sfcID"]])
+
+        updatedEG: EmbeddingGraph = self._infraManager.embedSFC(eg)
+        vnfs: VNF = updatedEG["vnfs"]
+        sfcId: str = updatedEG["sfcID"]
         vnfList: "list[str]" = []
         sharedVolumes: "dict[str, list[str]]" = getConfig()[
             "vnfs"]["sharedVolumes"]
@@ -148,30 +152,75 @@ class VNFManager(Subscriber):
         for thread in threads:
             thread.join()
 
-        self._embeddingGraphs.append(updatedFG)
+        self._embeddingGraphs[sfcId] = updatedEG
 
         sfccIP: str = getContainerIP(SFCC)
 
         requests.post(
-            f"http://{sfccIP}/add-fg",
-            json=updatedFG,
+            f"http://{sfccIP}/add-eg",
+            json=updatedEG,
             timeout=getConfig()["general"]["requestTimeout"]
         )
 
-        NotificationSystem.publish(FORWARDING_GRAPH_DEPLOYED, updatedFG)
+        NotificationSystem.publish(EMBEDDING_GRAPH_DEPLOYED, updatedEG)
 
-    def deployEmbeddingGraphs(self, fgs: "list[EmbeddingGraph]") -> None:
+    def _deleteEmbeddingGraph(self, eg: EmbeddingGraph) -> None:
         """
-        Deploy the forwarding graphs.
+        Delete the embedding graph.
 
         Parameters:
-            fgs (list[EmbeddingGraph]): The forwarding graphs to be deployed.
+            eg (EmbeddingGraph): The embedding graph to be deleted.
+        """
+
+        NotificationSystem.publish(EMBEDDING_GRAPH_DELETED, eg)
+        self._infraManager.deleteSFC(eg)
+        vnfs: VNF = eg["vnfs"]
+        vnfList: "list[str]" = []
+        threads: "list[Thread]" = []
+
+        def deleteVNF(vnfs: VNF):
+            host: TopoHost = vnfs["host"]
+            vnf: VNFEntity = vnfs["vnf"]
+
+            vnfList.append(vnf["id"])
+            vnfName: str = vnf["name"]
+
+            if host["id"] != SERVER:
+                dindClient: DockerClient = connectToDind(host["id"])
+
+                dindClient.containers.get(vnfName).remove(force=True)
+
+        def traverseCallback(vnfs: VNF) -> None:
+            """
+            Callback function for the traverseVNF function.
+
+            Parameters:
+                vnfs (VNF): The VNF.
+            """
+
+            thread: Thread = Thread(target=deleteVNF, args=(vnfs,))
+            thread.start()
+
+            threads.append(thread)
+
+        traverseVNF(vnfs, traverseCallback, shouldParseTerminal=False)
+
+        for thread in threads:
+            thread.join()
+
+
+    def deployEmbeddingGraphs(self, egs: "list[EmbeddingGraph]") -> None:
+        """
+        Deploy the embedding graphs.
+
+        Parameters:
+            egs (list[EmbeddingGraph]): The embedding graphs to be deployed.
         """
 
         threads: "list[Thread]" = []
-        for fg in fgs:
+        for eg in egs:
             thread: Thread = Thread(
-                target=self._deployEmbeddingGraph, args=(fg,))
+                target=self._deployEmbeddingGraph, args=(eg,))
             thread.start()
 
             threads.append(thread)

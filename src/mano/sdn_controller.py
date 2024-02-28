@@ -82,6 +82,47 @@ class SDNController():
                 raise RuntimeError(
                     f"Failed to install flow in switch {switch.name}.\n{response.json()}")
 
+    def _deleteFlow(self, destination: IPv4Network, gateway: IPv4Address, switch: OVSKernelSwitch) -> None:
+        """
+        Delete a flow in a switch.
+
+        Parameters:
+            destination (IPv4Network): The destination of the flow.
+            gateway (IPv4Address): The gateway of the flow.
+            switch (OVSKernelSwitch): The switch to delete the flow from.
+
+        Raises:
+            RuntimeError: If the flow could not be deleted.
+        """
+
+        response: Response = requests.request(
+            method="GET",
+            url=getRyuRestUrl(switch.dpid),
+            timeout=getConfig()["general"]["requestTimeout"]
+        )
+
+        if "failure" in str(response.content):
+            raise RuntimeError(
+                f"Failed to delete flow in switch {switch.name}.\n{response.json()}")
+        else:
+            flows: "list[dict]" = response.json()[0]["internal_network"][0]["route"]
+
+            for flow in flows:
+                if flow["destination"] == str(destination) and flow["gateway"] == str(gateway):
+                    data = {
+                        "route_id": flow["route_id"]
+                    }
+                    response = requests.request(
+                        method="DELETE",
+                        url=getRyuRestUrl(switch.dpid),
+                        json=data,
+                        timeout=getConfig()["general"]["requestTimeout"]
+                    )
+
+                    if "failure" in str(response.content):
+                        raise RuntimeError(
+                            f"Failed to delete flow in switch {switch.name}.\n{response.json()}")
+                    break
 
     def assignSwitchIPs(self, topology: Topology, switches: "dict[str, OVSKernelSwitch]",
                         hostIPs: "dict[str, (IPv4Network, IPv4Address, IPv4Address)]",
@@ -133,23 +174,23 @@ class SDNController():
             elif link["destination"] == host:
                 self._assignIP(ip, switches[link["source"]])
 
-    def installFlows(self, fg: EmbeddingGraph,
+    def installFlows(self, eg: EmbeddingGraph,
                      vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]",
                      switches: "dict[str, OVSKernelSwitch]") -> EmbeddingGraph:
         """
         Install flows in the switches in the topology.
 
         Parameters:
-            fg (EmbeddingGraph): The forwarding graph to install flows in.
+            eg (EmbeddingGraph): The embedding graph to install flows in.
             vnfHosts (dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
-            The hosts of the VNFs in the forwarding graph.
+            The hosts of the VNFs in the embedding graph.
             switches (dict[str, OVSKernelSwitch]"): The switches to install flows in.
 
         Returns:
-            EmbeddingGraph: The forwarding graph with the flows installed.
+            EmbeddingGraph: The embedding graph with the flows installed.
         """
 
-        links: "list[ForwardingLink]" = fg["links"]
+        links: "list[ForwardingLink]" = eg["links"]
 
         for link in links:
             sourceNetwork: IPv4Network = vnfHosts[link["source"]["id"]][0]
@@ -168,4 +209,36 @@ class SDNController():
                     self._installFlow(sourceNetwork, self._switchLinks[f"{prevSwitch}-{switch}"],
                                      switches[switch])
 
-        return fg
+        return eg
+
+    def deleteFlows(self, eg: EmbeddingGraph,
+                     vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]",
+                     switches: "dict[str, OVSKernelSwitch]") -> None:
+        """
+        Delete flows in the switches in the topology.
+
+        Parameters:
+            eg (EmbeddingGraph): The embedding graph to delete flows from.
+            vnfHosts (dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
+            The hosts of the VNFs in the embedding graph.
+            switches (dict[str, OVSKernelSwitch]"): The switches to delete flows from.
+        """
+
+        links: "list[ForwardingLink]" = eg["links"]
+
+        for link in links:
+            sourceNetwork: IPv4Network = vnfHosts[link["source"]["id"]][0]
+            destinationNetwork: IPv4Network = vnfHosts[link["destination"]["id"]][0]
+
+            for index, switch in enumerate(link["links"]):
+                nextSwitch: str = link["links"][index +
+                                                1] if index < len(link["links"]) - 1 else None
+                prevSwitch: str = link["links"][index -
+                                                1] if index > 0 else None
+
+                if nextSwitch is not None:
+                    self._deleteFlow(destinationNetwork, self._switchLinks[f"{nextSwitch}-{switch}"],
+                                      switches[switch])
+                if prevSwitch is not None:
+                    self._deleteFlow(sourceNetwork, self._switchLinks[f"{prevSwitch}-{switch}"],
+                                      switches[switch])

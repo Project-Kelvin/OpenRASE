@@ -13,7 +13,7 @@ from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
 from influxdb_client import InfluxDBClient
 from constants.container import DIND_IMAGE, TAG
-from constants.notification import FORWARDING_GRAPH_DEPLOYED
+from constants.notification import EMBEDDING_GRAPH_DELETED, EMBEDDING_GRAPH_DEPLOYED
 from constants.topology import SFCC, TRAFFIC_GENERATOR
 from mano.notification_system import NotificationSystem, Subscriber
 from utils.container import connectToDind, getContainerIP
@@ -29,7 +29,7 @@ INFLUX_DB_CONFIG = {
     "TOKEN": "K6_INFLUXDB"
 }
 INFLUXDB: str = "influxdb"
-
+K6: str = "K6"
 
 class TrafficGenerator(Subscriber):
     """
@@ -37,7 +37,6 @@ class TrafficGenerator(Subscriber):
     """
 
     _design: "list[TrafficDesign]" = []
-    _embeddingGraphs: "list[EmbeddingGraph]" = []
     _tgClient: DockerClient = None
     _influxDBClient: InfluxDBClient = None
 
@@ -69,7 +68,8 @@ class TrafficGenerator(Subscriber):
             token=INFLUX_DB_CONFIG["TOKEN"],
             org=INFLUX_DB_CONFIG["ORG"])
 
-        NotificationSystem.subscribe(FORWARDING_GRAPH_DEPLOYED, self)
+        NotificationSystem.subscribe(EMBEDDING_GRAPH_DEPLOYED, self)
+        NotificationSystem.subscribe(EMBEDDING_GRAPH_DELETED, self)
 
     def setDesign(self, design: "list[TrafficDesign]") -> None:
         """
@@ -116,18 +116,29 @@ class TrafficGenerator(Subscriber):
             INFLUXDB).attrs["NetworkSettings"]["IPAddress"]
 
         # pylint: disable=invalid-name
-        K6: str = "k6"
-        self._tgClient.containers.run(f"{TAG}/k6:latest", cap_add="NET_ADMIN", name=K6,  detach=True, environment={
-            "K6_OUT": f"xk6-influxdb=http://{influxDBhost}:8086",
-            "K6_INFLUXDB_ORGANIZATION": INFLUX_DB_CONFIG["ORG"],
-            "K6_INFLUXDB_BUCKET": INFLUX_DB_CONFIG["BUCKET"],
-            "K6_INFLUXDB_INSECURE": "true",
-            "K6_INFLUXDB_TOKEN": INFLUX_DB_CONFIG["TOKEN"]
-        })
-        self._tgClient.containers.get(K6).exec_run(
+        name: str = f"{sfcID}-{K6}"
+        self._tgClient.containers.run(f"{TAG}/k6:latest", cap_add="NET_ADMIN", name=name,
+                                      detach=True, environment={
+                                          "K6_OUT": f"xk6-influxdb=http://{influxDBhost}:8086",
+                                          "K6_INFLUXDB_ORGANIZATION": INFLUX_DB_CONFIG["ORG"],
+                                          "K6_INFLUXDB_BUCKET": INFLUX_DB_CONFIG["BUCKET"],
+                                          "K6_INFLUXDB_INSECURE": "true",
+                                          "K6_INFLUXDB_TOKEN": INFLUX_DB_CONFIG["TOKEN"]
+                                      })
+        self._tgClient.containers.get(name).exec_run(
             ["sh", "-c", f"echo '{outputFileContent}' > script.js"])
-        self._tgClient.containers.get(K6).exec_run(
+        self._tgClient.containers.get(name).exec_run(
             f"k6 run -e MY_HOSTNAME={getContainerIP(SFCC)} -e SFC_ID={sfcID} script.js", detach=True)
+
+    def stopTrafficGeneration(self, sfcID: str) -> None:
+        """
+        Stop the traffic generation.
+
+        Parameters:
+            sfcID (str): The ID of the SFC.
+        """
+
+        self._tgClient.containers.get(f"{sfcID}-{K6}").remove(force=True)
 
     def getData(self, dataRange: str) -> "list[Any]":
         """
@@ -157,11 +168,12 @@ class TrafficGenerator(Subscriber):
         return data
 
     def receiveNotification(self, topic, *args: "list[Any]") -> None:
-        if topic == FORWARDING_GRAPH_DEPLOYED:
-            fg: EmbeddingGraph = args[0]
-            self._embeddingGraphs.append(fg)
-
-            self.generateTraffic(fg["sfcID"])
+        if topic == EMBEDDING_GRAPH_DEPLOYED:
+            eg: EmbeddingGraph = args[0]
+            self.generateTraffic(eg["sfcID"])
+        elif topic == EMBEDDING_GRAPH_DELETED:
+            eg: EmbeddingGraph = args[0]
+            self.stopTrafficGeneration(eg["sfcID"])
 
     def __del__(self) -> None:
         """
