@@ -22,7 +22,7 @@ class SDNController():
 
     _switchLinks: "dict[str, IPv4Address]" = {}
 
-    def _assignIP(self, ip: IPv4Address, switch: OVSKernelSwitch) -> None:
+    def assignIP(self, ip: IPv4Address, switch: OVSKernelSwitch) -> None:
         """
         Assign an IP address to a switch.
 
@@ -135,6 +135,7 @@ class SDNController():
             switches (dict[str, OVSKernelSwitch]): The switches to assign IP addresses to.
             hostIPs (dict[str, (IPv4Network, IPv4Address, IPv4Address)]):
                 The gateways of the hosts in the topology.
+            existingIPs (list[IPv4Network]): The IP addresses that are already in use.
         """
 
         links: "list[Link]" = topology["links"]
@@ -142,16 +143,16 @@ class SDNController():
         for link in links:
             if link["source"] in switches and link["destination"] in switches:
                 _networkAddr, addr1, addr2 = generateIP(existingIPs)
-                self._assignIP(addr1, switches[link["source"]])
-                self._assignIP(addr2, switches[link["destination"]])
+                self.assignIP(addr1, switches[link["source"]])
+                self.assignIP(addr2, switches[link["destination"]])
                 self._switchLinks[f'{link["source"]}-{link["destination"]}'] = addr1
                 self._switchLinks[f'{link["destination"]}-{link["source"]}'] = addr2
             else:
                 if link["source"] in switches:
-                    self._assignIP(hostIPs[link["destination"]][1], switches[link["source"]])
+                    self.assignIP(hostIPs[link["destination"]][1], switches[link["source"]])
                     self._switchLinks[f'{link["source"]}-{link["destination"]}'] = hostIPs[link["destination"]][1]
                 elif link["destination"] in switches:
-                    self._assignIP(hostIPs[link["source"]][1], switches[link["destination"]])
+                    self.assignIP(hostIPs[link["source"]][1], switches[link["destination"]])
                     self._switchLinks[f'{link["source"]}-{link["destination"]}'] = hostIPs[link["source"]][1]
 
     def assignGatewayIP(self, topology: Topology, host: str, ip: IPv4Address,
@@ -170,9 +171,9 @@ class SDNController():
 
         for link in links:
             if link["source"] == host:
-                self._assignIP(ip, switches[link["destination"]])
+                self.assignIP(ip, switches[link["destination"]])
             elif link["destination"] == host:
-                self._assignIP(ip, switches[link["source"]])
+                self.assignIP(ip, switches[link["source"]])
 
     def installFlows(self, eg: EmbeddingGraph,
                      vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]",

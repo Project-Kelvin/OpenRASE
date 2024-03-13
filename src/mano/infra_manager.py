@@ -17,12 +17,13 @@ from mininet.net import Containernet
 from mininet.cli import CLI
 from constants.notification import TOPOLOGY_INSTALLED
 from constants.topology import SERVER, SFCC
-from constants.container import CPU_PERIOD, DIND_IMAGE, SERVER_IMAGE, SFCC_IMAGE
+from constants.container import CPU_PERIOD, DIND_IMAGE, SERVER_IMAGE, SFCC_IMAGE, SFF_IMAGE
 from mano.notification_system import NotificationSystem
 from mano.sdn_controller import SDNController
 from mano.telemetry import Telemetry
 from utils.container import getContainerIP
 from utils.embedding_graph import traverseVNF
+
 
 class InfraManager():
     """
@@ -39,6 +40,7 @@ class InfraManager():
     _hostIPs: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = {}
     _telemetry: Telemetry = None
     _sfcHostIPs: "dict[str, dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]]" = {}
+    _sfcHostByIPs: "dict[str, tuple[str, str]]" = {}
 
     def __init__(self, sdnController: SDNController) -> None:
         """
@@ -61,7 +63,7 @@ class InfraManager():
         """
 
         self._topology = topology
-        self._telemetry = Telemetry(self._topology)
+        self._telemetry = Telemetry(self._topology, self._sfcHostByIPs)
 
         config: Config = getConfig()
 
@@ -75,8 +77,9 @@ class InfraManager():
             dimage=SFCC_IMAGE,
             dcmd="poetry run python sfc_classifier.py",
         )
-        self._hosts[SFCC]=sfcc
+        self._hosts[SFCC] = sfcc
         self._hostIPs[SFCC] = ipSFCC
+        self._sfcHostByIPs[str(ipSFCC[2])] = (None, SFCC)
 
         # Add server
         ipServer: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
@@ -89,19 +92,28 @@ class InfraManager():
             dimage=SERVER_IMAGE,
             dcmd="poetry run python server.py"
         )
-        self._hosts[SERVER]=server
+        self._hosts[SERVER] = server
+
+        hostNodes: "list[Host]" = []
 
         for host in topology['hosts']:
             ip: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
                 self._networkIPs)
             self._hostIPs[host["id"]] = ip
 
-            hostNode: Host = self._net.addDocker(
+            sff: Host = self._net.addDocker(
                 host['id'],
-                ip=f"{str(ip[2])}/{ip[0].prefixlen}",
-                cpu_quota=host['cpu'] * CPU_PERIOD,
-                mem_limit=host['memory'],
-                memswap_limit=host['memory'],
+                ip=f"{getConfig()['sff']['network1']['sffIP']}/{getConfig()['sff']['network1']['mask']}",
+                dimage=SFF_IMAGE,
+                dcmd="poetry run python sff.py"
+            )
+
+            hostNode: Host = self._net.addDocker(
+                f"{host['id']}Node",
+                ip=f"{getConfig()['sff']['network1']['hostIP']}/{getConfig()['sff']['network2']['mask']}",
+                cpu_quota=host["cpu"] * CPU_PERIOD if "cpu" in host else -1,
+                mem_limit=host["memory"] if "memory" in host else None,
+                memswap_limit=host["memory"] if "memory" in host else None,
                 dimage=DIND_IMAGE,
                 privileged=True,
                 dcmd="dockerd",
@@ -112,7 +124,11 @@ class InfraManager():
                     + "/docker/compose:/home/docker/compose"
                 ]
             )
-            self._hosts[host["id"]]=hostNode
+            hostNodes.append(hostNode)
+            self._net.addLink(sff, hostNode)
+            #self._net.addLink(switch, hostNode)
+
+            self._hosts[host["id"]] = sff
 
         for switch in topology['switches']:
             switchNode: OVSKernelSwitch = self._net.addSwitch(switch['id'])
@@ -123,19 +139,27 @@ class InfraManager():
             self._net.addLink(
                 self._net.get(
                     link['source']),
-                    self._net.get(link['destination']),
-                    bw=link['bandwidth'] if 'bandwidth' in link else None)
+                self._net.get(link['destination']),
+                bw=link['bandwidth'] if 'bandwidth' in link else None)
 
         self._net.start()
         sleep(5)
 
         for name, host in self._hosts.items():
+            if name != SERVER and name != SFCC:
+                host.cmd(f"ip addr add {str(self._hostIPs[name][2])}/{self._hostIPs[name][0].prefixlen} dev {name}-eth1")
+                host.cmd(f"ip addr add {getConfig()['sff']['network2']['sffIP']}/{getConfig()['sff']['network2']['mask']} dev {name}-eth0")
             for name1, host1 in self._hosts.items():
                 if host.name != host1.name:
                     host.cmd(
                         f"ip route add {str(self._hostIPs[name1][0])} via {str(self._hostIPs[name][1])}")
 
-        self._sdnController.assignSwitchIPs(topology, self._switches, self._hostIPs, self._networkIPs)
+        for hostNode in hostNodes:
+            hostNode.cmd(
+                f"ip route add {getConfig()['sff']['network2']['networkIP']} via {getConfig()['sff']['network1']['hostIP']}")
+
+        self._sdnController.assignSwitchIPs(
+            topology, self._switches, self._hostIPs, self._networkIPs)
 
         # Notify
         sleep(10)
@@ -156,7 +180,8 @@ class InfraManager():
             eg (EmbeddingGraph): The SFC to be deleted.
         """
 
-        self._sdnController.deleteFlows(eg, self._sfcHostIPs[eg["sfcID"]], self._switches)
+        self._sdnController.deleteFlows(
+            eg, self._sfcHostIPs[eg["sfcID"]], self._switches)
 
     def embedSFC(self, eg: EmbeddingGraph) -> EmbeddingGraph:
         """
@@ -197,20 +222,23 @@ class InfraManager():
 
                 vnfs['host']['ip'] = str(ipAddr[2])
                 vnfHosts[vnfs['host']['id']] = ipAddr
+                self._sfcHostByIPs[str(ipAddr[2])] = (
+                    eg["sfcID"], vnfs['host']['id'])
 
                 # Assign IP to the host
                 self._net.get(vnfs['host']['id']).cmd(
-                    f"ip addr add {str(ipAddr[2])}/{ipAddr[0].prefixlen} dev {vnfs['host']['id']}-eth0")
+                    f"ip addr add {str(ipAddr[2])}/{ipAddr[0].prefixlen} dev {vnfs['host']['id']}-eth1")
 
-                self._sdnController.assignGatewayIP(self._topology, vnfs['host']['id'], ipAddr[1], self._switches)
+                self._sdnController.assignGatewayIP(
+                    self._topology, vnfs['host']['id'], ipAddr[1], self._switches)
 
                 # Add ip to SFF
                 hostIP: str = getContainerIP(vnfs["host"]["id"])
 
                 if not vnfs["next"] == TERMINAL:
                     requests.post(f"http://{hostIP}:{getConfig()['sff']['port']}/add-host",
-                                json={"hostIP": str(ipAddr[2])},
-                                timeout=getConfig()["general"]["requestTimeout"])
+                                  json={"hostIP": str(ipAddr[2])},
+                                  timeout=getConfig()["general"]["requestTimeout"])
 
         traverseVNF(vnfs, traverseCallback, vnfHosts)
 

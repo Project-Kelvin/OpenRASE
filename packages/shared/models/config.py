@@ -10,6 +10,8 @@ class SFFNetwork(dict):
 
     networkIP: str
     sffIP: str
+    hostIP: str
+    mask: int
 
 
 class SFF(dict):
@@ -18,7 +20,7 @@ class SFF(dict):
     """
 
     network1: SFFNetwork
-    network2IP: SFFNetwork
+    network2: SFFNetwork
     port: int
 
 

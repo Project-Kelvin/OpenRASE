@@ -2,9 +2,13 @@ sff:
   network1:
     networkIP: "192.168.0.0/24"
     sffIP: "192.168.0.2"
+    hostIP: "192.168.0.1"
+    mask: 24
   network2:
     networkIP: "172.16.0.0/24"
     sffIP: "172.16.0.2"
+    hostIP: "172.16.0.1"
+    mask: 24
   port: 80
 
 server:

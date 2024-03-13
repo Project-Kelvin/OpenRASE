@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from mano.orchestrator import Orchestrator
 
 
-class ISFCRequestGenerator(ABC):
+class SFCRequestGenerator(ABC):
     """
     Abstract class for generating SFC requests.
     """

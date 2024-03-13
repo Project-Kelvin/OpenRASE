@@ -6,11 +6,11 @@ from threading import Thread
 from typing import Any, Type
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
-from constants.notification import SFF_DEPLOYED
+from constants.notification import TOPOLOGY_INSTALLED
 from mano.mano_class import MANO
 from mano.notification_system import NotificationSystem, Subscriber
 from sfc.solver import Solver
-from sfc.sfc_request_generator import ISFCRequestGenerator
+from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.traffic_generator import TrafficGenerator
 
 
@@ -20,11 +20,11 @@ class SFCEmulator(Subscriber):
     """
 
     _mano: MANO = None
-    _sfcRequestGenerator: ISFCRequestGenerator = None
+    _sfcRequestGenerator: SFCRequestGenerator = None
     _trafficGenerator: TrafficGenerator = None
     _solver: Solver = None
 
-    def __init__(self, sfcRequestGenerator: Type[ISFCRequestGenerator], solver: Type[Solver]) -> None:
+    def __init__(self, sfcRequestGenerator: Type[SFCRequestGenerator], solver: Type[Solver]) -> None:
         """
         Constructor for the class.
 
@@ -40,7 +40,7 @@ class SFCEmulator(Subscriber):
         self._mano.getOrchestrator().injectSolver(self._solver)
         self._sfcRequestGenerator = sfcRequestGenerator(
             self._mano.getOrchestrator())
-        NotificationSystem.subscribe(SFF_DEPLOYED, self)
+        NotificationSystem.subscribe(TOPOLOGY_INSTALLED, self)
 
     def startTest(self, topology: Topology, trafficDesign: "list[TrafficDesign]") -> None:
         """
@@ -55,7 +55,7 @@ class SFCEmulator(Subscriber):
         self._mano.getOrchestrator().installTopology(topology)
 
     def receiveNotification(self, topic, *args: "list[Any]") -> None:
-        if topic == SFF_DEPLOYED:
+        if topic == TOPOLOGY_INSTALLED:
             Thread(target=self._sfcRequestGenerator.generateRequests).start()
             Thread(target=self._solver.generateEmbeddingGraphs).start()
 

@@ -2,36 +2,29 @@
 Defines the VNFManager class that corresponds to the VNF Manager in the NFV architecture.
 """
 
-from ipaddress import IPv4Address, IPv4Network
-from time import sleep
-from typing import Any, Tuple
 from threading import Thread
 import requests
 from shared.models.embedding_graph import VNF, EmbeddingGraph, VNFEntity
 from shared.models.topology import Host as TopoHost
 from shared.utils.config import getConfig
 from shared.utils.container import getVNFContainerTag
-from constants.notification import EMBEDDING_GRAPH_DELETED, EMBEDDING_GRAPH_DEPLOYED, SFF_DEPLOYED, TOPOLOGY_INSTALLED
+from constants.notification import EMBEDDING_GRAPH_DELETED, EMBEDDING_GRAPH_DEPLOYED
 from constants.topology import SERVER, SFCC
-from constants.container import DIND_NETWORK1, \
-    DIND_NETWORK2, DIND_NW1_IP, DIND_NW2_IP, \
-    SFF, SFF_IMAGE, SFF_IP1, SFF_IP2
 from mano.infra_manager import InfraManager
-from mano.notification_system import NotificationSystem, Subscriber
-from docker.types import IPAMConfig, IPAMPool
 from docker import DockerClient
+from mano.notification_system import NotificationSystem
 from utils.container import connectToDind, getContainerIP
 from utils.embedding_graph import traverseVNF
 
 
-class VNFManager(Subscriber):
+class VNFManager():
     """
     Class that corresponds to the VNF Manager in the NFV architecture.
     """
 
     _infraManager: InfraManager = None
     _embeddingGraphs: "dict[str, EmbeddingGraph]" = {}
-    _vnfHosts: "dict[str, ]"
+    _ports: "dict[str, int]" = {}
 
     def __init__(self, infraManager: InfraManager) -> None:
         """
@@ -42,47 +35,6 @@ class VNFManager(Subscriber):
         """
 
         self._infraManager = infraManager
-        NotificationSystem.subscribe(TOPOLOGY_INSTALLED, self)
-
-    def _deploySFF(self):
-        """
-        Deploy the SFF.
-        """
-
-        hostIPs: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]" = self._infraManager.getHostIPs()
-        threads: "list[Thread]" = []
-
-        def deploySFFinNode(host: str):
-            dindClient: DockerClient = connectToDind(host)
-            dindClient.networks.create(DIND_NETWORK1,
-                                       ipam=IPAMConfig(pool_configs=[IPAMPool(subnet=DIND_NW1_IP)]))
-            dindClient.networks.create(DIND_NETWORK2,
-                                       ipam=IPAMConfig(pool_configs=[IPAMPool(subnet=DIND_NW2_IP)]))
-
-            container: Any = dindClient.containers.run(
-                SFF_IMAGE,
-                detach=True,
-                name=SFF,
-                ports={80: 80}
-            )
-
-            dindClient.networks.get(DIND_NETWORK1).connect(
-                container.id, ipv4_address=SFF_IP1)
-            dindClient.networks.get(DIND_NETWORK2).connect(
-                container.id, ipv4_address=SFF_IP2)
-
-        for host in hostIPs:
-            if host not in (SERVER, SFCC):
-                thread: Thread = Thread(target=deploySFFinNode, args=(host,))
-                thread.start()
-
-                threads.append(thread)
-
-        for thread in threads:
-            thread.join()
-
-        sleep(10)
-        NotificationSystem.publish(SFF_DEPLOYED)
 
     def _deployEmbeddingGraph(self, eg: EmbeddingGraph) -> None:
         """
@@ -112,7 +64,7 @@ class VNFManager(Subscriber):
             vnf["name"] = vnfName
 
             if host["id"] != SERVER:
-                dindClient: DockerClient = connectToDind(host["id"])
+                dindClient: DockerClient = connectToDind(f"{host['id']}Node")
 
                 volumes = {}
                 for vol in sharedVolumes[vnf["id"]]:
@@ -121,18 +73,20 @@ class VNFManager(Subscriber):
                         "mode": "rw"
                     }
 
-                container: Any = dindClient.containers.run(
+                if host["id"] in self._ports:
+                    self._ports[host["id"]] += 1
+                else:
+                    self._ports[host["id"]] = 5000
+
+                dindClient.containers.run(
                     getVNFContainerTag(vnf["id"]),
                     detach=True,
                     name=vnfName,
                     volumes=volumes,
-                    network_mode=DIND_NETWORK1
+                    ports={"80/tcp": f"{self._ports[host['id']]}"},
                 )
 
-                dindClient.networks.get(DIND_NETWORK2).connect(container.id)
-
-                vnf["ip"] = dindClient.containers.get(
-                    container.id).attrs["NetworkSettings"]["Networks"][DIND_NETWORK1]["IPAddress"]
+                vnf["ip"] = f"{getConfig()['sff']['network1']['hostIP']}:{self._ports[host['id']]}"
 
         def traverseCallback(vnfs: VNF) -> None:
             """
@@ -227,15 +181,3 @@ class VNFManager(Subscriber):
 
         for thread in threads:
             thread.join()
-
-    def receiveNotification(self, topic, *args: "list[Any]") -> None:
-        """
-        Receive a notification.
-
-        Parameters:
-            topic (str): The topic of the notification.
-            args (list[Any]): The arguments of the notification.
-        """
-
-        if topic == TOPOLOGY_INSTALLED:
-            self._deploySFF()
