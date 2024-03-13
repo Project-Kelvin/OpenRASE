@@ -5,6 +5,9 @@ Defines models related to telemetry.
 
 
 
+from typing import Union
+
+
 class VNFData(dict):
     """
     Represents the data of a VNF.
@@ -20,26 +23,20 @@ class SingleHostData(dict):
     Represents the data of a single host.
     """
 
-    cpuUsage: float
-    memoryUsage: float
+    cpuUsage: "tuple[float, float, float]"
+    memoryUsage: "tuple[float, float, float]"
     networkUsage: float
     vnfs: "dict[str, VNFData]"
 
 
-class HostData(dict):
-    """
-    Represents the data of the hosts.
-    """
-
-    hosts: "dict[str, SingleHostData]"
-
+HostData = Union["dict[str, SingleHostData]", "dict['timeStamp': int]"]
 
 class SrcDstData(dict):
     """
     Represents the data of the source and destination.
     """
 
-    ipSrcDst: str
+    ipSrcDst: "tuple[tuple[str, str], tuple[str, str]]"
     interface: str
     value: float
 
@@ -61,3 +58,4 @@ class SwitchData(dict):
     ipSrcDst: "list[SrcDstData]"
     inflow: "list[FlowData]"
     outflow: "list[FlowData]"
+    timeStamp: int
