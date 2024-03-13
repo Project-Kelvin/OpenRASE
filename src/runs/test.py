@@ -10,7 +10,7 @@ from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from constants.topology import SERVER, SFCC
 from sfc.sfc_emulator import SFCEmulator
-from sfc.sfc_request_generator import ISFCRequestGenerator
+from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
 
 topo: Topology = {
@@ -208,7 +208,7 @@ trafficDesign: "list[TrafficDesign]" = [
     ]
 ]
 
-class SFCRequestGenerator(ISFCRequestGenerator):
+class SFCR(SFCRequestGenerator):
     """
     SFC Request Generator.
     """
@@ -231,7 +231,7 @@ class SFCSolver(Solver):
         sleep(120)
         self._orchestrator.sendEmbeddingGraphs([simpleEGUpdated])
 
-sfcEmulator = SFCEmulator(SFCRequestGenerator, SFCSolver)
+sfcEmulator = SFCEmulator(SFCR, SFCSolver)
 sfcEmulator.startTest(topo, trafficDesign)
 sfcEmulator.startCLI()
 sfcEmulator.end()
