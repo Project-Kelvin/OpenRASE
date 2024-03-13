@@ -2,6 +2,7 @@
 Defines the TrafficGenerator class.
 """
 
+from datetime import datetime
 import json
 import random
 from time import sleep
@@ -16,6 +17,7 @@ from constants.container import DIND_IMAGE, TAG
 from constants.notification import EMBEDDING_GRAPH_DELETED, EMBEDDING_GRAPH_DEPLOYED
 from constants.topology import SFCC, TRAFFIC_GENERATOR
 from mano.notification_system import NotificationSystem, Subscriber
+from models.traffic_generator import TrafficData
 from utils.container import connectToDind, getContainerIP
 from docker import DockerClient, from_env
 
@@ -30,6 +32,7 @@ INFLUX_DB_CONFIG = {
 }
 INFLUXDB: str = "influxdb"
 K6: str = "K6"
+
 
 class TrafficGenerator(Subscriber):
     """
@@ -140,7 +143,7 @@ class TrafficGenerator(Subscriber):
 
         self._tgClient.containers.get(f"{sfcID}-{K6}").remove(force=True)
 
-    def getData(self, dataRange: str) -> "list[Any]":
+    def getData(self, dataRange: str) -> "list[TrafficData]":
         """
         Get the data from the traffic generator.
 
@@ -148,22 +151,46 @@ class TrafficGenerator(Subscriber):
             dataRange (str): Data range.
 
         Returns:
-            "list[Any]": The data.
+            "list[TrafficData]": The traffic data.
         """
 
-        data: "list[Any]" = []
+        HTTP_REQS: str = "http_reqs"
+        HTTP_REQ_DURATION: str = "http_req_duration"
+
+        data: "list[TrafficData]" = []
         tables = self._influxDBClient.query_api().query(
             f'from(bucket: "{INFLUX_DB_CONFIG["BUCKET"]}")'
             f' |> range(start: -{dataRange})'
-            f' |> filter(fn: (r) => r["_measurement"] == "http_req_duration")'
+            f' |> filter(fn: (r) => r["_measurement"] == "{HTTP_REQ_DURATION}" or r["_measurement"] == "{HTTP_REQS}")'
             f' |> filter(fn: (r) => r["_field"] == "value")'
-            f' |> filter(fn: (r) => r["expected_response"] == "true")'
-            f' |> aggregateWindow(every: {dataRange}, fn: mean, createEmpty: false)'
-            f' |> yield(name: "mean")')
+            f' |> filter(fn: (r) => r["expected_response"] == "true")')
+
+        stopTime: str = ""
+        httpReqs: int = 0
+        httpRequestDuration: float = 0
 
         for table in tables:
             for record in table.records:
-                data.append(record.values)
+                measurement: str = record.values["_measurement"]
+                if measurement == HTTP_REQS:
+                    httpReqs += int(record.values["_value"])
+                elif measurement == HTTP_REQ_DURATION:
+                    httpRequestDuration += float(record.values["_value"])
+
+                stopTime = datetime.timestamp(record.values["_stop"])
+
+        data = [
+            {
+                "measurement": HTTP_REQS,
+                "value": httpReqs,
+                "time": stopTime,
+            },
+            {
+                "measurement": HTTP_REQ_DURATION,
+                "value": httpRequestDuration/httpReqs if httpRequestDuration != 0 and httpReqs != 0 else 0,
+                "time": stopTime,
+            }
+        ]
 
         return data
 

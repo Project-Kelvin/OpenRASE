@@ -5,9 +5,9 @@ export const options = {
     scenarios: {
         default: {
             executor: "ramping-arrival-rate",
-            timeUnit: "1m",
-            startRate: 100,
-            preAllocatedVUs: 1,
+            timeUnit: "1s",
+            startRate: 1,
+            preAllocatedVUs: 100,
             stages: {{DESIGN}}
         }
     }
