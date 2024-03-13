@@ -6,6 +6,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from mano.infra_manager import InfraManager
+from mano.telemetry import Telemetry
 from mano.vnf_manager import VNFManager
 from mano.sdn_controller import SDNController
 from sfc.solver import Solver
@@ -47,12 +48,12 @@ class Orchestrator():
 
         self._infraManager.getTopology()
 
-    def getTelemetry(self) -> None:
+    def getTelemetry(self) -> Telemetry:
         """
         Get the telemetry from the infrastructure manager.
         """
 
-        self._infraManager.getTelemetry()
+        return self._infraManager.getTelemetry()
 
     def installTopology(self, topology: Topology) -> None:
         """
