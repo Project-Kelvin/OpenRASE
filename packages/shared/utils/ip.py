@@ -3,7 +3,7 @@ Provides utils replated IP address operations.
 """
 
 
-from typing import Iterator, Literal, Tuple, TypedDict
+from typing import Any, Iterator, Literal, Tuple, TypedDict
 from ipaddress import IPv4Address, IPv4Network, ip_address, ip_network
 
 from shared.models.config import Config
@@ -37,7 +37,14 @@ def incrementNetworkIP(ip: IPv4Network) -> IPv4Network:
     ipInt: int = int(ip.network_address)
     incrementor: int = 2 ** (32 - ip.prefixlen)
 
-    return ip_network((ipInt + incrementor, ip.prefixlen))
+    ipNetwork: IPv4Network = ip_network((ipInt + incrementor, ip.prefixlen))
+
+    sffConfig: Any = getConfig()["sff"]
+
+    if str(ip) == sffConfig["network1"]["networkIP"] or str(ip) == sffConfig["network2"]["networkIP"]:
+        ipNetwork = ip_network((ipInt + (incrementor * 2), ip.prefixlen))
+
+    return ipNetwork
 
 def generateLocalNetworkIP(mask: int, existingIPs: "list[IPv4Network]") -> IPv4Network:
     """
