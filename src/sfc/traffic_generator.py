@@ -97,6 +97,11 @@ class TrafficGenerator(Subscriber):
         design: TrafficDesign = self._design[random.randint(
             0, len(self._design) - 1)]
         designStr: str = json.dumps(design)
+        config: Config = getConfig()
+        vus: int = config["k6"]["vus"]
+        timeUnit: str = config["k6"]["timeUnit"]
+        startRate: int = config["k6"]["startRate"]
+        executor: str = config["k6"]["executor"]
 
         config: Config = getConfig()
         templateFile: str = f"{config['repoAbsolutePath']}/docker/files/k6/script.js.j2"
@@ -105,7 +110,13 @@ class TrafficGenerator(Subscriber):
         try:
             with open(templateFile, "r+", encoding="utf-8") as file:
                 jTemplate: Template = Template(file.read())
-                templatedFile = jTemplate.render(DESIGN=designStr)
+                templatedFile = jTemplate.render(
+                    DESIGN=designStr,
+                    VUS=vus,
+                    TIME_UNIT=timeUnit,
+                    START_RATE=startRate,
+                    EXECUTOR=executor
+                )
                 outputFileContent = templatedFile
 
         except FileNotFoundError:

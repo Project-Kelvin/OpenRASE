@@ -71,6 +71,15 @@ class VNFs(dict):
 
     sharedVolumes: "dict[str, list[str]]"
 
+class K6(dict):
+    """
+    Defines the `K6` dictionary type.
+    """
+
+    vus: int
+    startRate: int
+    timeUnit: str
+    executor: str
 
 class Config(dict):
     """
@@ -86,3 +95,4 @@ class Config(dict):
     templates: "list[str]"
     ipRange: IPRange
     vnfs: VNFs
+    k6: K6
