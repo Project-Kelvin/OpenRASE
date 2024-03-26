@@ -2,6 +2,7 @@
 Defines the class that corresponds to the Orchestrator class in the NFV architecture.
 """
 
+from typing import Union
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
@@ -75,15 +76,15 @@ class Orchestrator():
 
         self._solver = solver
 
-    def sendSFCRequests(self, sfcRequests: "list[SFCRequest]") -> None:
+    def sendRequests(self, requests: "list[Union[SFCRequest, EmbeddingGraph]]") -> None:
         """
         Send the SFC requests to the orchestrator.
 
         Parameters:
-            sfcRequests (list[SFCRequest]): The list of SFC requests.
+            sfcRequests (list[Union[SFCRequest, EmbeddingGraph]]): The list of SFC requests.
         """
 
-        self._solver.sendSFCRequests(sfcRequests)
+        self._solver.sendRequests(requests)
 
     def end(self) -> None:
         """

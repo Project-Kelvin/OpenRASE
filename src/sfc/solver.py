@@ -4,7 +4,8 @@ Defines the abstract Solver class.
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Union
+from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
 from sfc.traffic_generator import TrafficGenerator
 
@@ -17,7 +18,7 @@ class Solver(ABC):
     Abstract class that defines the interface for the Solver.
     """
 
-    _sfcRequests: "list[SFCRequest]" = []
+    _requests: "list[Union[SFCRequest, EmbeddingGraph]]" = []
     _trafficGenerator: TrafficGenerator = None
     _orchestrator: Orchestrator = None
 
@@ -26,7 +27,7 @@ class Solver(ABC):
         self._orchestrator = orchestrator
         self._trafficGenerator = trafficGenerator
 
-    def sendSFCRequests(self, sfcRequests: "list[SFCRequest]") -> None:
+    def sendRequests(self, requests: "list[Union[SFCRequest, EmbeddingGraph]]") -> None:
         """
         Send the SFC requests to the orchestrator.
 
@@ -34,7 +35,7 @@ class Solver(ABC):
             sfcRequests (list[SFCRequest]): The list of SFC requests.
         """
 
-        self._sfcRequests.append(sfcRequests)
+        self._requests.append(requests)
 
     @abstractmethod
     def generateEmbeddingGraphs(self) -> None:

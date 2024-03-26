@@ -215,7 +215,7 @@ class SFCR(SFCRequestGenerator):
 
     def generateRequests(self) -> None:
 
-        self._orchestrator.sendSFCRequests([sfcRequest])
+        self._orchestrator.sendRequests([sfcRequest])
 
 class SFCSolver(Solver):
     """
@@ -228,7 +228,7 @@ class SFCSolver(Solver):
         """
 
         self._orchestrator.sendEmbeddingGraphs([simpleEG])
-        sleep(120)
+        sleep(60)
         self._orchestrator.sendEmbeddingGraphs([simpleEGUpdated])
 
 sfcEmulator = SFCEmulator(SFCR, SFCSolver)

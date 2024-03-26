@@ -3,12 +3,13 @@ Defines the SFCEmulator class.
 """
 
 from threading import Thread
-from typing import Any, Type
+from typing import Any, Type, Union
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from constants.notification import TOPOLOGY_INSTALLED
 from mano.mano_class import MANO
 from mano.notification_system import NotificationSystem, Subscriber
+from sfc.fg_request_generator import FGRequestGenerator
 from sfc.solver import Solver
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.traffic_generator import TrafficGenerator
@@ -20,16 +21,16 @@ class SFCEmulator(Subscriber):
     """
 
     _mano: MANO = None
-    _sfcRequestGenerator: SFCRequestGenerator = None
+    _requestGenerator: Union[SFCRequestGenerator, FGRequestGenerator] = None
     _trafficGenerator: TrafficGenerator = None
     _solver: Solver = None
 
-    def __init__(self, sfcRequestGenerator: Type[SFCRequestGenerator], solver: Type[Solver]) -> None:
+    def __init__(self, requestGenerator: Union[Type[SFCRequestGenerator], Type[FGRequestGenerator]], solver: Type[Solver]) -> None:
         """
         Constructor for the class.
 
         Parameters:
-            sfcRequestGenerator (ISFCRequestGenerator): The SFC request generator.
+            requestGenerator (SFCRequestGenerator | FGRequestGenerator): The SFC request generator.
             solver (Type[Solver]): A child class of Solver.
         """
 
@@ -38,7 +39,7 @@ class SFCEmulator(Subscriber):
         self._solver = solver(self._mano.getOrchestrator(),
                               self._trafficGenerator)
         self._mano.getOrchestrator().injectSolver(self._solver)
-        self._sfcRequestGenerator = sfcRequestGenerator(
+        self._requestGenerator = requestGenerator(
             self._mano.getOrchestrator())
         NotificationSystem.subscribe(TOPOLOGY_INSTALLED, self)
 
@@ -56,7 +57,7 @@ class SFCEmulator(Subscriber):
 
     def receiveNotification(self, topic, *args: "list[Any]") -> None:
         if topic == TOPOLOGY_INSTALLED:
-            Thread(target=self._sfcRequestGenerator.generateRequests).start()
+            Thread(target=self._requestGenerator.generateRequests).start()
             Thread(target=self._solver.generateEmbeddingGraphs).start()
 
     def startCLI(self) -> None:
