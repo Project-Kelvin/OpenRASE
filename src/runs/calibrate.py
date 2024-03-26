@@ -2,8 +2,8 @@
 This code is used to calibrate the CPU, memory, and bandwidth demands of VNFs.
 """
 
-from time import sleep, time
 from timeit import default_timer
+import csv
 from shared.constants.embedding_graph import TERMINAL
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
@@ -16,7 +16,6 @@ from models.traffic_generator import TrafficData
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
-import csv
 
 
 sfcr: SFCRequest = {
@@ -58,12 +57,18 @@ eg: EmbeddingGraph = {
         "vnf": {
             "id": "waf"
         },
-        "next": {
+        "next": [{
             "host": {
                 "id": SERVER
             },
             "next": TERMINAL
-        }
+        },
+            {
+            "host": {
+                "id": SERVER
+            },
+            "next": TERMINAL
+        }]
     },
     "links": [
         {
@@ -87,14 +92,24 @@ eg: EmbeddingGraph = {
     ]
 }
 
-trafficDesign: "list[TrafficDesign]" = [
-    [
-        {
-            "target": 1000,
-            "duration": "2m"
-        }
-    ]
-]
+trafficDesign: "list[TrafficDesign]" = [[
+    {
+        "duration": "5m",
+        "target": 1000
+    },
+    {
+        "duration": "5m",
+        "target": 0
+    },
+    {
+        "duration": "5m",
+        "target": 2000
+    },
+    {
+        "duration": "5m",
+        "target": 0
+    }
+]]
 
 
 class SFCR(SFCRequestGenerator):
@@ -104,7 +119,7 @@ class SFCR(SFCRequestGenerator):
 
     def generateRequests(self) -> None:
 
-        self._orchestrator.sendSFCRequests([sfcr])
+        self._orchestrator.sendRequests([sfcr])
 
 
 class SFCSolver(Solver):
@@ -119,10 +134,10 @@ class SFCSolver(Solver):
 
         self._orchestrator.sendEmbeddingGraphs([eg])
         telemetry: Telemetry = self._orchestrator.getTelemetry()
-        count: int = 0
+        seconds: int = 0
 
-        headers = ["cpuUsage", "memoryUsage", "networkUsageIn", "networkUsageOut", "cpuUsage",
-                   "memoryUsage", "networkUsageIn", "networkUsageOut", "http_reqs", "latency", "duration"]
+        headers = ["cpuUsage", "memoryUsage", "networkUsageIn",
+                   "networkUsageOut", "http_reqs", "latency", "duration"]
 
         # Create a CSV file
         filename = "/home/thivi/SFC-Emulator/src/runs/calibrate.csv"
@@ -131,12 +146,13 @@ class SFCSolver(Solver):
         with open(filename, mode='w', newline='', encoding="utf8") as file:
             writer = csv.writer(file)
             writer.writerow(headers)
-        while count < 30:
+        while seconds < 20*60:
             start: float = default_timer()
             hostData: HostData = telemetry.getHostData()["h1"]["vnfs"]
             end: float = default_timer()
+            duration: int = round(end - start, 0)
             trafficData: "list[TrafficData]" = self._trafficGenerator.getData(
-                f"{round(end - start, 0):.0f}s")
+                f"{duration:.0f}s")
             row = []
 
             for _key, data in hostData.items():
@@ -154,7 +170,9 @@ class SFCSolver(Solver):
             with open(filename, mode='a', newline='', encoding="utf8") as file:
                 writer = csv.writer(file)
                 writer.writerow(row)
-            count += 1
+            seconds += duration
+
+        print("Finished!")
 
 
 em: SFCEmulator = SFCEmulator(SFCR, SFCSolver)
