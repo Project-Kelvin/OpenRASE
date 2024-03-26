@@ -107,7 +107,6 @@ class VNFManager():
             thread.join()
 
         self._embeddingGraphs[sfcId] = updatedEG
-
         sfccIP: str = getContainerIP(SFCC)
 
         requests.post(
@@ -140,7 +139,7 @@ class VNFManager():
             vnfName: str = vnf["name"]
 
             if host["id"] != SERVER:
-                dindClient: DockerClient = connectToDind(host["id"])
+                dindClient: DockerClient = connectToDind(f"{host['id']}Node")
 
                 dindClient.containers.get(vnfName).remove(force=True)
 
