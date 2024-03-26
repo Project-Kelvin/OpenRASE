@@ -110,10 +110,10 @@ class InfraManager():
 
             hostNode: Host = self._net.addDocker(
                 f"{host['id']}Node",
-                ip=f"{getConfig()['sff']['network1']['hostIP']}/{getConfig()['sff']['network2']['mask']}",
+                ip=f"{getConfig()['sff']['network1']['hostIP']}/{getConfig()['sff']['network1']['mask']}",
                 cpu_quota=host["cpu"] * CPU_PERIOD if "cpu" in host else -1,
-                mem_limit=host["memory"] if "memory" in host else None,
-                memswap_limit=host["memory"] if "memory" in host else None,
+                mem_limit=f"{host['memory']}mb" if "memory" in host else None,
+                memswap_limit=f"{host['memory']}mb" if "memory" in host else None,
                 dimage=DIND_IMAGE,
                 privileged=True,
                 dcmd="dockerd",
@@ -156,7 +156,7 @@ class InfraManager():
 
         for hostNode in hostNodes:
             hostNode.cmd(
-                f"ip route add {getConfig()['sff']['network2']['networkIP']} via {getConfig()['sff']['network1']['hostIP']}")
+                f"ip addr add {getConfig()['sff']['network2']['hostIP']}/{getConfig()['sff']['network2']['mask']} dev {hostNode.name}-eth0")
 
         self._sdnController.assignSwitchIPs(
             topology, self._switches, self._hostIPs, self._networkIPs)
@@ -226,8 +226,9 @@ class InfraManager():
                     eg["sfcID"], vnfs['host']['id'])
 
                 # Assign IP to the host
+                port: str = "eth0" if vnfs['host']['id'] == SERVER else "eth1"
                 self._net.get(vnfs['host']['id']).cmd(
-                    f"ip addr add {str(ipAddr[2])}/{ipAddr[0].prefixlen} dev {vnfs['host']['id']}-eth1")
+                    f"ip addr add {str(ipAddr[2])}/{ipAddr[0].prefixlen} dev {vnfs['host']['id']}-{port}")
 
                 self._sdnController.assignGatewayIP(
                     self._topology, vnfs['host']['id'], ipAddr[1], self._switches)
