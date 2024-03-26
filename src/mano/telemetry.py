@@ -21,7 +21,7 @@ from shared.utils.config import getConfig
 from shared.utils.container import doesContainerExist
 from mininet.net import Mininet
 from mininet.util import quietRun
-from constants.container import MININET_PREFIX, SFF
+from constants.container import MININET_PREFIX
 from constants.notification import EMBEDDING_GRAPH_DEPLOYED
 from mano.notification_system import NotificationSystem, Subscriber
 from models.telemetry import HostData, SwitchData
@@ -199,7 +199,7 @@ class Telemetry(Subscriber):
             for host in hosts:
                 client: DockerClient = from_env()
                 hostContainer: Container = client.containers.get(
-                    f"{MININET_PREFIX}.{host['id']}")
+                    f"{MININET_PREFIX}.{host['id']}Node")
                 memoryLimit: float = hostContainer.stats(
                     stream=False)["memory_stats"]["limit"]
 
@@ -217,7 +217,7 @@ class Telemetry(Subscriber):
                     "vnfs": {}
                 }
 
-                dindClient: DockerClient = connectToDind(host["id"])
+                dindClient: DockerClient = connectToDind(f"{host['id']}Node")
 
                 if host["id"] in self._vnfsInHosts and len(self._vnfsInHosts[host["id"]]) > 0:
                     for vnf in self._vnfsInHosts[host["id"]]:
@@ -234,19 +234,6 @@ class Telemetry(Subscriber):
                             "memoryUsage": vnfMemoryUsage,
                             "networkUsage": vnfNetworkUsage
                         }
-
-                container: Container = dindClient.containers.get(SFF)
-                sffCPUUsage: Future = executor.submit(self._calculateCPUUsage,
-                    host["id"], container)
-                sffMemoryUsage: Future = executor.submit(self._calculateMemoryUsage,
-                    container, memoryLimit)
-                sffNetworkUsage: Future = executor.submit(self._calculateNetworkUsage,
-                    container)
-                hostDataFutures[host["id"]]["vnfs"][SFF] = {
-                    "cpuUsage": sffCPUUsage,
-                    "memoryUsage": sffMemoryUsage,
-                    "networkUsage": sffNetworkUsage
-                }
 
             for hostKey, host in hostDataFutures.items():
                 hostData[hostKey] = {
