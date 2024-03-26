@@ -18,7 +18,7 @@ class Host(dict):
     would mean that the host will use 2 cores. You can simply define the number of cores/CPUs to use
     using this `cpu` attribute and the right CPU Quota will be calculated automatically.
     """
-    memory: str
+    memory: float
 
 
 class Switch(dict):
