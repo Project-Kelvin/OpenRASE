@@ -24,6 +24,7 @@ class SFCEmulator(Subscriber):
     _requestGenerator: Union[SFCRequestGenerator, FGRequestGenerator] = None
     _trafficGenerator: TrafficGenerator = None
     _solver: Solver = None
+    _threads: "list[Thread]" = []
 
     def __init__(self, requestGenerator: Union[Type[SFCRequestGenerator], Type[FGRequestGenerator]], solver: Type[Solver]) -> None:
         """
@@ -57,8 +58,8 @@ class SFCEmulator(Subscriber):
 
     def receiveNotification(self, topic, *args: "list[Any]") -> None:
         if topic == TOPOLOGY_INSTALLED:
-            Thread(target=self._requestGenerator.generateRequests).start()
-            Thread(target=self._solver.generateEmbeddingGraphs).start()
+            self._threads.append(Thread(target=self._requestGenerator.generateRequests).start())
+            self._threads.append(Thread(target=self._solver.generateEmbeddingGraphs).start())
 
     def startCLI(self) -> None:
         """
@@ -74,3 +75,11 @@ class SFCEmulator(Subscriber):
 
         self._mano.getOrchestrator().end()
         self._trafficGenerator.end()
+
+    def wait(self) -> None:
+        """
+        Wait for all threads to finish.
+        """
+
+        for thread in self._threads:
+            thread.join()

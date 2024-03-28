@@ -70,6 +70,7 @@ class VNFs(dict):
     """
 
     sharedVolumes: "dict[str, list[str]]"
+    names: "list[str]"
 
 class K6(dict):
     """

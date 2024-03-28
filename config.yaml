@@ -43,6 +43,14 @@ ipRange:
   mask: 24
 
 vnfs:
+  names:
+    - "waf"
+    - "lb"
+    - "tm"
+    - "ips"
+    - "ids"
+    - "dpi"
+    - "ha"
   sharedVolumes:
     waf:
       - "/home/docker/files/waf/shared/Caddyfile:/etc/caddy/Caddyfile"

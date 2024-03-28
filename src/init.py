@@ -204,6 +204,18 @@ def symLinkConfig() -> None:
     except FileExistsError:
         pass
 
+def createArtifactsDirectory() -> None:
+    """
+    Create the artifacts directory.
+    """
+
+    config: Config = getConfig()
+
+    try:
+        os.mkdir(f"{config['repoAbsolutePath']}/artifacts")
+    except FileExistsError:
+        pass
+
 
 def main() -> None:
     """
@@ -238,6 +250,10 @@ def main() -> None:
         if name != "":
             print("Pushing Docker image " + name)
             pushDockerImage(name)
+
+    print("Creating artifacts directory...")
+    # Create artifacts directory.
+    createArtifactsDirectory()
 
 
 main()
