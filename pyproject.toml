@@ -24,6 +24,8 @@ influxdb-client = {extras = ["ciso"], version = "^1.40.0"}
 dijkstar = "^2.6.0"
 numpy = "^1.26.4"
 tensorflow = "^2.16.1"
+pandas = "^2.2.1"
+matplotlib = "^3.8.3"
 
 [build-system]
 requires = ["poetry-core"]
