@@ -118,7 +118,7 @@ def addRegistryToInsecureRegistries() -> None:
     addr: str = getRegistryContainerTag()
 
     try:
-        with open("/etc/docker/daemon.json", "r+", encoding="utf-8") as f:
+        with open("/etc/docker/daemon.json", "w+", encoding="utf-8") as f:
             if not f.readable() or f.read().lstrip() == "":
                 data: Any = {}
             else:
@@ -169,16 +169,15 @@ def generateConfigFilesFromTemplates() -> None:
     for template in templates:
         mapper: "list[str]" = template.split(":")
 
-        templateFile: str = f"{config['repoAbsolutePath']}/templates/{mapper[0]}"
-        outputFile: str = mapper[1]
-
+        templateFile: str = os.path.join(config['repoAbsolutePath'], "templates", mapper[0])
+        outputFile: str = os.path.join(config['repoAbsolutePath'], mapper[1])
         templatedFile: str = ""
         try:
             with open(templateFile, "r+", encoding="utf-8") as file:
                 jTemplate: Template = Template(file.read())
                 templatedFile = jTemplate.render(generateTemplateData())
 
-            with open(outputFile, "w", encoding="utf-8") as file:
+            with open(outputFile, "w+", encoding="utf-8") as file:
                 file.write(templatedFile)
         except FileNotFoundError:
             print(f"Template file {templateFile} not found.")
