@@ -29,7 +29,7 @@ sfcClassifier:
 general:
   requestTimeout: 5
 
-repoAbsolutePath: "/home/thivi/SFC-Emulator"
+repoAbsolutePath: "/home/thivi/OpenRASE"
 
 templates:
   - "daemon.json.j2:docker/files/dind/shared/daemon.json"
