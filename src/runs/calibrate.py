@@ -259,6 +259,8 @@ class Calibrate:
             SFC Solver.
             """
 
+            _headers: "list[str]" = self._headers
+
             def generateEmbeddingGraphs(self) -> None:
                 """
                 Generate the embedding graphs.
