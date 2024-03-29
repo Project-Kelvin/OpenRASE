@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "sfc-emulator"
+name = "OpenRASE"
 version = "0.1.0"
 description = "This is an emulator built on top of Containernet to benchmark and evaluate solutions to the NFV-RA problem."
 authors = ["Theviyanthan K."]
