@@ -22,7 +22,7 @@ from utils.container import connectToDind, getContainerIP
 from docker import DockerClient, from_env
 
 
-TG_HOME_PATH: str = "/home/docker/compose"
+TG_HOME_PATH: str = "/home/docker/files/influxdb"
 INFLUX_DB_CONFIG = {
     "USERNAME": "admin",
     "PASSWORD": "password",
@@ -52,7 +52,7 @@ class TrafficGenerator(Subscriber):
         dockerClient: DockerClient = from_env()
 
         dockerClient.containers.run(DIND_IMAGE, detach=True, name=TRAFFIC_GENERATOR, privileged=True, volumes=[
-            f"{config['repoAbsolutePath']}/docker/compose:{TG_HOME_PATH}"
+            f"{config['repoAbsolutePath']}/docker/files/influxdb:{TG_HOME_PATH}"
         ], command="dockerd", ports={"8086/tcp": 8086})
         sleep(20)
         self._tgClient = connectToDind(TRAFFIC_GENERATOR, False)
@@ -64,7 +64,7 @@ class TrafficGenerator(Subscriber):
             "DOCKER_INFLUXDB_INIT_BUCKET": INFLUX_DB_CONFIG["BUCKET"],
             "DOCKER_INFLUXDB_INIT_ADMIN_TOKEN": INFLUX_DB_CONFIG["TOKEN"]
         }, ports={"8086/tcp": 8086},
-            volumes=[f"{TG_HOME_PATH}/tester/shared/data:/var/lib/influxdb2"])
+            volumes=[f"{TG_HOME_PATH}/data:/var/lib/influxdb2"])
 
         self._influxDBClient = InfluxDBClient(
             url="http://localhost:8086",
