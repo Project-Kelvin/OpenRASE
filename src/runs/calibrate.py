@@ -163,7 +163,7 @@ class Calibrate:
         return testResult
 
 
-    def calibrateVNF(self, vnf: str) -> None:
+    def _calibrateVNF(self, vnf: str) -> None:
         """
         Calibrate the VNF.
 
@@ -272,7 +272,7 @@ class Calibrate:
 
                 # Create a CSV file
                 # Write headers to the CSV file
-                with open(filename, mode='w', newline='', encoding="utf8") as file:
+                with open(filename, mode='w+', newline='', encoding="utf8") as file:
                     writer = csv.writer(file)
                     writer.writerow(self._headers)
                 while seconds < 20*60:
@@ -305,12 +305,12 @@ class Calibrate:
 
         em: SFCEmulator = SFCEmulator(SFCR, SFCSolver)
         em.startTest(topology, self._trafficDesign)
+        em.wait()
 
         self._trainModel(filename, self._headers[0], vnf)  # cpu
         self._trainModel(filename, self._headers[1], vnf)  # memory
         self._trainModel(filename, self._headers[4], vnf)  # I/O Ratio
 
-        em.wait()
         em.end()
 
     def _getVNFResourceDemandModel(self, vnf: str, metric: str):
@@ -342,11 +342,19 @@ class Calibrate:
         memoryModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[1])
         iorModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[4])
 
-        cpu: float = cpuModel.predict([reqps])[0][0]
-        memory: float = memoryModel.predict([reqps])[0][0]
-        ior: float = iorModel.predict([reqps])[0][0]
+        cpu: float = cpuModel.predict(np.array([reqps]))[0][0]
+        memory: float = memoryModel.predict(np.array([reqps]))[0][0]
+        ior: float = iorModel.predict(np.array([reqps]))[0][0]
 
-        return ResourceDemand(cpu, memory, ior)
+        return ResourceDemand(cpu=cpu, memory=memory, ior=ior)
+
+    def calibrateVNFs(self) -> None:
+        """
+        Calibrate all the VNFs.
+        """
+
+        for vnf in self._config["vnfs"]["names"]:
+            self._calibrateVNF(vnf)
 
     def getResourceDemands(self, reqps: float) -> "dict[str, ResourceDemand]":
         """
@@ -360,9 +368,7 @@ class Calibrate:
         """
 
         demands: "dict[str, ResourceDemand]" = {}
-        for vnf in self._config["vnfs"]:
+        for vnf in self._config["vnfs"]["names"]:
             demands[vnf] = self._getVNFResourceDemands(vnf, reqps)
 
-
-cal = Calibrate()
-cal.calibrateVNF("waf")
+        return demands
