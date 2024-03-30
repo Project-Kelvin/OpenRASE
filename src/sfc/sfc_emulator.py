@@ -58,8 +58,12 @@ class SFCEmulator(Subscriber):
 
     def receiveNotification(self, topic, *args: "list[Any]") -> None:
         if topic == TOPOLOGY_INSTALLED:
-            self._threads.append(Thread(target=self._requestGenerator.generateRequests).start())
-            self._threads.append(Thread(target=self._solver.generateEmbeddingGraphs).start())
+            sfcrThread: Thread = Thread(target=self._requestGenerator.generateRequests)
+            solverThread: Thread = Thread(target=self._solver.generateEmbeddingGraphs)
+            sfcrThread.start()
+            solverThread.start()
+            self._threads.append(sfcrThread)
+            self._threads.append(solverThread)
 
     def startCLI(self) -> None:
         """
