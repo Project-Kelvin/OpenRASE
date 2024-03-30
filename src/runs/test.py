@@ -18,12 +18,12 @@ topo: Topology = {
         {
             "id": "h1",
             "cpu": 4,
-            "memory": "1gb"
+            "memory": 1024
         },
         {
             "id": "h2",
             "cpu": 4,
-            "memory": "1gb"
+            "memory": 1024
         }
     ],
     "switches": [
