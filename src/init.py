@@ -13,7 +13,7 @@ from shared.utils.config import getConfig
 from shared.utils.container import getRegistryContainerTag, isContainerRunning, doesContainerExist
 from docker import from_env, DockerClient
 from models.template_data import TemplateData
-
+from threading import Thread
 
 client: DockerClient = from_env()
 
@@ -243,12 +243,22 @@ def main() -> None:
 
     print("Building and pushing Docker images...")
     # Build and push Docker images.
+
+    threads: "list[Thread]" = []
     for directory in os.listdir(f"{config['repoAbsolutePath']}/docker/files"):
-        print("Building Docker image for " + directory)
-        name: str = buildDockerImage(directory)
-        if name != "":
-            print("Pushing Docker image " + name)
-            pushDockerImage(name)
+        def buildAndPush():
+            print("Building Docker image for " + directory)
+            name: str = buildDockerImage(directory)
+            if name != "":
+                print("Pushing Docker image " + name)
+                pushDockerImage(name)
+
+        thread: Thread = Thread(target=buildAndPush)
+        thread.start()
+        threads.append(thread)
+
+    for thread in threads:
+        thread.join()
 
     print("Creating artifacts directory...")
     # Create artifacts directory.
