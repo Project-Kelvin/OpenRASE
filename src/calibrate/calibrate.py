@@ -5,6 +5,7 @@ This code is used to calibrate the CPU, memory, and bandwidth demands of VNFs.
 import os
 from timeit import default_timer
 import csv
+import json
 from typing import Any
 from shared.constants.embedding_graph import TERMINAL
 from shared.models.config import Config
@@ -34,7 +35,6 @@ class Calibrate:
     """
 
     _config: Config = None
-    _trafficDesign: "list[TrafficDesign]" = None
     _calDir: str = None
     _modelName: str = None
     _headers: "list[str]" = None
@@ -48,24 +48,6 @@ class Calibrate:
         """
 
         self._config = getConfig()
-        self._trafficDesign = [[
-            {
-                "duration": "5m",
-                "target": 1000
-            },
-            {
-                "duration": "5m",
-                "target": 0
-            },
-            {
-                "duration": "5m",
-                "target": 2000
-            },
-            {
-                "duration": "5m",
-                "target": 0
-            }
-        ]]
         self._calDir = f"{self._config['repoAbsolutePath']}/artifacts/calibrations"
         self._modelName = "model.keras"
         self._headers = ["cpuUsage", "memoryUsage", "networkUsageIn",
@@ -177,6 +159,22 @@ class Calibrate:
         directory: str = f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"
         filename = f"{directory}/calibration_data.csv"
 
+        config: Config = getConfig()
+        with open(f"{config['repoAbsolutePath']}/src/calibrate/traffic-design.json", 'r', encoding="utf8") as file:
+            trafficDesign: "list[TrafficDesign]" = [json.load(file)]
+
+        totalDuration: int = 0
+
+        for traffic in trafficDesign[0]:
+            durationText: str = traffic["duration"]
+            unit: str  = durationText[-1]
+            if unit == "s":
+                totalDuration += int(durationText[:-1])
+            elif unit == "m":
+                totalDuration += int(durationText[:-1]) * 60
+            elif unit == "h":
+                totalDuration += int(durationText[:-1]) * 60 * 60
+
         topology: Topology = {
             "hosts": [
                 {
@@ -251,6 +249,9 @@ class Calibrate:
             """
 
             def generateRequests(self) -> None:
+                """
+                Generate the requests.
+                """
 
                 self._orchestrator.sendRequests([sfcr])
 
@@ -275,7 +276,7 @@ class Calibrate:
                 with open(filename, mode='w+', newline='', encoding="utf8") as file:
                     writer = csv.writer(file)
                     writer.writerow(self._headers)
-                while seconds < 20*60:
+                while seconds < totalDuration:
                     start: float = default_timer()
                     hostData: HostData = telemetry.getHostData()["h1"]["vnfs"]
                     end: float = default_timer()
@@ -289,7 +290,11 @@ class Calibrate:
                         row.append(data["memoryUsage"][0])
                         row.append(data["networkUsage"][0])
                         row.append(data["networkUsage"][1])
-                        row.append(data["networkUsage"][0]/data["networkUsage"][1])
+
+                        if data["networkUsage"][0] == 0 or data["networkUsage"][1] == 0:
+                            row.append(0)
+                        else:
+                            row.append(data["networkUsage"][0]/data["networkUsage"][1])
 
                     for data in trafficData:
                         row.append(data["value"])
@@ -304,9 +309,10 @@ class Calibrate:
 
 
         em: SFCEmulator = SFCEmulator(SFCR, SFCSolver)
-        em.startTest(topology, self._trafficDesign)
-        em.wait()
+        print("Running the network and taking measurements. This will take a while.")
+        em.startTest(topology, trafficDesign)
 
+        print("Training the models.")
         self._trainModel(filename, self._headers[0], vnf)  # cpu
         self._trainModel(filename, self._headers[1], vnf)  # memory
         self._trainModel(filename, self._headers[4], vnf)  # I/O Ratio
@@ -354,6 +360,7 @@ class Calibrate:
         """
 
         for vnf in self._config["vnfs"]["names"]:
+            print("Calibrating VNF: " + vnf)
             self._calibrateVNF(vnf)
 
     def getResourceDemands(self, reqps: float) -> "dict[str, ResourceDemand]":
