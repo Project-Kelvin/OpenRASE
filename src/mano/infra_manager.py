@@ -111,7 +111,7 @@ class InfraManager():
             hostNode: Host = self._net.addDocker(
                 f"{host['id']}Node",
                 ip=f"{getConfig()['sff']['network1']['hostIP']}/{getConfig()['sff']['network1']['mask']}",
-                cpu_quota=host["cpu"] * CPU_PERIOD if "cpu" in host else -1,
+                cpu_quota=int(host["cpu"] * CPU_PERIOD if "cpu" in host else -1),
                 mem_limit=f"{host['memory']}mb" if "memory" in host else None,
                 memswap_limit=f"{host['memory']}mb" if "memory" in host else None,
                 dimage=DIND_IMAGE,
@@ -203,7 +203,7 @@ class InfraManager():
                 SFCC: self._hostIPs[SFCC]
             }
 
-        def traverseCallback(vnfs: VNF,
+        def traverseCallback(vnfs: VNF, _depth: int,
                              vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]") -> None:
             """
             Callback function for the traverseVNF function.
