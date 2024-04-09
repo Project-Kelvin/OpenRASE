@@ -35,7 +35,7 @@ class Solver(ABC):
             sfcRequests (list[SFCRequest]): The list of SFC requests.
         """
 
-        self._requests.append(requests)
+        self._requests.extend(requests)
 
     @abstractmethod
     def generateEmbeddingGraphs(self) -> None:
