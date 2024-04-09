@@ -10,6 +10,9 @@ packages = [
     { include = "constants", from = "src" },
     { include = "mano", from = "src" },
     { include = "sfc", from = "src" },
+    { include = "algorithms", from = "src" },
+    { include = "calibrate", from = "src" },
+    { include = "runs", from = "src" },
     { include = "shared", from = "packages"}
 ]
 
@@ -30,3 +33,10 @@ matplotlib = "^3.8.3"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+init = "runs.init:run"
+calibrate = "runs.calibrate_vnfs:run"
+dijkstra = "runs.simple_dijkstra_algorithm.run:run"
+simdij = "runs.simple_dijkstra_algorithm.sim_run:run"
+test = "runs.test:run"
