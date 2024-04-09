@@ -128,7 +128,7 @@ def tx() -> Response:
         # Makes forwarding decision.
         nextDest: str = ""
         if sfcUpdated["host"]["id"] == sfc["host"]["id"]:
-            nextDest = f"http://{sfc['vnf']}"
+            nextDest = f"http://{sfc['vnf']['ip']}"
         elif sfc["next"] == TERMINAL:
             nextDest = f'http://{sfc["host"]["ip"]}'
         else:
