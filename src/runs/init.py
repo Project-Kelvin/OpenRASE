@@ -6,6 +6,7 @@ and configuring the settings.
 import json
 import os
 from typing import Any
+from threading import Thread
 from jinja2 import Template, TemplateSyntaxError
 from shared.constants.sfc import SFC_REGISTRY
 from shared.models.config import Config
@@ -13,7 +14,6 @@ from shared.utils.config import getConfig
 from shared.utils.container import getRegistryContainerTag, isContainerRunning, doesContainerExist
 from docker import from_env, DockerClient
 from models.template_data import TemplateData
-from threading import Thread
 
 client: DockerClient = from_env()
 
@@ -216,7 +216,7 @@ def createArtifactsDirectory() -> None:
         pass
 
 
-def main() -> None:
+def run() -> None:
     """
     The main function.
     """
@@ -246,14 +246,14 @@ def main() -> None:
 
     threads: "list[Thread]" = []
     for directory in os.listdir(f"{config['repoAbsolutePath']}/docker/files"):
-        def buildAndPush():
+        def buildAndPush(directory: str):
             print("Building Docker image for " + directory)
             name: str = buildDockerImage(directory)
             if name != "":
                 print("Pushing Docker image " + name)
                 pushDockerImage(name)
 
-        thread: Thread = Thread(target=buildAndPush)
+        thread: Thread = Thread(target=buildAndPush, args=(directory,))
         thread.start()
         threads.append(thread)
 
@@ -263,6 +263,3 @@ def main() -> None:
     print("Creating artifacts directory...")
     # Create artifacts directory.
     createArtifactsDirectory()
-
-
-main()
