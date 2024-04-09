@@ -231,7 +231,13 @@ class SFCSolver(Solver):
         sleep(60)
         self._orchestrator.sendEmbeddingGraphs([simpleEGUpdated])
 
-sfcEmulator = SFCEmulator(SFCR, SFCSolver)
-sfcEmulator.startTest(topo, trafficDesign)
-sfcEmulator.startCLI()
-sfcEmulator.end()
+
+def run () -> None:
+    """
+    Run the test.
+    """
+
+    sfcEmulator = SFCEmulator(SFCR, SFCSolver)
+    sfcEmulator.startTest(topo, trafficDesign)
+    sfcEmulator.startCLI()
+    sfcEmulator.end()
