@@ -455,7 +455,7 @@ class Telemetry(Subscriber):
 
         vnfs: VNF = embeddingGraph["vnfs"]
 
-        def traverseCallback(vnf: VNF) -> None:
+        def traverseCallback(vnf: VNF, _depth: int) -> None:
             """
             Callback function for the traverseVNF function.
 
