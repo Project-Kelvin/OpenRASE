@@ -55,6 +55,7 @@ class SFCEmulator(Subscriber):
 
         self._trafficGenerator.setDesign(trafficDesign)
         self._mano.getOrchestrator().installTopology(topology)
+        self._wait()
 
     def receiveNotification(self, topic, *args: "list[Any]") -> None:
         if topic == TOPOLOGY_INSTALLED:
@@ -80,7 +81,7 @@ class SFCEmulator(Subscriber):
         self._mano.getOrchestrator().end()
         self._trafficGenerator.end()
 
-    def wait(self) -> None:
+    def _wait(self) -> None:
         """
         Wait for all threads to finish.
         """
