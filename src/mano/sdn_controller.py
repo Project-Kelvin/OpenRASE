@@ -3,6 +3,7 @@ Defines the class that manipulates the Ryu SDN controller.
 """
 
 from ipaddress import IPv4Address, IPv4Network
+from threading import Thread
 from typing import Tuple
 from requests import Response
 import requests
@@ -243,3 +244,38 @@ class SDNController():
                 if prevSwitch is not None:
                     self._deleteFlow(sourceNetwork, self._switchLinks[f"{prevSwitch}-{switch}"],
                                       switches[switch])
+
+    def waitTillReady(self, switches: "dict[str, OVSKernelSwitch]" ) -> None:
+        """
+        Wait until the SDN controller is ready.
+
+        Parameters:
+            switches (dict[str, OVSKernelSwitch]): The switches to wait for.
+        """
+
+        config: Config = getConfig()
+
+        threads: "list[Thread]" = []
+
+        def checkSwitch(switch: OVSKernelSwitch):
+            isReady: bool = False
+            while not isReady:
+                try:
+                    response: Response = requests.request(
+                        method="GET",
+                        url=getRyuRestUrl(switch.dpid),
+                        timeout=config["general"]["requestTimeout"]
+                    )
+                    if "failure" not in str(response.content):
+                        isReady = True
+                # pylint: disable=broad-except
+                except Exception:
+                    pass
+
+        for switch in switches.values():
+            thread: Thread = Thread(target=checkSwitch, args=(switch,))
+            threads.append(thread)
+            thread.start()
+
+        for thread in threads:
+            thread.join()

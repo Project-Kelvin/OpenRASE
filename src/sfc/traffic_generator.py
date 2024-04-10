@@ -5,7 +5,6 @@ Defines the TrafficGenerator class.
 from datetime import datetime
 import json
 import random
-from time import sleep
 from typing import Any
 from jinja2 import Template, TemplateSyntaxError
 from shared.models.config import Config
@@ -18,8 +17,8 @@ from constants.notification import EMBEDDING_GRAPH_DELETED, EMBEDDING_GRAPH_DEPL
 from constants.topology import SFCC, TRAFFIC_GENERATOR
 from mano.notification_system import NotificationSystem, Subscriber
 from models.traffic_generator import TrafficData
-from utils.container import connectToDind, getContainerIP
-from docker import DockerClient, from_env
+from utils.container import connectToDind, getContainerIP, waitTillContainerReady
+from docker import DockerClient, from_env, errors
 
 
 TG_HOME_PATH: str = "/home/docker/files/influxdb"
@@ -51,10 +50,17 @@ class TrafficGenerator(Subscriber):
         config: Config = getConfig()
         dockerClient: DockerClient = from_env()
 
+        try:
+            dockerClient.containers.get(TRAFFIC_GENERATOR).remove(force=True)
+        except errors.NotFound:
+            pass
+
         dockerClient.containers.run(DIND_IMAGE, detach=True, name=TRAFFIC_GENERATOR, privileged=True, volumes=[
             f"{config['repoAbsolutePath']}/docker/files/influxdb:{TG_HOME_PATH}"
         ], command="dockerd", ports={"8086/tcp": 8086})
-        sleep(20)
+
+        waitTillContainerReady(TRAFFIC_GENERATOR, False)
+
         self._tgClient = connectToDind(TRAFFIC_GENERATOR, False)
         self._tgClient.containers.run(f"{TAG}/influxdb:latest", name=INFLUXDB, detach=True, environment={
             "DOCKER_INFLUXDB_INIT_MODE": "setup",

@@ -3,7 +3,7 @@ Defines the class that corresponds to the Virtualized Infrastructure Manager in 
 """
 
 from ipaddress import IPv4Address, IPv4Network
-from time import sleep
+from threading import Thread
 from typing import Any, Tuple
 import requests
 from shared.constants.embedding_graph import TERMINAL
@@ -21,7 +21,7 @@ from constants.container import CPU_PERIOD, DIND_IMAGE, SERVER_IMAGE, SFCC_IMAGE
 from mano.notification_system import NotificationSystem
 from mano.sdn_controller import SDNController
 from mano.telemetry import Telemetry
-from utils.container import getContainerIP
+from utils.container import getContainerIP, waitTillContainerReady
 from utils.embedding_graph import traverseVNF
 
 
@@ -126,7 +126,6 @@ class InfraManager():
             )
             hostNodes.append(hostNode)
             self._net.addLink(sff, hostNode)
-            #self._net.addLink(switch, hostNode)
 
             self._hosts[host["id"]] = sff
 
@@ -143,7 +142,7 @@ class InfraManager():
                 bw=link['bandwidth'] if 'bandwidth' in link else None)
 
         self._net.start()
-        sleep(5)
+        self._sdnController.waitTillReady(self._switches)
 
         for name, host in self._hosts.items():
             if name != SERVER and name != SFCC:
@@ -162,7 +161,15 @@ class InfraManager():
             topology, self._switches, self._hostIPs, self._networkIPs)
 
         # Notify
-        sleep(10)
+        threads: "list[Thread]" = []
+        for host in hostNodes:
+            thread: Thread = Thread(target=waitTillContainerReady, args=(host.name,))
+            thread.start()
+            threads.append(thread)
+
+        for thread in threads:
+            thread.join()
+
         NotificationSystem.publish(TOPOLOGY_INSTALLED)
 
     def getHostIPs(self) -> "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]":

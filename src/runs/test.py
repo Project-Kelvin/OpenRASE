@@ -2,7 +2,6 @@
 This file is used to test the functionality of the SFC Emulator.
 """
 
-from time import sleep
 from shared.constants.embedding_graph import TERMINAL
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
@@ -228,8 +227,8 @@ class SFCSolver(Solver):
         """
 
         self._orchestrator.sendEmbeddingGraphs([simpleEG])
-        sleep(60)
-        self._orchestrator.sendEmbeddingGraphs([simpleEGUpdated])
+        #sleep(60)
+        #self._orchestrator.sendEmbeddingGraphs([simpleEGUpdated])
 
 
 def run () -> None:

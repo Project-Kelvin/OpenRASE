@@ -45,3 +45,23 @@ def connectToDind(hostName: str, isMnContainer: bool = True) -> DockerClient:
         base_url=f"tcp://{hostIP}:{DIND_TCP_PORT}")
 
     return dindClient
+
+def waitTillContainerReady(name: str, isMnContainer: bool = True) -> None:
+    """
+    Wait until the container is ready.
+
+    Parameters:
+        name (str): The name of the container.
+        isMnContainer (bool): Whether the container is a Mininet container.
+    """
+
+    isReady: bool = False
+
+    while not isReady:
+        try:
+            client: DockerClient = connectToDind(name, isMnContainer)
+            client.containers.list()
+            isReady= True
+        # pylint: disable=broad-except
+        except Exception:
+            pass
