@@ -7,6 +7,7 @@ import json
 import os
 from typing import Any
 from threading import Thread
+import click
 from jinja2 import Template, TemplateSyntaxError
 from shared.constants.sfc import SFC_REGISTRY
 from shared.models.config import Config
@@ -215,51 +216,98 @@ def createArtifactsDirectory() -> None:
     except FileExistsError:
         pass
 
+def createDPIHttpLog() -> None:
+    """
+    Create the DPI HTTP log file.
+    """
 
-def run() -> None:
+    config: Config = getConfig()
+
+    try:
+        with open(f"{config['repoAbsolutePath']}/docker/files/dpi/shared/logs/http.log", "w"):
+            pass
+    except FileExistsError:
+        pass
+
+@click.command()
+@click.option("--template", is_flag=True, default=False, help="Generate the config files from the templates.")
+@click.option("--registry", is_flag=True, default=False, help="Start the registry container.")
+@click.option("--insecure", is_flag=True, default=False, help="Add the registry to insecure registries.")
+@click.option("--images", is_flag=True, default=False, help="Build and push the Docker images.")
+@click.option("--artifacts", is_flag=True, default=False, help="Create the artifacts directory.")
+@click.option("--dpi", is_flag=True, default=False, help="Create the DPI HTTP log file.")
+def run(template: bool, registry: bool, insecure: bool, images: bool, artifacts: bool, dpi: bool) -> None:
     """
     The main function.
     """
+
     config: Config = getConfig()
 
-    print("Initializing emulator...")
+    def runTemplate() -> None:
+        print("Generating config files from templates...")
+        # Generate config files from templates.
+        generateConfigFilesFromTemplates()
+        print("Creating symlinks to config file...")
+        # Create symlink to config file.
+        symLinkConfig()
 
-    print("Starting the registry container...")
-    # Start registry container.
-    if not isRegistryContainerRunning():
-        startRegistryContainer()
+    def runRegistry() -> None:
+        print("Starting the registry container...")
+        # Start registry container.
+        if not isRegistryContainerRunning():
+            startRegistryContainer()
 
-    print("Adding registry to insecure registries...")
-    # Add registry to insecure registries.
-    addRegistryToInsecureRegistries()
+    def runInsecure() -> None:
+        print("Adding registry to insecure registries...")
+        # Add registry to insecure registries.
+        addRegistryToInsecureRegistries()
 
-    print("Generating config files from templates...")
-    # Generate config files from templates.
-    generateConfigFilesFromTemplates()
+    def runImages() -> None:
+        print("Building and pushing Docker images...")
+        # Build and push Docker images.
 
-    print("Creating symlinks to config file...")
-    # Create symlink to config file.
-    symLinkConfig()
+        threads: "list[Thread]" = []
+        for directory in os.listdir(f"{config['repoAbsolutePath']}/docker/files"):
+            def buildAndPush(directory: str):
+                print("Building Docker image for " + directory)
+                name: str = buildDockerImage(directory)
+                if name != "":
+                    print("Pushing Docker image " + name)
+                    pushDockerImage(name)
 
-    print("Building and pushing Docker images...")
-    # Build and push Docker images.
+            thread: Thread = Thread(target=buildAndPush, args=(directory,))
+            thread.start()
+            threads.append(thread)
 
-    threads: "list[Thread]" = []
-    for directory in os.listdir(f"{config['repoAbsolutePath']}/docker/files"):
-        def buildAndPush(directory: str):
-            print("Building Docker image for " + directory)
-            name: str = buildDockerImage(directory)
-            if name != "":
-                print("Pushing Docker image " + name)
-                pushDockerImage(name)
+        for thread in threads:
+            thread.join()
 
-        thread: Thread = Thread(target=buildAndPush, args=(directory,))
-        thread.start()
-        threads.append(thread)
+    def runArtifacts() -> None:
+        print("Creating artifacts directory...")
+        # Create artifacts directory.
+        createArtifactsDirectory()
 
-    for thread in threads:
-        thread.join()
+    def runDPI() -> None:
+        print("Creating DPI HTTP log file...")
+        # Create DPI HTTP log file.
+        createDPIHttpLog()
 
-    print("Creating artifacts directory...")
-    # Create artifacts directory.
-    createArtifactsDirectory()
+    if template:
+        runTemplate()
+    elif registry:
+        runRegistry()
+    elif insecure:
+        runInsecure()
+    elif images:
+        runImages()
+    elif artifacts:
+        runArtifacts()
+    elif dpi:
+        runDPI()
+    else:
+        runRegistry()
+        runTemplate()
+        runInsecure()
+        runImages()
+        runArtifacts()
+        runDPI()
