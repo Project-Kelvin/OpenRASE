@@ -22,7 +22,7 @@ from shared.utils.container import doesContainerExist
 from mininet.net import Mininet
 from mininet.util import quietRun
 from constants.container import MININET_PREFIX
-from constants.notification import EMBEDDING_GRAPH_DEPLOYED
+from constants.notification import EMBEDDING_GRAPH_DELETED, EMBEDDING_GRAPH_DEPLOYED
 from mano.notification_system import NotificationSystem, Subscriber
 from models.telemetry import HostData, SwitchData
 from utils.container import connectToDind
@@ -41,10 +41,6 @@ class Telemetry(Subscriber):
     Class that collects and sends telemetry data of the topology.
     """
 
-    _topology: Topology = None
-    _vnfsInHosts: "dict[str, list[VNFEntity]]" = {}
-    _sfcHostByIPs: "dict[str, tuple[str, str]]" = {}
-
     def __init__(self, topology: Topology, sfcHostByIPs: "dict[str, tuple[str, str]]") -> None:
         """
         Constructor for the class.
@@ -54,9 +50,11 @@ class Telemetry(Subscriber):
             sfcHostByIPs (dict[str, tuple[str, str]]): The SFC hosts by IPs.
         """
 
-        self._sfcHostByIPs = sfcHostByIPs
-        self._topology = topology
+        self._sfcHostByIPs: "dict[str, tuple[str, str]]" = sfcHostByIPs
+        self._topology: Topology = topology
+        self._vnfsInHosts: "dict[str, list[VNFEntity]]" = {}
         NotificationSystem.subscribe(EMBEDDING_GRAPH_DEPLOYED, self)
+        NotificationSystem.subscribe(EMBEDDING_GRAPH_DELETED, self)
         self._startSflow()
 
     def _startSflow(self):
@@ -445,12 +443,13 @@ class Telemetry(Subscriber):
 
         return switchData
 
-    def _mapVNFsToHosts(self, embeddingGraph: EmbeddingGraph) -> None:
+    def _mapVNFsToHosts(self, embeddingGraph: EmbeddingGraph, delete: bool = False) -> None:
         """
         Map the VNFs to the hosts.
 
         Parameters:
             embeddingGraph (EmbeddingGraph): The embedding graph.
+            delete (bool): Whether the VNFs are being deleted.
         """
 
         vnfs: VNF = embeddingGraph["vnfs"]
@@ -464,9 +463,16 @@ class Telemetry(Subscriber):
             """
 
             if vnf["host"]["id"] in self._vnfsInHosts:
-                self._vnfsInHosts[vnf["host"]["id"]].append(vnf["vnf"])
+                if not delete:
+                    self._vnfsInHosts[vnf["host"]["id"]].append(vnf["vnf"])
+                else:
+                    for vnfInHost in self._vnfsInHosts[vnf["host"]["id"]]:
+                        if vnfInHost["name"] == vnf["vnf"]["name"]:
+                            self._vnfsInHosts[vnf["host"]["id"]].remove(vnfInHost)
+                            break
             else:
-                self._vnfsInHosts[vnf["host"]["id"]] = [vnf["vnf"]]
+                if not delete:
+                    self._vnfsInHosts[vnf["host"]["id"]] = [vnf["vnf"]]
 
         traverseVNF(vnfs, traverseCallback, shouldParseTerminal=False)
 
@@ -481,3 +487,6 @@ class Telemetry(Subscriber):
 
         if topic == EMBEDDING_GRAPH_DEPLOYED:
             self._mapVNFsToHosts(args[0])
+        elif topic == EMBEDDING_GRAPH_DELETED:
+            eg: EmbeddingGraph = args[0]
+            self._mapVNFsToHosts(eg, delete=True)

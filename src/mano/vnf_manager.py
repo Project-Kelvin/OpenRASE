@@ -15,18 +15,13 @@ from mano.notification_system import NotificationSystem
 from docker import DockerClient
 from utils.container import connectToDind, getContainerIP
 from utils.embedding_graph import traverseVNF
+from utils.tui import TUI
 
 
 class VNFManager():
     """
     Class that corresponds to the VNF Manager in the NFV architecture.
     """
-
-    _infraManager: InfraManager = None
-    _embeddingGraphs: "dict[str, EmbeddingGraph]" = {}
-    _ports: "dict[str, int]" = {}
-    _portLock = None
-    _infraLock = None
 
     def __init__(self, infraManager: InfraManager) -> None:
         """
@@ -36,9 +31,12 @@ class VNFManager():
             infraManager (InfraManager): The infrastructure manager.
         """
 
-        self._infraManager = infraManager
+
+        self._infraManager: InfraManager = infraManager
         self._portLock: Lock = Lock()
         self._infraLock: Lock = Lock()
+        self._embeddingGraphs: "dict[str, EmbeddingGraph]" = {}
+        self._ports: "dict[str, int]" = {}
 
     def _deployEmbeddingGraph(self, eg: EmbeddingGraph) -> None:
         """
@@ -49,9 +47,12 @@ class VNFManager():
         """
 
         if eg["sfcID"] in self._embeddingGraphs:
+            TUI.appendToLog(f"Deleting previous embedding graph {eg['sfcID']}:")
             self._deleteEmbeddingGraph(self._embeddingGraphs[eg["sfcID"]])
+            TUI.appendToLog(f"Deleted previous embedding graph {eg['sfcID']}.")
 
         with self._infraLock:
+            TUI.appendToLog(f"  Deploying embedding graph {eg['sfcID']}:")
             updatedEG: EmbeddingGraph = self._infraManager.embedSFC(eg)
         vnfs: VNF = updatedEG["vnfs"]
         sfcId: str = updatedEG["sfcID"]
@@ -87,13 +88,18 @@ class VNFManager():
                         self._ports[host["id"]] = 5000
                     port = self._ports[host["id"]]
 
-                dindClient.containers.run(
-                    getVNFContainerTag(vnf["id"]),
-                    detach=True,
-                    name=vnfName,
-                    volumes=volumes,
-                    ports={"80/tcp": port},
-                )
+                TUI.appendToLog(f"    Deploying {vnfName} ({getVNFContainerTag(vnf['id'])}) on {host['id']} with IP {getConfig()['sff']['network1']['hostIP']}:{port}.")
+                try:
+                    dindClient.containers.run(
+                        getVNFContainerTag(vnf["id"]),
+                        detach=True,
+                        name=vnfName,
+                        volumes=volumes,
+                        ports={"80/tcp": port},
+                    )
+                except Exception as e:
+                    TUI.appendToLog(f"    Error deploying {vnfName}: {e}")
+                    return
 
                 vnf["ip"] = f"{getConfig()['sff']['network1']['hostIP']}:{port}"
 
@@ -118,13 +124,14 @@ class VNFManager():
         self._embeddingGraphs[sfcId] = updatedEG
         sfccIP: str = getContainerIP(SFCC)
 
+        TUI.appendToLog(f"    Sending embedding graph {sfcId} to SFCC.")
         requests.post(
             f"http://{sfccIP}/add-eg",
             json=updatedEG,
             timeout=getConfig()["general"]["requestTimeout"]
         )
 
-        print(updatedEG)
+        TUI.appendToLog(f"  Deployed embedding graph {sfcId} successfully.")
         NotificationSystem.publish(EMBEDDING_GRAPH_DEPLOYED, updatedEG)
 
     def _deleteEmbeddingGraph(self, eg: EmbeddingGraph) -> None:
@@ -141,6 +148,7 @@ class VNFManager():
         vnfList: "list[str]" = []
         threads: "list[Thread]" = []
 
+        TUI.appendToLog("  Deleting VNFs:")
         def deleteVNF(vnfs: VNF):
             host: TopoHost = vnfs["host"]
             vnf: VNFEntity = vnfs["vnf"]
@@ -151,6 +159,7 @@ class VNFManager():
             if host["id"] != SERVER:
                 dindClient: DockerClient = connectToDind(f"{host['id']}Node")
 
+                TUI.appendToLog(f"    Deleting {vnfName}.")
                 dindClient.containers.get(vnfName).remove(force=True)
 
         def traverseCallback(vnfs: VNF, _depth: int) -> None:
@@ -171,6 +180,8 @@ class VNFManager():
         for thread in threads:
             thread.join()
 
+        TUI.appendToLog(f"Deleted embedding graph {eg['sfcID']} successfully.")
+
 
     def deployEmbeddingGraphs(self, egs: "list[EmbeddingGraph]") -> None:
         """
@@ -180,8 +191,11 @@ class VNFManager():
             egs (list[EmbeddingGraph]): The embedding graphs to be deployed.
         """
 
+        TUI.appendToLog(f"Deploying {len(egs)} embedding graphs:")
+
         threads: "list[Thread]" = []
         for eg in egs:
+            TUI.appendToLog(f"  {eg['sfcID']}")
             thread: Thread = Thread(
                 target=self._deployEmbeddingGraph, args=(eg,))
             thread.start()

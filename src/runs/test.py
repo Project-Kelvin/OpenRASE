@@ -2,15 +2,18 @@
 This file is used to test the functionality of the SFC Emulator.
 """
 
+from time import sleep
 from shared.constants.embedding_graph import TERMINAL
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from constants.topology import SERVER, SFCC
+from models.traffic_generator import TrafficData
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
+from utils.tui import TUI
 
 topo: Topology = {
     "hosts": [
@@ -229,6 +232,14 @@ class SFCSolver(Solver):
         self._orchestrator.sendEmbeddingGraphs([simpleEG])
         #sleep(60)
         #self._orchestrator.sendEmbeddingGraphs([simpleEGUpdated])
+        duration = 5*60
+        elapsed = 0
+        while elapsed < duration:
+            sleep(5)
+            data: "list[TrafficData]" = self._trafficGenerator.getData("5s")
+            TUI.appendToSolverLog(f"{data[0]['value']} requests took {data[1]['value']/data[0]['value'] if data[1]['value'] != 0 else 0} seconds on average.")
+            elapsed += 5
+        TUI.appendToSolverLog("Solver has finished.")
 
 
 def run () -> None:

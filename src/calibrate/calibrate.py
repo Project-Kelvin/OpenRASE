@@ -3,6 +3,7 @@ This code is used to calibrate the CPU, memory, and bandwidth demands of VNFs.
 """
 
 import os
+from time import sleep
 from timeit import default_timer
 import csv
 import json
@@ -27,6 +28,7 @@ from models.traffic_generator import TrafficData
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
+from utils.tui import TUI
 
 
 class Calibrate:
@@ -34,10 +36,6 @@ class Calibrate:
     Class that calibrates the VNFs.
     """
 
-    _config: Config = None
-    _calDir: str = None
-    _modelName: str = None
-    _headers: "list[str]" = None
 
     def __init__(self) -> None:
         """
@@ -47,10 +45,10 @@ class Calibrate:
             trafficDesign (dict): The design of the traffic generator.
         """
 
-        self._config = getConfig()
-        self._calDir = f"{self._config['repoAbsolutePath']}/artifacts/calibrations"
-        self._modelName = "model.keras"
-        self._headers = ["cpuUsage", "memoryUsage", "networkUsageIn",
+        self._config: Config = getConfig()
+        self._calDir: str = f"{self._config['repoAbsolutePath']}/artifacts/calibrations"
+        self._modelName: str = "model.keras"
+        self._headers: "list[str]" = ["cpuUsage", "memoryUsage", "networkUsageIn",
                 "networkUsageOut", "ior", "http_reqs", "latency", "duration"]
 
         if not os.path.exists(f"{self._config['repoAbsolutePath']}/artifacts/calibrations"):
@@ -299,6 +297,8 @@ class Calibrate:
                     for data in trafficData:
                         row.append(data["value"])
 
+                    TUI.appendToSolverLog(f"{trafficData[0]['value']} requests took {trafficData[1]['value']/trafficData[0]['value'] if trafficData[1]['value'] != 0 else 0} seconds on average.")
+
                     row.append(f"{round(end - start, 0):.0f}")
 
                     # Write row data to the CSV file
@@ -306,8 +306,11 @@ class Calibrate:
                         writer = csv.writer(file)
                         writer.writerow(row)
                     seconds += duration
+                TUI.appendToSolverLog(f"Finished generating traffic for {vnf}.")
+                sleep(2)
+                TUI.exit()
 
-
+        print("Starting OpenRASE.")
         em: SFCEmulator = SFCEmulator(SFCR, SFCSolver)
         print("Running the network and taking measurements. This will take a while.")
         em.startTest(topology, trafficDesign)

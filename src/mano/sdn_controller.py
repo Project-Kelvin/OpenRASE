@@ -15,13 +15,19 @@ from shared.models.topology import Topology
 from shared.utils.ip import generateIP
 from mininet.node import OVSKernelSwitch
 from utils.ryu import getRyuRestUrl
+from utils.tui import TUI
 
 class SDNController():
     """
     Class that communicates with the Ryu SDN controller.
     """
 
-    _switchLinks: "dict[str, IPv4Address]" = {}
+    def __init__(self) -> None:
+        """
+        Constructor for the class.
+        """
+
+        self._switchLinks: "dict[str, IPv4Address]" = {}
 
     def assignIP(self, ip: IPv4Address, switch: OVSKernelSwitch) -> None:
         """
@@ -96,6 +102,7 @@ class SDNController():
             RuntimeError: If the flow could not be deleted.
         """
 
+        TUI.appendToLog(f"    Deleting flow from {switch.name} to {destination} via {gateway}")
         response: Response = requests.request(
             method="GET",
             url=getRyuRestUrl(switch.dpid),
@@ -123,6 +130,8 @@ class SDNController():
                     if "failure" in str(response.content):
                         raise RuntimeError(
                             f"Failed to delete flow in switch {switch.name}.\n{response.json()}")
+
+                    TUI.appendToLog(f"    Deleted flow from {switch.name} to {destination} via {gateway}")
                     break
 
     def assignSwitchIPs(self, topology: Topology, switches: "dict[str, OVSKernelSwitch]",
@@ -172,8 +181,10 @@ class SDNController():
 
         for link in links:
             if link["source"] == host:
+                TUI.appendToLog(f"    Assigning IP {ip} to {switches[link['destination']].name}")
                 self.assignIP(ip, switches[link["destination"]])
             elif link["destination"] == host:
+                TUI.appendToLog(f"    Assigning IP {ip} to {switches[link['source']].name}")
                 self.assignIP(ip, switches[link["source"]])
 
     def installFlows(self, eg: EmbeddingGraph,
