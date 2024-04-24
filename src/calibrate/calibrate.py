@@ -143,12 +143,13 @@ class Calibrate:
         return testResult
 
 
-    def _calibrateVNF(self, vnf: str) -> None:
+    def _calibrateVNF(self, vnf: str, trafficDesignFile: str = "") -> None:
         """
         Calibrate the VNF.
 
         Parameters:
             vnf (str): The VNF to calibrate.
+            trafficDesignFile (str): The file containing the design of the traffic generator.
         """
 
         if not os.path.exists(f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"):
@@ -158,8 +159,13 @@ class Calibrate:
         filename = f"{directory}/calibration_data.csv"
 
         config: Config = getConfig()
-        with open(f"{config['repoAbsolutePath']}/src/calibrate/traffic-design.json", 'r', encoding="utf8") as file:
-            trafficDesign: "list[TrafficDesign]" = [json.load(file)]
+
+        if trafficDesignFile is not None and trafficDesignFile != "":
+            with open(trafficDesignFile, 'r', encoding="utf8") as file:
+                trafficDesign: "list[TrafficDesign]" = [json.load(file)]
+        else:
+            with open(f"{config['repoAbsolutePath']}/src/calibrate/traffic-design.json", 'r', encoding="utf8") as file:
+                trafficDesign: "list[TrafficDesign]" = [json.load(file)]
 
         totalDuration: int = 0
 
@@ -357,14 +363,17 @@ class Calibrate:
 
         return ResourceDemand(cpu=cpu, memory=memory, ior=ior)
 
-    def calibrateVNFs(self) -> None:
+    def calibrateVNFs(self, trafficDesignFile: str = "") -> None:
         """
         Calibrate all the VNFs.
+
+        Parameters:
+            trafficDesignFile (str): The file containing the design of the traffic generator.
         """
 
         for vnf in self._config["vnfs"]["names"]:
             print("Calibrating VNF: " + vnf)
-            self._calibrateVNF(vnf)
+            self._calibrateVNF(vnf, trafficDesignFile)
 
     def getResourceDemands(self, reqps: float) -> "dict[str, ResourceDemand]":
         """
