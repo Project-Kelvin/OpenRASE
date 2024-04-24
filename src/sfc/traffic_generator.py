@@ -5,6 +5,7 @@ Defines the TrafficGenerator class.
 from datetime import datetime
 import json
 import random
+from time import sleep
 from typing import Any
 from jinja2 import Template, TemplateSyntaxError
 from shared.models.config import Config
@@ -19,6 +20,7 @@ from mano.notification_system import NotificationSystem, Subscriber
 from models.traffic_generator import TrafficData
 from utils.container import connectToDind, getContainerIP, waitTillContainerReady
 from docker import DockerClient, from_env, errors
+from utils.tui import TUI
 
 
 TG_HOME_PATH: str = "/home/docker/files/influxdb"
@@ -38,13 +40,23 @@ class TrafficGenerator(Subscriber):
     Class that generates traffic.
     """
 
-    _design: "list[TrafficDesign]" = []
-    _tgClient: DockerClient = None
-    _influxDBClient: InfluxDBClient = None
 
     def __init__(self) -> None:
         """
         Constructor for the class.
+        """
+
+        self._design: "list[TrafficDesign]" = []
+        self._tgClient: DockerClient = None
+        self._influxDBClient: InfluxDBClient = None
+        self._parentContainerStarted: bool = False
+
+        NotificationSystem.subscribe(EMBEDDING_GRAPH_DEPLOYED, self)
+        NotificationSystem.subscribe(EMBEDDING_GRAPH_DELETED, self)
+
+    def startParentContainer(self) -> None:
+        """
+        Start the parent container.
         """
 
         config: Config = getConfig()
@@ -77,8 +89,8 @@ class TrafficGenerator(Subscriber):
             token=INFLUX_DB_CONFIG["TOKEN"],
             org=INFLUX_DB_CONFIG["ORG"])
 
-        NotificationSystem.subscribe(EMBEDDING_GRAPH_DEPLOYED, self)
-        NotificationSystem.subscribe(EMBEDDING_GRAPH_DELETED, self)
+        TUI.appendToLog("Traffic generator parent container started.")
+        self._parentContainerStarted = True
 
     def setDesign(self, design: "list[TrafficDesign]") -> None:
         """
@@ -98,10 +110,18 @@ class TrafficGenerator(Subscriber):
             sfcID (str): The ID of the SFC.
         """
 
+        while not self._parentContainerStarted:
+            TUI.appendToLog("Parent traffic generator container not started yet. Waiting for it to start.")
+            sleep(1)
+
+        TUI.appendToLog(f"Spinning up traffic generator for SFC {sfcID}:")
         # Select a design randomly from the list of designs.
         random.seed()
-        design: TrafficDesign = self._design[random.randint(
-            0, len(self._design) - 1)]
+        index: int = random.randint(
+            0, len(self._design) - 1)
+
+        TUI.appendToLog(f"  Using traffic design {index}.")
+        design: TrafficDesign = self._design[index]
         designStr: str = json.dumps(design)
         config: Config = getConfig()
         vus: int = config["k6"]["vus"]
@@ -126,17 +146,18 @@ class TrafficGenerator(Subscriber):
                 outputFileContent = templatedFile
 
         except FileNotFoundError:
-            print(f"Template file {templateFile} not found.")
+            TUI.appendToLog(f"  Template file {templateFile} not found.", True)
         except TemplateSyntaxError as e:
-            print(
-                f"Template syntax error in file {templateFile} on line {e.lineno}.")
-            print(e)
+            TUI.appendToLog(
+                f"  Template syntax error in file {templateFile} on line {e.lineno}.", True)
+            TUI.appendToLog(f"  {e}", True)
 
         influxDBhost: str = self._tgClient.containers.get(
             INFLUXDB).attrs["NetworkSettings"]["IPAddress"]
 
         # pylint: disable=invalid-name
         name: str = f"{sfcID}-{K6}"
+        TUI.appendToLog(f"  Starting to generate traffic using k6 for SFC {sfcID}.")
         self._tgClient.containers.run(f"{TAG}/k6:latest", cap_add="NET_ADMIN", name=name,
                                       detach=True, environment={
                                           "K6_OUT": f"xk6-influxdb=http://{influxDBhost}:8086",
@@ -149,6 +170,7 @@ class TrafficGenerator(Subscriber):
             ["sh", "-c", f"echo '{outputFileContent}' > script.js"])
         self._tgClient.containers.get(name).exec_run(
             f"k6 run -e MY_HOSTNAME={getContainerIP(SFCC)} -e SFC_ID={sfcID} script.js", detach=True)
+        TUI.appendToLog(f"  Traffic generation started for SFC {sfcID}.")
 
     def stopTrafficGeneration(self, sfcID: str) -> None:
         """
@@ -181,7 +203,6 @@ class TrafficGenerator(Subscriber):
             f' |> filter(fn: (r) => r["_measurement"] == "{HTTP_REQ_DURATION}" or r["_measurement"] == "{HTTP_REQS}")'
             f' |> filter(fn: (r) => r["_field"] == "value")'
             f' |> filter(fn: (r) => r["expected_response"] == "true")')
-
         stopTime: str = ""
         httpReqs: int = 0
         httpRequestDuration: float = 0
@@ -218,13 +239,6 @@ class TrafficGenerator(Subscriber):
         elif topic == EMBEDDING_GRAPH_DELETED:
             eg: EmbeddingGraph = args[0]
             self.stopTrafficGeneration(eg["sfcID"])
-
-    def __del__(self) -> None:
-        """
-        Destructor for the class.
-        """
-
-        self.end()
 
     def end(self) -> None:
         """
