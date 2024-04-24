@@ -12,7 +12,7 @@ class NotificationSystem():
     Class to handle publishing and subscribing to notifications.
     """
 
-    topics: "dict[str, list[object]]" = {}
+    _topics: "dict[str, list[object]]" = {}
 
     @classmethod
     def publish(cls, topic: str, *args: "list[Any]") -> None:
@@ -24,8 +24,8 @@ class NotificationSystem():
             args (list[Any]): The arguments of the notification.
         """
 
-        if topic in cls.topics and cls.topics[topic] is not None:
-            for sub in cls.topics[topic]:
+        if topic in cls._topics and cls._topics[topic] is not None:
+            for sub in cls._topics[topic]:
                 sub.receiveNotification(topic, *args)
 
     @classmethod
@@ -38,11 +38,18 @@ class NotificationSystem():
             subscriber (object): The subscriber.
         """
 
-        if topic in cls.topics:
-            cls.topics[topic].append(subscriber)
+        if topic in cls._topics:
+            cls._topics[topic].append(subscriber)
         else:
-            cls.topics[topic] = [subscriber]
+            cls._topics[topic] = [subscriber]
 
+    @classmethod
+    def unsubscribeAll(cls) -> None:
+        """
+        Unsubscribe all subscribers.
+        """
+
+        cls._topics = {}
 
 class Subscriber(ABC):
     """
