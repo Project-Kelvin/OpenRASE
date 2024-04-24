@@ -63,7 +63,7 @@ vnfs:
       - "/home/docker/files/ips/shared/conf/suricata.yaml:/etc/suricata/suricata.yaml"
       - "/home/docker/files/ips/shared/rules/suricata.rules:/var/lib/suricata/rules/suricata.rules"
     dpi:
-      - "/home/docker/files/dpi/shared/logs:/home/ncap"
+      - "/home/docker/files/dpi/shared/logs/http.log:/home/ncap/http.log"
     ha:
       - "/home/docker/files/ha/shared/conf/default.vcl:/etc/varnish/default.vcl"
     lb:
