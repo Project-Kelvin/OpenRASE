@@ -1,3 +1,6 @@
+![OpenRASE](docs/assets/open_rase.svg##gh-light-mode-only)
+![OpenRASE](docs/assets/open_rase_white.svg##gh-dark-mode-only)
+---
 # OpenRASE
 This is an emulator built on top of Containernet to benchmark and evaluate solutions to the NFV-RA problem.
 
@@ -123,15 +126,15 @@ Install the dependencies.
 ```bash
 sudo poetry install
 ```
-13. Initialize OpenRASE.
+13. Add the private Docker registry to insecure registries.
 ```bash
-sudo poetry run init
+sudo poetry run init --insecure
 ```
 Restart the Docker service.
 ```bash
 sudo service docker restart
 ```
-Reinitialize OpenRASE.
+Intialize OpenRASE.
 ```bash
 sudo poetry run init
 ```
