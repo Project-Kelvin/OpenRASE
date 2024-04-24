@@ -18,12 +18,13 @@ from sfc.sfc_emulator import SFCEmulator
 from sfc.solver import Solver
 from sfc.traffic_generator import TrafficGenerator
 from utils.topology import generateFatTreeTopology
+from utils.traffic_design import generateTrafficDesign
 
 
 config: Config = getConfig()
 configPath: str = f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/configs"
 
-topology: Topology = generateFatTreeTopology(4, 1000, 1, 512)
+topology: Topology = generateFatTreeTopology(4, 1000, 1, None)
 
 with open(f"{configPath}/traffic-design.json", "r", encoding="utf8") as trafficFile:
     trafficDesign: "list[TrafficDesign]" = [json.load(trafficFile)]
@@ -63,14 +64,13 @@ class SFCSolver(Solver):
         self._resourceDemands: "dict[str, ResourceDemand]" = None
 
         calibrate = Calibrate()
-        #self._resourceDemands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(600)
 
-        self._resourceDemands: "dict[str, ResourceDemand]" = {
-            "waf": ResourceDemand(cpu=0.5, memory=512, ior=0.9),
-            "lb": ResourceDemand(cpu=0.5, memory=512, ior=0.9),
-            "tm": ResourceDemand(cpu=0.5, memory=512, ior=0.9),
-            "ha": ResourceDemand(cpu=0.5, memory=512, ior=0.9)
-        }
+        trafficDesignPath = f"{configPath}/traffic-design.json"
+        with open(trafficDesignPath, "r", encoding="utf8") as traffic:
+            design = json.load(traffic)
+        maxTarget: int = max(design, key=lambda x: x["target"])["target"]
+
+        self._resourceDemands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(maxTarget)
 
     def generateEmbeddingGraphs(self) -> None:
         sda = SimpleDijkstraAlgorithm(self._requests, topology, self._resourceDemands)
@@ -78,7 +78,7 @@ class SFCSolver(Solver):
         print(f"Failed to deploy {len(failedFGs)} out of {len(fgs) + len(failedFGs)} FGs.")
         self._orchestrator.sendEmbeddingGraphs(fgs)
 
-def run():
+def run() -> None:
     """
     Run the Simple Dijkstra Algorithm.
     """
@@ -87,3 +87,14 @@ def run():
     sfcEm.startTest(topology, trafficDesign)
     sfcEm.startCLI()
     sfcEm.end()
+
+def getTrafficDesign() -> None:
+    """
+    Get the Traffic Design.
+    """
+
+    design: TrafficDesign = generateTrafficDesign(
+        f"{getConfig()['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/data/requests.csv")
+
+    with open(f"{configPath}/traffic-design.json", "w", encoding="utf8") as traffic:
+        json.dump(design, traffic, indent=4)
