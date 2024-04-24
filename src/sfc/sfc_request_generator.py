@@ -11,7 +11,6 @@ class SFCRequestGenerator(ABC):
     Abstract class for generating SFC requests.
     """
 
-    _orchestrator: Orchestrator = None
 
     def __init__(self, orchestrator: Orchestrator) -> None:
         """
@@ -21,7 +20,7 @@ class SFCRequestGenerator(ABC):
             orchestrator (Orchestrator): The orchestrator.
         """
 
-        self._orchestrator = orchestrator
+        self._orchestrator: Orchestrator = orchestrator
 
     @abstractmethod
     def generateRequests(self) -> None:

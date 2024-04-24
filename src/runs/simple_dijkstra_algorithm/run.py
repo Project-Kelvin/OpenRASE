@@ -33,10 +33,10 @@ class FGR(FGRequestGenerator):
     FG Request Generator.
     """
 
-    _fgs: "list[EmbeddingGraph]" = []
 
     def __init__(self, orchestrator: Orchestrator) -> None:
         super().__init__(orchestrator)
+        self._fgs: "list[EmbeddingGraph]" = []
 
         with open(f"{configPath}/forwarding-graphs.json", "r", encoding="utf8") as fgFile:
             fgs: "list[EmbeddingGraph]" = json.load(fgFile)
@@ -56,11 +56,11 @@ class SFCSolver(Solver):
     SFC Solver.
     """
 
-    _topology: Topology = None
-    _resourceDemands: "dict[str, ResourceDemand]" = None
 
     def __init__(self, orchestrator: Orchestrator, trafficGenerator: TrafficGenerator) -> None:
         super().__init__(orchestrator, trafficGenerator)
+        self._topology: Topology = None
+        self._resourceDemands: "dict[str, ResourceDemand]" = None
 
         calibrate = Calibrate()
         #self._resourceDemands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(600)

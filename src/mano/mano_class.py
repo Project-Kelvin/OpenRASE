@@ -13,20 +13,16 @@ class MANO():
     Class that performs Management and Operations functions.
     """
 
-    _infraManager: InfraManager = None
-    _vnfManager: VNFManager = None
-    _sdnController: SDNController = None
-    _orchestrator: Orchestrator = None
 
     def __init__(self) -> None:
         """
         Constructor for the class.
         """
 
-        self._sdnController = SDNController()
-        self._infraManager = InfraManager(self._sdnController)
-        self._vnfManager = VNFManager(self._infraManager)
-        self._orchestrator = Orchestrator(
+        self._sdnController: SDNController = SDNController()
+        self._infraManager: InfraManager = InfraManager(self._sdnController)
+        self._vnfManager: VNFManager = VNFManager(self._infraManager)
+        self._orchestrator: Orchestrator = Orchestrator(
             self._infraManager, self._vnfManager, self._sdnController)
 
     def getOrchestrator(self) -> Orchestrator:

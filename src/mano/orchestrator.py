@@ -18,18 +18,15 @@ class Orchestrator():
     Class that corresponds to the Orchestrator class in the NFV architecture.
     """
 
-    _infraManager: InfraManager = None
-    _vnfManager: VNFManager = None
-    _sdnController: SDNController = None
-    _solver: Solver = None
 
     def __init__(self,
                  infraManager: InfraManager,
                  vnfManager: VNFManager,
                  sdnController: SDNController) -> None:
-        self._infraManager = infraManager
-        self._vnfManager = vnfManager
-        self._sdnController = sdnController
+        self._infraManager: InfraManager = infraManager
+        self._vnfManager: VNFManager = vnfManager
+        self._sdnController: SDNController = sdnController
+        self._solver: Solver = None
 
 
     def sendEmbeddingGraphs(self, egs: "list[EmbeddingGraph]") -> None:

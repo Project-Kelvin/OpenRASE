@@ -16,20 +16,17 @@ class SimpleDijkstraAlgorithm():
     Class that implements the Simple Dijkstra's Algorithm.
     """
 
-    _vnfResourceDemands: "dict[str, ResourceDemand]" = {}
-    _fgs: "list[EmbeddingGraph]" = None
-    _topology: Topology = None
-    _nodeResourceUsage: "dict[str, ResourceDemand]" = {}
-    _nodes: "dict[str, list[str]]" = {}
 
     def __init__(self, fg: "list[EmbeddingGraph]", topology: Topology, vnfResourceDemands: "dict[str, ResourceDemand]") -> None:
         """
         Initialize the Simple Dijkstra's Algorithm.
         """
 
-        self._fgs = fg
-        self._topology = topology
-        self._vnfResourceDemands = vnfResourceDemands
+        self._fgs: "list[EmbeddingGraph]" = fg
+        self._topology: Topology = topology
+        self._nodeResourceUsage: "dict[str, ResourceDemand]" = {}
+        self._nodes: "dict[str, list[str]]" = {}
+        self._vnfResourceDemands: "dict[str, ResourceDemand]" = vnfResourceDemands
 
         for graph in self._fgs:
             self._nodes[graph["sfcID"]]= [SFCC]
