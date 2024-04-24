@@ -102,7 +102,7 @@ class TrafficGenerator(Subscriber):
 
         self._design = design
 
-    def generateTraffic(self, sfcID: str) -> None:
+    def _generateTraffic(self, sfcID: str) -> None:
         """
         Generate traffic.
 
@@ -172,7 +172,7 @@ class TrafficGenerator(Subscriber):
             f"k6 run -e MY_HOSTNAME={getContainerIP(SFCC)} -e SFC_ID={sfcID} script.js", detach=True)
         TUI.appendToLog(f"  Traffic generation started for SFC {sfcID}.")
 
-    def stopTrafficGeneration(self, sfcID: str) -> None:
+    def _stopTrafficGeneration(self, sfcID: str) -> None:
         """
         Stop the traffic generation.
 
@@ -235,10 +235,10 @@ class TrafficGenerator(Subscriber):
     def receiveNotification(self, topic, *args: "list[Any]") -> None:
         if topic == EMBEDDING_GRAPH_DEPLOYED:
             eg: EmbeddingGraph = args[0]
-            self.generateTraffic(eg["sfcID"])
+            self._generateTraffic(eg["sfcID"])
         elif topic == EMBEDDING_GRAPH_DELETED:
             eg: EmbeddingGraph = args[0]
-            self.stopTrafficGeneration(eg["sfcID"])
+            self._stopTrafficGeneration(eg["sfcID"])
 
     def end(self) -> None:
         """
