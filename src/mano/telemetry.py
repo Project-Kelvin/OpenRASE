@@ -288,7 +288,7 @@ class Telemetry(Subscriber):
             # Removed multiplier to prevent usage exceeding 100%.
             # See: https://github.com/docker/cli/issues/2134
             usagePercentage: float = cpuDelta / systemDelta * ratio * 100.0
-            usedCPU: float = cpuDelta/systemDelta * totalCPUs
+            usedCPU: float = cpuDelta / systemDelta * totalCPUs
             remainingCPU: float = totalCPUs - usedCPU
 
             return (usedCPU, remainingCPU, usagePercentage)
