@@ -186,7 +186,7 @@ class InfraManager():
 
             NotificationSystem.publish(TOPOLOGY_INSTALLED)
         except Exception as e:
-            TUI.appendToLog(f"Error: {e}", True)
+            TUI.appendToLog(f"Error: {str(e)}", True)
 
     def getHostIPs(self) -> "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]":
         """
