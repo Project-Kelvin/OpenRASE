@@ -193,7 +193,8 @@ class TUI():
     The TUI class is responsible for displaying the progress of OpenRASE.
     """
 
-    isInitialized: bool = False
+    _isInitialized: bool = False
+    _disable: bool = False
 
     @classmethod
     def init(cls) -> None:
@@ -202,14 +203,17 @@ class TUI():
         """
 
 
-        cls.isInitialized = False
+        cls._isInitialized = False
+
+        if cls._disable:
+            return
 
         cls.app: UI = UI()
 
         def switchToLogger() -> None:
             sleep(2)
             cls.app.switch_screen("logger")
-            cls.isInitialized = True
+            cls._isInitialized = True
 
         Thread(target=switchToLogger).start()
 
@@ -221,7 +225,7 @@ class TUI():
         Wait for the TUI to be initialized.
         """
 
-        while not cls.isInitialized:
+        while not cls._isInitialized:
             pass
 
     @classmethod
@@ -233,6 +237,9 @@ class TUI():
             text (str): The text to log.
         """
 
+        if cls._disable:
+            return
+
         cls._wait()
         cls.app.addToLog(text)
 
@@ -241,6 +248,9 @@ class TUI():
         """
         Log a message.
         """
+
+        if cls._disable:
+            return
 
         cls._wait()
         cls.app.addToLogSolver(text)
@@ -255,6 +265,9 @@ class TUI():
             error (bool): Whether the text is an error.
         """
 
+        if cls._disable:
+            return
+
         cls._wait()
         cls.app.appendtoLog(f"\n[{'red' if error else 'green'}]{text}[/]")
 
@@ -268,6 +281,9 @@ class TUI():
             error (bool): Whether the text is an error.
         """
 
+        if cls._disable:
+            return
+
         cls._wait()
         cls.app.appendToSolverLog(f"\n[{'red' if error else 'green'}]{text}[/]")
 
@@ -277,7 +293,18 @@ class TUI():
         Exit the TUI.
         """
 
-        cls.isInitialized = False
+        if cls._disable:
+            return
+
+        cls._isInitialized = False
         cls.app.exit()
         cls.app.uninstall_screen("logger")
         cls.app.uninstall_screen("splash")
+
+    @classmethod
+    def disable(cls) -> None:
+        """
+        Disable the TUI.
+        """
+
+        cls._disable = True
