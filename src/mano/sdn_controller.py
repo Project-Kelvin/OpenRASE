@@ -279,8 +279,8 @@ class SDNController():
                     )
                     if "failure" not in str(response.content):
                         isReady = True
-                # pylint: disable=broad-except
-                except Exception:
+                        TUI.appendToLog(f"  {switch.name} is ready.")                        
+                except:
                     pass
 
         for switch in switches.values():
