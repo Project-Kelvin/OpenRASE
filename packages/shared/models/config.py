@@ -71,6 +71,7 @@ class VNFs(dict):
 
     sharedVolumes: "dict[str, list[str]]"
     names: "list[str]"
+    splitters: "list[str]"
 
 class K6(dict):
     """

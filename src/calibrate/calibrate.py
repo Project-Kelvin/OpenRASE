@@ -2,12 +2,14 @@
 This code is used to calibrate the CPU, memory, and bandwidth demands of VNFs.
 """
 
+from copy import deepcopy
 import os
 from time import sleep
 from timeit import default_timer
 import csv
 import json
 from typing import Any
+from packages.shared.models.embedding_graph import VNF
 from shared.constants.embedding_graph import TERMINAL
 from shared.models.config import Config
 from shared.models.embedding_graph import EmbeddingGraph
@@ -128,7 +130,7 @@ class Calibrate:
             testLabels, verbose=0
         )
 
-        x = tf.linspace(0.0, 50, 51)
+        x = tf.linspace(0.0, 200, 201)
         y = model.predict(x)
 
         plt.scatter(trainFeatures["reqps"], trainLabels, label='Data')
@@ -158,13 +160,11 @@ class Calibrate:
         directory: str = f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"
         filename = f"{directory}/calibration_data.csv"
 
-        config: Config = getConfig()
-
         if trafficDesignFile is not None and trafficDesignFile != "":
             with open(trafficDesignFile, 'r', encoding="utf8") as file:
                 trafficDesign: "list[TrafficDesign]" = [json.load(file)]
         else:
-            with open(f"{config['repoAbsolutePath']}/src/calibrate/traffic-design.json", 'r', encoding="utf8") as file:
+            with open(f"{self._config['repoAbsolutePath']}/src/calibrate/traffic-design.json", 'r', encoding="utf8") as file:
                 trafficDesign: "list[TrafficDesign]" = [json.load(file)]
 
         totalDuration: int = 0
@@ -247,6 +247,10 @@ class Calibrate:
             ]
         }
 
+        if vnf in self._config["vnfs"]["splitters"]:
+            next: VNF = deepcopy(eg["vnfs"]["next"])
+            eg["vnfs"]["next"] = [next, next]
+        
         class SFCR(SFCRequestGenerator):
             """
             SFC Request Generator.

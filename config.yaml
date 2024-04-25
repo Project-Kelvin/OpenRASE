@@ -68,3 +68,5 @@ vnfs:
       - "/home/docker/files/ha/shared/conf/default.vcl:/etc/varnish/default.vcl"
     lb:
       - "/home/docker/files/lb/shared/Caddyfile:/etc/caddy/Caddyfile"
+  splitters:
+    - "lb"
