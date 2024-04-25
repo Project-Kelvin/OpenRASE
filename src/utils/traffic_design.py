@@ -22,8 +22,8 @@ def generateTrafficDesign(dataFile: str) -> "TrafficDesign":
         _header = file.readline()  # Read and discard the header
         for line in file:
             numOfReqs: int = int(line)
-            # scale by 10
-            numOfReqs = numOfReqs * 10
+            # scale by 20
+            numOfReqs = numOfReqs * 20
             #Considering an hour is equal to 4 seconds
             rate: int = numOfReqs // 4
             design.append({
