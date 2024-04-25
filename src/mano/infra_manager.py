@@ -4,6 +4,7 @@ Defines the class that corresponds to the Virtualized Infrastructure Manager in 
 
 from ipaddress import IPv4Address, IPv4Network
 from threading import Thread
+from time import sleep
 from typing import Any, Tuple
 import requests
 from shared.constants.embedding_graph import TERMINAL
@@ -148,7 +149,10 @@ class InfraManager():
                     bw=link['bandwidth'] if 'bandwidth' in link else None)
 
             TUI.appendToLog("Starting Mininet.")
-            self._net.start()
+            try:
+                self._net.start()
+            except Exception as e:
+                TUI.appendToLog(f"Non-critical error: {str(e)}", True)
 
             TUI.appendToLog("Waiting till Ryu is ready.")
             self._sdnController.waitTillReady(self._switches)
@@ -168,6 +172,7 @@ class InfraManager():
                     f"ip addr add {getConfig()['sff']['network2']['hostIP']}/{getConfig()['sff']['network2']['mask']} dev {hostNode.name}-eth0")
 
             TUI.appendToLog("Assigning IP addresses to switches.")
+            
             self._sdnController.assignSwitchIPs(
                 topology, self._switches, self._hostIPs, self._networkIPs)
 
