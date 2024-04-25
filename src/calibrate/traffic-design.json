@@ -1,6 +1,10 @@
 [
     {
-        "duration": "3m",
+        "duration": "5m",
         "target": 1000
+    },
+    {
+        "duration": "5m",
+        "target": 0
     }
 ]
