@@ -18,10 +18,11 @@ sudo apt-get install -y build-essential  zlib1g-dev libffi-dev libssl-dev liblzm
 ```bash
 curl https://pyenv.run | bash
 ```
-Add the following lines to your .bashrc or .zshrc file.
+Add the following lines to your .bashrc or .zshrc and .bash-profile or .profile file.
 ```bash
 export PYENV_ROOT="$HOME/.pyenv"
 [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init -)"
 ```
 Source your .bashrc or .zshrc file.
 ```bash
@@ -92,7 +93,11 @@ Defaults        secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/
 ```
 10. Install Ryu.
 ```bash
-python3 -m pip install ryu
+sudo poetry run python -m pip install ryu
+```
+Install eventlet.
+```bash
+sudo poetry run python -m pip install eventlet==0.30.2
 ```
 11. Clone OpenRASE.
 ```bash
