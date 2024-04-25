@@ -60,132 +60,133 @@ class InfraManager():
             topology (Topology): The topology to be spun up.
         """
 
-        TUI.appendToLog("Installing topology:")
-        self._topology = topology
-        self._telemetry = Telemetry(self._topology, self._sfcHostByIPs)
-
-        config: Config = getConfig()
-
-        # Add SFCC
-        ipSFCC: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
-            self._networkIPs)
-
-        TUI.appendToLog("  Installing SFCC.")
-        sfcc: Host = self._net.addDocker(
-            SFCC,
-            ip=f"{ipSFCC[2]}/{ipSFCC[0].prefixlen}",
-            dimage=SFCC_IMAGE,
-            dcmd="poetry run python sfc_classifier.py",
-        )
-        self._hosts[SFCC] = sfcc
-        self._hostIPs[SFCC] = ipSFCC
-        self._sfcHostByIPs[str(ipSFCC[2])] = (None, SFCC)
-
-        # Add server
-        ipServer: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
-            self._networkIPs)
-        self._hostIPs[SERVER] = ipServer
-
-        TUI.appendToLog("  Installing server.")
-        server: Host = self._net.addDocker(
-            SERVER,
-            ip=f"{ipServer[2]}/{ipServer[0].prefixlen}",
-            dimage=SERVER_IMAGE,
-            dcmd="poetry run python server.py"
-        )
-        self._hosts[SERVER] = server
-
-        hostNodes: "list[Host]" = []
-
-        TUI.appendToLog("  Installing hosts:")
-        for host in topology['hosts']:
-            ip: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
-                self._networkIPs)
-            self._hostIPs[host["id"]] = ip
-
-            TUI.appendToLog(f"    Installing host {host['id']}.")
-            sff: Host = self._net.addDocker(
-                host['id'],
-                ip=f"{getConfig()['sff']['network1']['sffIP']}/{getConfig()['sff']['network1']['mask']}",
-                dimage=SFF_IMAGE,
-                dcmd="poetry run python sff.py"
-            )
-
-            hostNode: Host = self._net.addDocker(
-                f"{host['id']}Node",
-                ip=f"{getConfig()['sff']['network1']['hostIP']}/{getConfig()['sff']['network1']['mask']}",
-                cpu_quota=int(host["cpu"] * CPU_PERIOD if "cpu" in host else -1),
-                mem_limit=f"{host['memory']}mb" if "memory" in host else None,
-                memswap_limit=f"{host['memory']}mb" if "memory" in host else None,
-                dimage=DIND_IMAGE,
-                privileged=True,
-                dcmd="dockerd",
-                volumes=[
-                    config["repoAbsolutePath"]
-                    + "/docker/files:/home/docker/files"
-                ]
-            )
-            hostNodes.append(hostNode)
-            self._net.addLink(sff, hostNode)
-
-            self._hosts[host["id"]] = sff
-
-        TUI.appendToLog("  Installing switches:")
-        for switch in topology['switches']:
-            TUI.appendToLog(f"    Installing {switch['id']}.")
-            switchNode: OVSKernelSwitch = self._net.addSwitch(switch['id'])
-            self._switches[switch["id"]] = switchNode
-            switchNode.start([self._ryu])
-
-        TUI.appendToLog("  Establishing links:")
-        for link in topology['links']:
-            TUI.appendToLog(f"    Linking {link['source']} to {link['destination']}.")
-            self._net.addLink(
-                self._net.get(
-                    link['source']),
-                self._net.get(link['destination']),
-                bw=link['bandwidth'] if 'bandwidth' in link else None)
-
-        TUI.appendToLog("Starting Mininet.")
         try:
+            TUI.appendToLog("Installing topology:")
+            self._topology = topology
+            self._telemetry = Telemetry(self._topology, self._sfcHostByIPs)
+
+            config: Config = getConfig()
+
+            # Add SFCC
+            ipSFCC: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
+                self._networkIPs)
+
+            TUI.appendToLog("  Installing SFCC.")
+            sfcc: Host = self._net.addDocker(
+                SFCC,
+                ip=f"{ipSFCC[2]}/{ipSFCC[0].prefixlen}",
+                dimage=SFCC_IMAGE,
+                dcmd="poetry run python sfc_classifier.py",
+            )
+            self._hosts[SFCC] = sfcc
+            self._hostIPs[SFCC] = ipSFCC
+            self._sfcHostByIPs[str(ipSFCC[2])] = (None, SFCC)
+
+            # Add server
+            ipServer: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
+                self._networkIPs)
+            self._hostIPs[SERVER] = ipServer
+
+            TUI.appendToLog("  Installing server.")
+            server: Host = self._net.addDocker(
+                SERVER,
+                ip=f"{ipServer[2]}/{ipServer[0].prefixlen}",
+                dimage=SERVER_IMAGE,
+                dcmd="poetry run python server.py"
+            )
+            self._hosts[SERVER] = server
+
+            hostNodes: "list[Host]" = []
+
+            TUI.appendToLog("  Installing hosts:")
+            for host in topology['hosts']:
+                ip: "Tuple[IPv4Network, IPv4Address, IPv4Address]" = generateIP(
+                    self._networkIPs)
+                self._hostIPs[host["id"]] = ip
+
+                TUI.appendToLog(f"    Installing host {host['id']}.")
+                sff: Host = self._net.addDocker(
+                    host['id'],
+                    ip=f"{getConfig()['sff']['network1']['sffIP']}/{getConfig()['sff']['network1']['mask']}",
+                    dimage=SFF_IMAGE,
+                    dcmd="poetry run python sff.py"
+                )
+
+                hostNode: Host = self._net.addDocker(
+                    f"{host['id']}Node",
+                    ip=f"{getConfig()['sff']['network1']['hostIP']}/{getConfig()['sff']['network1']['mask']}",
+                    cpu_quota=int(host["cpu"] * CPU_PERIOD if "cpu" in host else -1),
+                    mem_limit=f"{host['memory']}mb" if "memory" in host else None,
+                    memswap_limit=f"{host['memory']}mb" if "memory" in host else None,
+                    dimage=DIND_IMAGE,
+                    privileged=True,
+                    dcmd="dockerd",
+                    volumes=[
+                        config["repoAbsolutePath"]
+                        + "/docker/files:/home/docker/files"
+                    ]
+                )
+                hostNodes.append(hostNode)
+                self._net.addLink(sff, hostNode)
+
+                self._hosts[host["id"]] = sff
+
+            TUI.appendToLog("  Installing switches:")
+            for switch in topology['switches']:
+                TUI.appendToLog(f"    Installing {switch['id']}.")
+                switchNode: OVSKernelSwitch = self._net.addSwitch(switch['id'])
+                self._switches[switch["id"]] = switchNode
+                switchNode.start([self._ryu])
+
+            TUI.appendToLog("  Establishing links:")
+            for link in topology['links']:
+                TUI.appendToLog(f"    Linking {link['source']} to {link['destination']}.")
+                self._net.addLink(
+                    self._net.get(
+                        link['source']),
+                    self._net.get(link['destination']),
+                    bw=link['bandwidth'] if 'bandwidth' in link else None)
+
+            TUI.appendToLog("Starting Mininet.")
             self._net.start()
+
+            TUI.appendToLog("Waiting till Ryu is ready.")
+            self._sdnController.waitTillReady(self._switches)
+
+            TUI.appendToLog("Adding IP addresses and routes in hosts.")
+            for name, host in self._hosts.items():
+                if name != SERVER and name != SFCC:
+                    host.cmd(f"ip addr add {str(self._hostIPs[name][2])}/{self._hostIPs[name][0].prefixlen} dev {name}-eth1")
+                    host.cmd(f"ip addr add {getConfig()['sff']['network2']['sffIP']}/{getConfig()['sff']['network2']['mask']} dev {name}-eth0")
+                for name1, host1 in self._hosts.items():
+                    if host.name != host1.name:
+                        host.cmd(
+                            f"ip route add {str(self._hostIPs[name1][0])} via {str(self._hostIPs[name][1])}")
+
+            for hostNode in hostNodes:
+                hostNode.cmd(
+                    f"ip addr add {getConfig()['sff']['network2']['hostIP']}/{getConfig()['sff']['network2']['mask']} dev {hostNode.name}-eth0")
+
+            TUI.appendToLog("Assigning IP addresses to switches.")
+            self._sdnController.assignSwitchIPs(
+                topology, self._switches, self._hostIPs, self._networkIPs)
+
+            TUI.appendToLog("Waiting till host containers are ready.")
+            # Notify
+            threads: "list[Thread]" = []
+            for host in hostNodes:
+                thread: Thread = Thread(target=waitTillContainerReady, args=(host.name,))
+                thread.start()
+                threads.append(thread)
+
+            for thread in threads:
+                thread.join()
+
+            TUI.appendToLog("Topology installed successfully!")
+
+            NotificationSystem.publish(TOPOLOGY_INSTALLED)
         except Exception as e:
             TUI.appendToLog(f"Error: {e}", True)
-        TUI.appendToLog("Waiting till Ryu is ready.")
-        self._sdnController.waitTillReady(self._switches)
-
-        TUI.appendToLog("Adding IP addresses and routes in hosts.")
-        for name, host in self._hosts.items():
-            if name != SERVER and name != SFCC:
-                host.cmd(f"ip addr add {str(self._hostIPs[name][2])}/{self._hostIPs[name][0].prefixlen} dev {name}-eth1")
-                host.cmd(f"ip addr add {getConfig()['sff']['network2']['sffIP']}/{getConfig()['sff']['network2']['mask']} dev {name}-eth0")
-            for name1, host1 in self._hosts.items():
-                if host.name != host1.name:
-                    host.cmd(
-                        f"ip route add {str(self._hostIPs[name1][0])} via {str(self._hostIPs[name][1])}")
-
-        for hostNode in hostNodes:
-            hostNode.cmd(
-                f"ip addr add {getConfig()['sff']['network2']['hostIP']}/{getConfig()['sff']['network2']['mask']} dev {hostNode.name}-eth0")
-
-        TUI.appendToLog("Assigning IP addresses to switches.")
-        self._sdnController.assignSwitchIPs(
-            topology, self._switches, self._hostIPs, self._networkIPs)
-
-        TUI.appendToLog("Waiting till host containers are ready.")
-        # Notify
-        threads: "list[Thread]" = []
-        for host in hostNodes:
-            thread: Thread = Thread(target=waitTillContainerReady, args=(host.name,))
-            thread.start()
-            threads.append(thread)
-
-        for thread in threads:
-            thread.join()
-
-        TUI.appendToLog("Topology installed successfully!")
-
-        NotificationSystem.publish(TOPOLOGY_INSTALLED)
 
     def getHostIPs(self) -> "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]":
         """
