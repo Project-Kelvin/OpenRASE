@@ -289,7 +289,7 @@ class Calibrate:
                     hostData: HostData = telemetry.getHostData()["h1"]["vnfs"]
                     end: float = default_timer()
                     duration: int = round(end - start, 0)
-                    trafficData: "list[TrafficData]" = self._trafficGenerator.getData(
+                    trafficData: "dict[str, TrafficData]" = self._trafficGenerator.getData(
                         f"{duration:.0f}s")
                     row = []
 
@@ -304,10 +304,12 @@ class Calibrate:
                         else:
                             row.append(data["networkUsage"][0]/data["networkUsage"][1])
 
-                    for data in trafficData:
-                        row.append(data["value"])
+                        httpReqs: int = trafficData[eg["sfcID"]]["httpReqs"]
+                        averageLatency: float = trafficData[eg["sfcID"]]["averageLatency"]
+                        row.append(httpReqs)
+                        row.append(averageLatency)
 
-                    TUI.appendToSolverLog(f"{trafficData[0]['value']} requests took {trafficData[1]['value']/trafficData[0]['value'] if trafficData[1]['value'] != 0 else 0} seconds on average.")
+                    TUI.appendToSolverLog(f"{httpReqs} requests took {averageLatency} seconds on average.")
 
                     row.append(f"{round(end - start, 0):.0f}")
 

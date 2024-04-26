@@ -4,8 +4,9 @@ Contains the models associated with traffic generation.
 
 class TrafficData(dict):
     """
-    Represents the data of the traffic.
+    Represents the data of teh traffic.
     """
-    metric: str
-    value: float
-    timestamp: int
+
+    httpReqs = int
+    averageLatency = float
+

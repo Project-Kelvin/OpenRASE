@@ -182,7 +182,7 @@ class TrafficGenerator(Subscriber):
 
         self._tgClient.containers.get(f"{sfcID}-{K6}").remove(force=True)
 
-    def getData(self, dataRange: str) -> "list[TrafficData]":
+    def getData(self, dataRange: str) -> "dict[str, TrafficData]":
         """
         Get the data from the traffic generator.
 
@@ -190,7 +190,7 @@ class TrafficGenerator(Subscriber):
             dataRange (str): Data range.
 
         Returns:
-            "list[TrafficData]": The traffic data.
+            "dict[str, TrafficData]": The traffic data for each SFC.
         """
 
         HTTP_REQS: str = "http_reqs"
@@ -203,32 +203,22 @@ class TrafficGenerator(Subscriber):
             f' |> filter(fn: (r) => r["_measurement"] == "{HTTP_REQ_DURATION}" or r["_measurement"] == "{HTTP_REQS}")'
             f' |> filter(fn: (r) => r["_field"] == "value")'
             f' |> filter(fn: (r) => r["expected_response"] == "true")')
-        stopTime: str = ""
-        httpReqs: int = 0
-        httpRequestDuration: float = 0
+
+        data: "dict[str, TrafficData]" = {}
 
         for table in tables:
             for record in table.records:
                 measurement: str = record.values["_measurement"]
+                sfc: str = record.values["sfcID"]
+                if sfc not in data:
+                    data[sfc] = TrafficData(httpReqs = 0, averageLatency = 0)
                 if measurement == HTTP_REQS:
-                    httpReqs += int(record.values["_value"])
+                    data[sfc]["httpReqs"] += int(record.values["_value"])
                 elif measurement == HTTP_REQ_DURATION:
-                    httpRequestDuration += float(record.values["_value"])
+                    data[sfc]["averageLatency"] += float(record.values["_value"])
 
-                stopTime = datetime.timestamp(record.values["_stop"])
-
-        data = [
-            {
-                "measurement": HTTP_REQS,
-                "value": httpReqs,
-                "time": stopTime,
-            },
-            {
-                "measurement": HTTP_REQ_DURATION,
-                "value": httpRequestDuration/httpReqs if httpRequestDuration != 0 and httpReqs != 0 else 0,
-                "time": stopTime,
-            }
-        ]
+        for _key, value in data.items():
+            value["averageLatency"] = value["averageLatency"] / value["httpReqs"]
 
         return data
 
