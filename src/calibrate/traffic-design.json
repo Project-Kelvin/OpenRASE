@@ -1,10 +1,50 @@
 [
     {
         "duration": "5m",
-        "target": 2000
+        "target": 50
     },
     {
         "duration": "5m",
-        "target": 0
+        "target": 100
+    },
+    {
+        "duration": "5m",
+        "target": 150
+    },
+    {
+        "duration": "5m",
+        "target": 200
+    },
+    {
+        "duration": "5m",
+        "target": 300
+    },
+    {
+        "duration": "5m",
+        "target": 400
+    },
+    {
+        "duration": "5m",
+        "target": 500
+    },
+    {
+        "duration": "5m",
+        "target": 600
+    },
+    {
+        "duration": "5m",
+        "target": 700
+    },
+    {
+        "duration": "5m",
+        "target": 800
+    },
+    {
+        "duration": "5m",
+        "target": 900
+    },
+    {
+        "duration": "5m",
+        "target": 1000
     }
 ]

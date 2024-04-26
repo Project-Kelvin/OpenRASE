@@ -50,19 +50,18 @@ class Calibrate:
         self._config: Config = getConfig()
         self._calDir: str = f"{self._config['repoAbsolutePath']}/artifacts/calibrations"
         self._modelName: str = "model.keras"
-        self._headers: "list[str]" = ["cpuUsage", "memoryUsage", "networkUsageIn",
-                "networkUsageOut", "ior", "http_reqs", "latency", "duration"]
+        self._headers: "list[str]" = ["cpu", "memory", "networkIn",
+                "networkOut", "ior", "http_reqs", "latency", "duration"]
 
         if not os.path.exists(f"{self._config['repoAbsolutePath']}/artifacts/calibrations"):
             os.makedirs(f"{self._config['repoAbsolutePath']}/artifacts/calibrations")
 
 
-    def _trainModel(self, file: str, metric: str, vnf: str) -> float:
+    def _trainModel(self, metric: str, vnf: str) -> float:
         """
         Train a model to predict the metric from the data in the file.
 
         Parameters:
-            file (str): The file containing the data.
             metric (str): The metric to predict.
             vnf (str): The VNF to predict the metric for.
 
@@ -70,11 +69,13 @@ class Calibrate:
             float: The test loss.
         """
 
+        directory: str = f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"
+        file = f"{directory}/calibration_data.csv"
+
         directory: str = f"{self._calDir}/{vnf}"
 
         data: DataFrame = pd.read_csv(file)
-        data["reqps"] = data["http_reqs"]/data["duration"]
-        data = data[[metric, "reqps"]]
+        data = data[[metric, "http_reqs"]]
 
         data = data[data[metric] != 0]
         q1: float = data[metric].quantile(0.25)
@@ -82,7 +83,7 @@ class Calibrate:
         iqr: float = q3 - q1
         lowerBound: float = q1 - (1.5 * iqr)
         upperBound: float = q3 + (1.5 * iqr)
-        data = data[(data[metric] < upperBound) & (data[metric] > lowerBound)]
+        data = data[(data[metric] <= upperBound) & (data[metric] >= lowerBound)]
 
         trainData: DataFrame = data.sample(frac=0.8, random_state=0)
         testData: DataFrame = data.drop(trainData.index)
@@ -93,7 +94,7 @@ class Calibrate:
         trainLabels: Series = trainFeatures.pop(metric)
         testLabels: Series = testFeatures.pop(metric)
 
-        reqps: Any = np.array(trainFeatures["reqps"])
+        reqps: Any = np.array(trainFeatures["http_reqs"])
         normalizer: Any = tf.keras.layers.Normalization(
             input_shape=[1,], axis=None)
         normalizer.adapt(reqps)
@@ -109,231 +110,250 @@ class Calibrate:
         )
 
         history: Any = model.fit(
-            trainFeatures["reqps"],
+            trainFeatures["http_reqs"],
             trainLabels,
-            epochs=100,
+            epochs=1000,
             verbose=0,
             validation_split=0.2
         )
         plt.plot(history.history['loss'], label='loss')
         plt.plot(history.history['val_loss'], label='val_loss')
-        plt.ylim([0, 0.1])
         plt.xlabel('Epoch')
-        plt.ylabel('Error [cpuUsage]')
+        plt.ylabel(f'Error [{metric}]')
         plt.legend()
         plt.grid(True)
         plt.savefig(f"{directory}/{metric}_loss.png")
         plt.clf()
 
         testResult: Any = model.evaluate(
-            testFeatures["reqps"],
+            testFeatures["http_reqs"],
             testLabels, verbose=0
         )
 
-        x = tf.linspace(0.0, 200, 201)
+        x = tf.linspace(0, 200, 21)
         y = model.predict(x)
 
-        plt.scatter(trainFeatures["reqps"], trainLabels, label='Data')
+        plt.scatter(trainFeatures["http_reqs"], trainLabels, label='Data')
         plt.plot(x, y, color='k', label='Predictions')
         plt.xlabel('reqps')
         plt.ylabel(metric)
         plt.legend()
         plt.savefig(f"{directory}/{metric}_trend_line.png")
+        plt.clf()
 
         model.save(f"{directory}/{metric}_{self._modelName}")
 
         return testResult
 
 
-    def _calibrateVNF(self, vnf: str, trafficDesignFile: str = "") -> None:
+    def _calibrateVNF(self, vnf: str, trafficDesignFile: str = "", metric: str = "", train: bool = False) -> None:
         """
         Calibrate the VNF.
 
         Parameters:
             vnf (str): The VNF to calibrate.
             trafficDesignFile (str): The file containing the design of the traffic generator.
+            metric (str): The metric to calibrate.
+            train (bool): Specifies if only training should be carried out.
         """
 
-        if not os.path.exists(f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"):
-            os.makedirs(
-                f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}")
-        directory: str = f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"
-        filename = f"{directory}/calibration_data.csv"
+        if not train:
 
-        if trafficDesignFile is not None and trafficDesignFile != "":
-            with open(trafficDesignFile, 'r', encoding="utf8") as file:
-                trafficDesign: "list[TrafficDesign]" = [json.load(file)]
-        else:
-            with open(f"{self._config['repoAbsolutePath']}/src/calibrate/traffic-design.json", 'r', encoding="utf8") as file:
-                trafficDesign: "list[TrafficDesign]" = [json.load(file)]
+            if not os.path.exists(f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"):
+                os.makedirs(
+                    f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}")
+            directory: str = f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"
+            filename = f"{directory}/calibration_data.csv"
 
-        totalDuration: int = 0
+            if trafficDesignFile is not None and trafficDesignFile != "":
+                with open(trafficDesignFile, 'r', encoding="utf8") as file:
+                    trafficDesign: "list[TrafficDesign]" = [json.load(file)]
+            else:
+                with open(f"{self._config['repoAbsolutePath']}/src/calibrate/traffic-design.json", 'r', encoding="utf8") as file:
+                    trafficDesign: "list[TrafficDesign]" = [json.load(file)]
 
-        for traffic in trafficDesign[0]:
-            durationText: str = traffic["duration"]
-            unit: str  = durationText[-1]
-            if unit == "s":
-                totalDuration += int(durationText[:-1])
-            elif unit == "m":
-                totalDuration += int(durationText[:-1]) * 60
-            elif unit == "h":
-                totalDuration += int(durationText[:-1]) * 60 * 60
+            totalDuration: int = 0
 
-        topology: Topology = {
-            "hosts": [
-                {
-                    "id": "h1",
-                }
-            ],
-            "switches": [{"id": "s1"}],
-            "links": [
-                {
-                    "source": SFCC,
-                    "destination": "s1",
-                },
-                {
-                    "source": "s1",
-                    "destination": "h1"
-                },
-                {
-                    "source": "s1",
-                    "destination": SERVER
-                }
-            ]
-        }
+            for traffic in trafficDesign[0]:
+                durationText: str = traffic["duration"]
+                unit: str  = durationText[-1]
+                if unit == "s":
+                    totalDuration += int(durationText[:-1])
+                elif unit == "m":
+                    totalDuration += int(durationText[:-1]) * 60
+                elif unit == "h":
+                    totalDuration += int(durationText[:-1]) * 60 * 60
 
-        sfcr: SFCRequest = {
-            "sfcrID": f"c{vnf.capitalize()}",
-            "latency": 10000,
-            "vnfs": [vnf],
-            "strictOrder": []
-        }
+            topology: Topology = {
+                "hosts": [
+                    {
+                        "id": "h1",
+                    }
+                ],
+                "switches": [{"id": "s1"}],
+                "links": [
+                    {
+                        "source": SFCC,
+                        "destination": "s1",
+                    },
+                    {
+                        "source": "s1",
+                        "destination": "h1"
+                    },
+                    {
+                        "source": "s1",
+                        "destination": SERVER
+                    }
+                ]
+            }
 
-        eg: EmbeddingGraph = {
-            "sfcID": f"c{vnf.capitalize()}",
-            "vnfs": {
-                "host": {
-                    "id": "h1",
-                },
-                "vnf": {
-                    "id": vnf
-                },
-                "next": {
+            sfcr: SFCRequest = {
+                "sfcrID": f"c{vnf.capitalize()}",
+                "latency": 10000,
+                "vnfs": [vnf],
+                "strictOrder": []
+            }
+
+            eg: EmbeddingGraph = {
+                "sfcID": f"c{vnf.capitalize()}",
+                "vnfs": {
                     "host": {
-                        "id": SERVER
+                        "id": "h1",
                     },
-                    "next": TERMINAL
-                }
-            },
-            "links": [
-                {
-                    "source": {
-                        "id": SFCC
+                    "vnf": {
+                        "id": vnf
                     },
-                    "destination": {
-                        "id": "h1"
-                    },
-                    "links": ["s1"]
+                    "next": {
+                        "host": {
+                            "id": SERVER
+                        },
+                        "next": TERMINAL
+                    }
                 },
-                {
-                    "source": {
-                        "id": "h1"
+                "links": [
+                    {
+                        "source": {
+                            "id": SFCC
+                        },
+                        "destination": {
+                            "id": "h1"
+                        },
+                        "links": ["s1"]
                     },
-                    "destination": {
-                        "id": SERVER
-                    },
-                    "links": ["s1"]
-                }
-            ]
-        }
+                    {
+                        "source": {
+                            "id": "h1"
+                        },
+                        "destination": {
+                            "id": SERVER
+                        },
+                        "links": ["s1"]
+                    }
+                ]
+            }
 
-        if vnf in self._config["vnfs"]["splitters"]:
-            next: VNF = deepcopy(eg["vnfs"]["next"])
-            eg["vnfs"]["next"] = [next, next]
-        
-        class SFCR(SFCRequestGenerator):
-            """
-            SFC Request Generator.
-            """
+            if vnf in self._config["vnfs"]["splitters"]:
+                next: VNF = deepcopy(eg["vnfs"]["next"])
+                eg["vnfs"]["next"] = [next, next]
 
-            def generateRequests(self) -> None:
+            class SFCR(SFCRequestGenerator):
                 """
-                Generate the requests.
-                """
-
-                self._orchestrator.sendRequests([sfcr])
-
-        class SFCSolver(Solver):
-            """
-            SFC Solver.
-            """
-
-            _headers: "list[str]" = self._headers
-
-            def generateEmbeddingGraphs(self) -> None:
-                """
-                Generate the embedding graphs.
+                SFC Request Generator.
                 """
 
-                self._orchestrator.sendEmbeddingGraphs([eg])
-                telemetry: Telemetry = self._orchestrator.getTelemetry()
-                seconds: int = 0
+                def generateRequests(self) -> None:
+                    """
+                    Generate the requests.
+                    """
 
-                # Create a CSV file
-                # Write headers to the CSV file
-                with open(filename, mode='w+', newline='', encoding="utf8") as file:
-                    writer = csv.writer(file)
-                    writer.writerow(self._headers)
-                while seconds < totalDuration:
-                    start: float = default_timer()
-                    hostData: HostData = telemetry.getHostData()["h1"]["vnfs"]
-                    end: float = default_timer()
-                    duration: int = round(end - start, 0)
-                    trafficData: "dict[str, TrafficData]" = self._trafficGenerator.getData(
-                        f"{duration:.0f}s")
-                    row = []
+                    self._orchestrator.sendRequests([sfcr])
 
-                    for _key, data in hostData.items():
-                        row.append(data["cpuUsage"][0])
-                        row.append(data["memoryUsage"][0])
-                        row.append(data["networkUsage"][0])
-                        row.append(data["networkUsage"][1])
+            class SFCSolver(Solver):
+                """
+                SFC Solver.
+                """
 
-                        if data["networkUsage"][0] == 0 or data["networkUsage"][1] == 0:
-                            row.append(0)
-                        else:
-                            row.append(data["networkUsage"][0]/data["networkUsage"][1])
+                _headers: "list[str]" = self._headers
 
-                        httpReqs: int = trafficData[eg["sfcID"]]["httpReqs"]
-                        averageLatency: float = trafficData[eg["sfcID"]]["averageLatency"]
-                        httpReqsRate: float = httpReqs / duration if httpReqs != 0 else 0
-                        row.append(httpReqsRate)
-                        row.append(averageLatency)
-                        
-                    TUI.appendToSolverLog(f"{httpReqsRate} requests took {averageLatency} seconds on average.")
+                def generateEmbeddingGraphs(self) -> None:
+                    """
+                    Generate the embedding graphs.
+                    """
 
-                    row.append(f"{round(end - start, 0):.0f}")
+                    self._orchestrator.sendEmbeddingGraphs([eg])
+                    telemetry: Telemetry = self._orchestrator.getTelemetry()
+                    seconds: int = 0
 
-                    # Write row data to the CSV file
-                    with open(filename, mode='a', newline='', encoding="utf8") as file:
+                    # Create a CSV file
+                    # Write headers to the CSV file
+                    with open(filename, mode='w+', newline='', encoding="utf8") as file:
                         writer = csv.writer(file)
-                        writer.writerow(row)
-                    seconds += duration
-                TUI.appendToSolverLog(f"Finished generating traffic for {vnf}.")
-                sleep(2)
-                TUI.exit()
+                        writer.writerow(self._headers)
+                    while seconds < totalDuration:
+                        try:
+                            start: float = default_timer()
+                            hostData: HostData = telemetry.getHostData()["h1"]["vnfs"]
+                            end: float = default_timer()
+                            duration: int = round(end - start, 0)
+                            trafficData: "dict[str, TrafficData]" = self._trafficGenerator.getData(
+                                f"{duration:.0f}s")
+                            row = []
 
-        print("Starting OpenRASE.")
-        em: SFCEmulator = SFCEmulator(SFCR, SFCSolver)
-        print("Running the network and taking measurements. This will take a while.")
-        em.startTest(topology, trafficDesign)
+                            for _key, data in hostData.items():
+                                row.append(data["cpuUsage"][0])
+                                row.append(data["memoryUsage"][0]/(1024*1024) if data["memoryUsage"][0] != 0 else 0)
+                                row.append(data["networkUsage"][0])
+                                row.append(data["networkUsage"][1])
 
-        print("Training the models.")
-        self._trainModel(filename, self._headers[0], vnf)  # cpu
-        self._trainModel(filename, self._headers[1], vnf)  # memory
-        self._trainModel(filename, self._headers[4], vnf)  # I/O Ratio
+                                if data["networkUsage"][0] == 0 or data["networkUsage"][1] == 0:
+                                    row.append(0)
+                                else:
+                                    row.append((data["networkUsage"][0]/data["networkUsage"][1]))
 
-        em.end()
+                                httpReqs: int = trafficData[eg["sfcID"]]["httpReqs"] if eg["sfcID"] in trafficData else 0
+                                averageLatency: float = trafficData[eg["sfcID"]]["averageLatency"] if eg["sfcID"] in trafficData else 0
+                                httpReqsRate: float = httpReqs / duration if httpReqs != 0 or duration !=0 else 0
+                                row.append(httpReqsRate)
+                                row.append(averageLatency)
+
+                            TUI.appendToSolverLog(f"{httpReqsRate} requests took {averageLatency} seconds on average.")
+
+                            row.append(f"{round(end - start, 0):.0f}")
+
+                            # Write row data to the CSV file
+                            with open(filename, mode='a', newline='', encoding="utf8") as file:
+                                writer = csv.writer(file)
+                                writer.writerow(row)
+                            seconds += duration
+                        except Exception as e:
+                            TUI.appendToSolverLog(str(e), True)
+                    TUI.appendToSolverLog(f"Finished generating traffic for {vnf}.")
+                    sleep(2)
+                    TUI.exit()
+
+            print("Starting OpenRASE.")
+            em: SFCEmulator = SFCEmulator(SFCR, SFCSolver)
+            print("Running the network and taking measurements. This will take a while.")
+            em.startTest(topology, trafficDesign)
+
+            print("Training the models.")
+
+            if metric != "":
+                self._trainModel(metric, vnf)
+            else:
+                self._trainModel(self._headers[0], vnf)  # cpu
+                self._trainModel(self._headers[1], vnf)  # memory
+                self._trainModel(self._headers[4], vnf)  # I/O Ratio
+
+            em.end()
+        else:
+            if metric != "":
+                self._trainModel(metric, vnf)
+            else:
+                self._trainModel(self._headers[0], vnf)  # cpu
+                self._trainModel(self._headers[1], vnf)  # memory
+                self._trainModel(self._headers[4], vnf)  # I/O Ratio
+
 
     def _getVNFResourceDemandModel(self, vnf: str, metric: str):
         """
@@ -370,17 +390,22 @@ class Calibrate:
 
         return ResourceDemand(cpu=cpu, memory=memory, ior=ior)
 
-    def calibrateVNFs(self, trafficDesignFile: str = "") -> None:
+    def calibrateVNFs(self, trafficDesignFile: str = "", vnf: str = "", metric: str = "", train: bool = False) -> None:
         """
         Calibrate all the VNFs.
 
         Parameters:
             trafficDesignFile (str): The file containing the design of the traffic generator.
+            vnf (str): The VNF to calibrate.
+            metric (str): The metric to calibrate.
+            train (bool): Specifies if only training should be carried out.
         """
-
-        for vnf in self._config["vnfs"]["names"]:
-            print("Calibrating VNF: " + vnf)
-            self._calibrateVNF(vnf, trafficDesignFile)
+        if vnf != "":
+            self._calibrateVNF(vnf, trafficDesignFile, metric, train)
+        else:
+            for vnf in self._config["vnfs"]["names"]:
+                print("Calibrating VNF: " + vnf)
+                self._calibrateVNF(vnf, trafficDesignFile, metric, train)
 
     def getResourceDemands(self, reqps: float) -> "dict[str, ResourceDemand]":
         """
