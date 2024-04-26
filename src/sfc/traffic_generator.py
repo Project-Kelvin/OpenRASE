@@ -210,15 +210,16 @@ class TrafficGenerator(Subscriber):
             for record in table.records:
                 measurement: str = record.values["_measurement"]
                 sfc: str = record.values["sfcID"]
-                if sfc not in data:
-                    data[sfc] = TrafficData(httpReqs = 0, averageLatency = 0)
-                if measurement == HTTP_REQS:
-                    data[sfc]["httpReqs"] += int(record.values["_value"])
-                elif measurement == HTTP_REQ_DURATION:
-                    data[sfc]["averageLatency"] += float(record.values["_value"])
+                if sfc != "" or sfc is not None:
+                    if sfc not in data:
+                        data[sfc] = TrafficData(httpReqs = 0, averageLatency = 0)
+                    if measurement == HTTP_REQS:
+                        data[sfc]["httpReqs"] += int(record.values["_value"])
+                    elif measurement == HTTP_REQ_DURATION:
+                        data[sfc]["averageLatency"] += float(record.values["_value"])
 
         for _key, value in data.items():
-            value["averageLatency"] = value["averageLatency"] / value["httpReqs"]
+            value["averageLatency"] = value["averageLatency"] / value["httpReqs"] if value["averageLatency"] != 0 or value["httpReqs"] != 0 else 0
 
         return data
 
