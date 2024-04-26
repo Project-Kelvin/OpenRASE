@@ -306,10 +306,11 @@ class Calibrate:
 
                         httpReqs: int = trafficData[eg["sfcID"]]["httpReqs"]
                         averageLatency: float = trafficData[eg["sfcID"]]["averageLatency"]
-                        row.append(httpReqs)
+                        httpReqsRate: float = httpReqs / duration if httpReqs != 0 else 0
+                        row.append(httpReqsRate)
                         row.append(averageLatency)
-
-                    TUI.appendToSolverLog(f"{httpReqs} requests took {averageLatency} seconds on average.")
+                        
+                    TUI.appendToSolverLog(f"{httpReqsRate} requests took {averageLatency} seconds on average.")
 
                     row.append(f"{round(end - start, 0):.0f}")
 
