@@ -1,7 +1,19 @@
 [
     {
         "duration": "5m",
-        "target": 50
+        "target": 20
+    },
+    {
+        "duration": "5m",
+        "target": 40
+    },
+    {
+        "duration": "5m",
+        "target": 60
+    },
+    {
+        "duration": "5m",
+        "target": 80
     },
     {
         "duration": "5m",
@@ -9,42 +21,22 @@
     },
     {
         "duration": "5m",
-        "target": 150
+        "target": 120
+    },
+    {
+        "duration": "5m",
+        "target": 140
+    },
+    {
+        "duration": "5m",
+        "target": 160
+    },
+    {
+        "duration": "5m",
+        "target": 180
     },
     {
         "duration": "5m",
         "target": 200
-    },
-    {
-        "duration": "5m",
-        "target": 300
-    },
-    {
-        "duration": "5m",
-        "target": 400
-    },
-    {
-        "duration": "5m",
-        "target": 500
-    },
-    {
-        "duration": "5m",
-        "target": 600
-    },
-    {
-        "duration": "5m",
-        "target": 700
-    },
-    {
-        "duration": "5m",
-        "target": 800
-    },
-    {
-        "duration": "5m",
-        "target": 900
-    },
-    {
-        "duration": "5m",
-        "target": 1000
     }
 ]
