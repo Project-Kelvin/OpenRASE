@@ -12,7 +12,8 @@ sff:
   port: 80
 
 k6:
-  vus: 50
+  vus: 10
+  maxVus: 100
   timeUnit: 1s
   startRate: 0
   executor: ramping-arrival-rate

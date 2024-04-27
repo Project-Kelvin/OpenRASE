@@ -82,6 +82,7 @@ class K6(dict):
     startRate: int
     timeUnit: str
     executor: str
+    maxVus: int
 
 class Config(dict):
     """

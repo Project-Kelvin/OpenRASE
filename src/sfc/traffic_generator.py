@@ -125,6 +125,7 @@ class TrafficGenerator(Subscriber):
         designStr: str = json.dumps(design)
         config: Config = getConfig()
         vus: int = config["k6"]["vus"]
+        maxVus: int = config["k6"]["maxVus"]
         timeUnit: str = config["k6"]["timeUnit"]
         startRate: int = config["k6"]["startRate"]
         executor: str = config["k6"]["executor"]
@@ -141,7 +142,8 @@ class TrafficGenerator(Subscriber):
                     VUS=vus,
                     TIME_UNIT=timeUnit,
                     START_RATE=startRate,
-                    EXECUTOR=executor
+                    EXECUTOR=executor,
+                    MAX_VUS=maxVus,
                 )
                 outputFileContent = templatedFile
 
