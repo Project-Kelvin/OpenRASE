@@ -4,6 +4,7 @@ Defines the abstract Solver class.
 
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from queue import Queue
 from typing import TYPE_CHECKING, Union
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
@@ -24,7 +25,7 @@ class Solver(ABC):
         super().__init__()
         self._orchestrator: Orchestrator = orchestrator
         self._trafficGenerator: TrafficGenerator = trafficGenerator
-        self._requests: "list[Union[SFCRequest, EmbeddingGraph]]" = []
+        self._requests: Queue = Queue()
 
     def sendRequests(self, requests: "list[Union[SFCRequest, EmbeddingGraph]]") -> None:
         """
@@ -38,7 +39,8 @@ class Solver(ABC):
         for request in requests:
             TUI.appendToLog(f"  {request['sfcrID']}")
 
-        self._requests.extend(requests)
+        for request in requests:
+            self._requests.put(request)
 
     @abstractmethod
     def generateEmbeddingGraphs(self) -> None:
