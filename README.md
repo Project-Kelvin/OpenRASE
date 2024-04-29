@@ -139,9 +139,9 @@ Restart the Docker service.
 ```bash
 sudo service docker restart
 ```
-Start the private Docker registry.
+Re-initialize OpenRASE
 ```bash
-sudo poetry run init --registry
+sudo poetry run init
 ```
 14. Run OpenRASE test.
 ```bash
