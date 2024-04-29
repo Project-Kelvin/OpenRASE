@@ -44,7 +44,7 @@ class Orchestrator():
         Get the topology from the infrastructure manager.
         """
 
-        self._infraManager.getTopology()
+        return self._infraManager.getTopology()
 
     def getTelemetry(self) -> Telemetry:
         """
