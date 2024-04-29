@@ -4,6 +4,7 @@ This runs the Simple Dijkstra algorithm in simulation.
 
 import copy
 import json
+from calibrate.calibrate import Calibrate
 from shared.models.config import Config
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
@@ -23,12 +24,14 @@ def run():
     """
 
     requests = []
-    resourceDemands: "dict[str, ResourceDemand]" = {
-            "waf": ResourceDemand(cpu=1, memory=512, ior=0.9),
-            "lb": ResourceDemand(cpu=1, memory=512, ior=0.9),
-            "tm": ResourceDemand(cpu=1, memory=512, ior=0.9),
-            "ha": ResourceDemand(cpu=1, memory=512, ior=0.9)
-        }
+    trafficDesignPath = f"{configPath}/traffic-design.json"
+    with open(trafficDesignPath, "r", encoding="utf8") as traffic:
+        design = json.load(traffic)
+    maxTarget: int = max(design, key=lambda x: x["target"])["target"]
+
+    calibrate: Calibrate = Calibrate()
+    resourceDemands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(maxTarget)
+
     with open(f"{configPath}/forwarding-graphs.json", "r", encoding="utf8") as fgFile:
         fgs: "list[EmbeddingGraph]" = json.load(fgFile)
         for i, fg in enumerate(fgs):
