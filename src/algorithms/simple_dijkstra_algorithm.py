@@ -29,6 +29,7 @@ class SimpleDijkstraAlgorithm():
         self._vnfResourceDemands: "dict[str, ResourceDemand]" = vnfResourceDemands
 
         for graph in self._fgs:
+            graph["sfcID"] = graph["sfcrID"]
             self._nodes[graph["sfcID"]]= [SFCC]
 
 
