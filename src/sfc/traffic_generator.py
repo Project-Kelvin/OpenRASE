@@ -239,3 +239,13 @@ class TrafficGenerator(Subscriber):
         """
 
         from_env().containers.get(TRAFFIC_GENERATOR).remove(force=True)
+
+    def getDesign(self) -> "list[TrafficDesign]":
+        """
+        Get the design of the traffic generator.
+
+        Returns:
+            list[TrafficDesign]: The design of the traffic generator.
+        """
+
+        return self._design
