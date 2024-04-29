@@ -117,8 +117,8 @@ class InfraManager():
                     f"{host['id']}Node",
                     ip=f"{getConfig()['sff']['network1']['hostIP']}/{getConfig()['sff']['network1']['mask']}",
                     cpu_quota=int(host["cpu"] * CPU_PERIOD if "cpu" in host else -1),
-                    mem_limit=f"{host['memory']}mb" if "memory" in host else None,
-                    memswap_limit=f"{host['memory']}mb" if "memory" in host else None,
+                    mem_limit=f"{host['memory']}mb" if "memory" in host and host["memory"] is not None else None,
+                    memswap_limit=f"{host['memory']}mb" if "memory" in host and host["memory"] is not None else None,
                     dimage=DIND_IMAGE,
                     privileged=True,
                     dcmd="dockerd",
@@ -172,7 +172,7 @@ class InfraManager():
                     f"ip addr add {getConfig()['sff']['network2']['hostIP']}/{getConfig()['sff']['network2']['mask']} dev {hostNode.name}-eth0")
 
             TUI.appendToLog("Assigning IP addresses to switches.")
-            
+
             self._sdnController.assignSwitchIPs(
                 topology, self._switches, self._hostIPs, self._networkIPs)
 
