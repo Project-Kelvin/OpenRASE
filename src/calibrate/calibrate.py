@@ -30,8 +30,11 @@ from models.traffic_generator import TrafficData
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
+from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
 
+
+EPOCHS: int = 1000
 
 class Calibrate:
     """
@@ -57,13 +60,14 @@ class Calibrate:
             os.makedirs(f"{self._config['repoAbsolutePath']}/artifacts/calibrations")
 
 
-    def _trainModel(self, metric: str, vnf: str) -> float:
+    def _trainModel(self, metric: str, vnf: str, epochs: int = EPOCHS) -> float:
         """
         Train a model to predict the metric from the data in the file.
 
         Parameters:
             metric (str): The metric to predict.
             vnf (str): The VNF to predict the metric for.
+            epochs (int): The number of epochs to train the model for.#
 
         Returns:
             float: The test loss.
@@ -77,7 +81,7 @@ class Calibrate:
         data: DataFrame = pd.read_csv(file)
         data = data[[metric, "http_reqs"]]
 
-        data = data[data[metric] != 0]
+        data = data[(data[metric] != 0) & (data["http_reqs"] != 0)]
         q1: float = data[metric].quantile(0.25)
         q3: float = data[metric].quantile(0.75)
         iqr: float = q3 - q1
@@ -112,7 +116,7 @@ class Calibrate:
         history: Any = model.fit(
             trainFeatures["http_reqs"],
             trainLabels,
-            epochs=1000,
+            epochs=epochs,
             verbose=0,
             validation_split=0.2
         )
@@ -146,7 +150,7 @@ class Calibrate:
         return testResult
 
 
-    def _calibrateVNF(self, vnf: str, trafficDesignFile: str = "", metric: str = "", train: bool = False) -> None:
+    def _calibrateVNF(self, vnf: str, trafficDesignFile: str = "", metric: str = "", train: bool = False, epochs: int = EPOCHS) -> None:
         """
         Calibrate the VNF.
 
@@ -155,6 +159,7 @@ class Calibrate:
             trafficDesignFile (str): The file containing the design of the traffic generator.
             metric (str): The metric to calibrate.
             train (bool): Specifies if only training should be carried out.
+            epochs (int): The number of epochs to train the model for.
         """
 
         if not train:
@@ -172,17 +177,7 @@ class Calibrate:
                 with open(f"{self._config['repoAbsolutePath']}/src/calibrate/traffic-design.json", 'r', encoding="utf8") as file:
                     trafficDesign: "list[TrafficDesign]" = [json.load(file)]
 
-            totalDuration: int = 0
-
-            for traffic in trafficDesign[0]:
-                durationText: str = traffic["duration"]
-                unit: str  = durationText[-1]
-                if unit == "s":
-                    totalDuration += int(durationText[:-1])
-                elif unit == "m":
-                    totalDuration += int(durationText[:-1]) * 60
-                elif unit == "h":
-                    totalDuration += int(durationText[:-1]) * 60 * 60
+            totalDuration: int = calculateTrafficDuration(trafficDesign)
 
             topology: Topology = {
                 "hosts": [
@@ -339,20 +334,20 @@ class Calibrate:
             print("Training the models.")
 
             if metric != "":
-                self._trainModel(metric, vnf)
+                self._trainModel(metric, vnf, epochs)
             else:
-                self._trainModel(self._headers[0], vnf)  # cpu
-                self._trainModel(self._headers[1], vnf)  # memory
-                self._trainModel(self._headers[4], vnf)  # I/O Ratio
+                self._trainModel(self._headers[0], vnf, epochs)  # cpu
+                self._trainModel(self._headers[1], vnf, epochs)  # memory
+                self._trainModel(self._headers[4], vnf, epochs)  # I/O Ratio
 
             em.end()
         else:
             if metric != "":
-                self._trainModel(metric, vnf)
+                self._trainModel(metric, vnf, epochs)
             else:
-                self._trainModel(self._headers[0], vnf)  # cpu
-                self._trainModel(self._headers[1], vnf)  # memory
-                self._trainModel(self._headers[4], vnf)  # I/O Ratio
+                self._trainModel(self._headers[0], vnf, epochs)  # cpu
+                self._trainModel(self._headers[1], vnf, epochs)  # memory
+                self._trainModel(self._headers[4], vnf, epochs)  # I/O Ratio
 
 
     def _getVNFResourceDemandModel(self, vnf: str, metric: str):
@@ -390,7 +385,7 @@ class Calibrate:
 
         return ResourceDemand(cpu=cpu, memory=memory, ior=ior)
 
-    def calibrateVNFs(self, trafficDesignFile: str = "", vnf: str = "", metric: str = "", train: bool = False) -> None:
+    def calibrateVNFs(self, trafficDesignFile: str = "", vnf: str = "", metric: str = "", train: bool = False, epochs: int = EPOCHS) -> None:
         """
         Calibrate all the VNFs.
 
@@ -399,13 +394,14 @@ class Calibrate:
             vnf (str): The VNF to calibrate.
             metric (str): The metric to calibrate.
             train (bool): Specifies if only training should be carried out.
+            epochs (int): The number of epochs to train the model for.
         """
         if vnf != "":
-            self._calibrateVNF(vnf, trafficDesignFile, metric, train)
+            self._calibrateVNF(vnf, trafficDesignFile, metric, train, epochs)
         else:
             for vnf in self._config["vnfs"]["names"]:
                 print("Calibrating VNF: " + vnf)
-                self._calibrateVNF(vnf, trafficDesignFile, metric, train)
+                self._calibrateVNF(vnf, trafficDesignFile, metric, train, epochs)
 
     def getResourceDemands(self, reqps: float) -> "dict[str, ResourceDemand]":
         """
