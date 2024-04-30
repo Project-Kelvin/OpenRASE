@@ -91,19 +91,11 @@ Append the copied output to `secure_path` as shown below.
 ```bash
 Defaults        secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin:/home/username/.pyenv/bin:/home/username/.local/bin"
 ```
-10. Install Ryu.
-```bash
-sudo poetry run python -m pip install ryu
-```
-Install eventlet.
-```bash
-sudo poetry run python -m pip install eventlet==0.30.2
-```
-11. Clone OpenRASE.
+10. Clone OpenRASE.
 ```bash
 git clone https://github.com/Project-Kelvin/OpenRASE
 ```
-12. Install OpenRASE.
+11. Install OpenRASE.
 Move into the OpenRASE directory.
 ```bash
 cd OpenRASE
@@ -131,15 +123,23 @@ Install the dependencies.
 ```bash
 sudo poetry install
 ```
-13. Add the private Docker registry to insecure registries.
+12. Install Ryu.
 ```bash
-sudo poetry run init --insecure
+sudo poetry run python -m pip install ryu
+```
+Install eventlet.
+```bash
+sudo poetry run python -m pip install eventlet==0.30.2
+```
+13. Initialize OpenRASE
+```bash
+sudo poetry run init
 ```
 Restart the Docker service.
 ```bash
 sudo service docker restart
 ```
-Intialize OpenRASE.
+Re-initialize OpenRASE
 ```bash
 sudo poetry run init
 ```
