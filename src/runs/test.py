@@ -205,7 +205,7 @@ trafficDesign: "list[TrafficDesign]" = [
     [
         {
             "target": 100,
-            "duration": "5m"
+            "duration": "1m"
         }
     ]
 ]
@@ -230,16 +230,22 @@ class SFCSolver(Solver):
         """
 
         self._orchestrator.sendEmbeddingGraphs([simpleEG])
+        TUI.appendToSolverLog("Starting traffic generation.")
         #sleep(60)
         #self._orchestrator.sendEmbeddingGraphs([simpleEGUpdated])
-        duration = 5*60
+        duration = 1*60
         elapsed = 0
         while elapsed < duration:
             sleep(5)
             data: "list[TrafficData]" = self._trafficGenerator.getData("5s")
-            TUI.appendToSolverLog(f"{data[0]['value']} requests took {data[1]['value']/data[0]['value'] if data[1]['value'] != 0 else 0} seconds on average.")
+            httpReqs: int = data[simpleEG["sfcID"]]["httpReqs"] if simpleEG["sfcID"] in data else 0
+            averageLatency: float = data[simpleEG["sfcID"]]["averageLatency"] if simpleEG["sfcID"] in data else 0
+            httpReqsRate: float = httpReqs / 5 if httpReqs != 0 else 0
+
+            TUI.appendToSolverLog(f"{httpReqsRate} requests took {averageLatency} seconds on average.")
             elapsed += 5
         TUI.appendToSolverLog("Solver has finished.")
+        TUI.exit()
 
 
 def run () -> None:
@@ -249,5 +255,4 @@ def run () -> None:
 
     sfcEmulator = SFCEmulator(SFCR, SFCSolver)
     sfcEmulator.startTest(topo, trafficDesign)
-    sfcEmulator.startCLI()
     sfcEmulator.end()
