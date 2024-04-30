@@ -89,9 +89,9 @@ class FGR8SFC(FGR):
 
         self._orchestrator.sendRequests(self._fgs)
 
-class FGR12SFC(FGR):
+class FGR32SFC(FGR):
     """
-    FG Request Generator that generates all 4 FGs thrice.
+    FG Request Generator that generates all 4 FGs 8 times.
     """
 
     def generateRequests(self) -> None:
@@ -100,10 +100,27 @@ class FGR12SFC(FGR):
             fg["sfcrID"] = f"sfc{index}-1"
             copiedFG: EmbeddingGraph = copy.deepcopy(fg)
             copiedFG1: EmbeddingGraph = copy.deepcopy(fg)
-            copiedFG["sfcrID"] = f"sfc{index}-2"
-            copiedFG1["sfcrID"] = f"sfc{index}-3"
+            copiedFG2: EmbeddingGraph = copy.deepcopy(fg)
+            copiedFG3: EmbeddingGraph = copy.deepcopy(fg)
+            copiedFG4: EmbeddingGraph = copy.deepcopy(fg)
+            copiedFG5: EmbeddingGraph = copy.deepcopy(fg)
+            copiedFG6: EmbeddingGraph = copy.deepcopy(fg)
+            copiedFG7: EmbeddingGraph = copy.deepcopy(fg)
+            copiedFG1["sfcrID"] = f"sfc{index}-2"
+            copiedFG2["sfcrID"] = f"sfc{index}-3"
+            copiedFG3["sfcrID"] = f"sfc{index}-4"
+            copiedFG4["sfcrID"] = f"sfc{index}-5"
+            copiedFG5["sfcrID"] = f"sfc{index}-6"
+            copiedFG6["sfcrID"] = f"sfc{index}-7"
+            copiedFG7["sfcrID"] = f"sfc{index}-8"
             copiedFGs.append(copiedFG)
             copiedFGs.append(copiedFG1)
+            copiedFGs.append(copiedFG2)
+            copiedFGs.append(copiedFG3)
+            copiedFGs.append(copiedFG4)
+            copiedFGs.append(copiedFG5)
+            copiedFGs.append(copiedFG6)
+            copiedFGs.append(copiedFG7)
 
         self._fgs.extend(copiedFGs)
 
@@ -244,9 +261,9 @@ def run(experiment: int) -> None:
         Run Experiment 3.
         """
 
-        # Experiment 3 - 12 SFCs 0.5
-        appendToLog("SFCs: 12, Topology: 0.5")
-        runExperiment(FGR12SFC, topologyPointFive)
+        # Experiment 3 - 32 SFCs 0.5
+        appendToLog("SFCs: 32, Topology: 0.5")
+        runExperiment(FGR32SFC, topologyPointFive)
 
     def experiment4() -> None:
         """
@@ -280,9 +297,9 @@ def run(experiment: int) -> None:
         Run Experiment 7.
         """
 
-        # Experiment 7 - 12 SFCs 1
-        appendToLog("SFCs: 12, Topology: 1")
-        runExperiment(FGR12SFC, topology1)
+        # Experiment 7 - 32 SFCs 1
+        appendToLog("SFCs: 32, Topology: 1")
+        runExperiment(FGR32SFC, topology1)
 
     def experiment8() -> None:
         """
