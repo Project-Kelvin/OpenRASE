@@ -177,7 +177,7 @@ class Calibrate:
                 with open(f"{self._config['repoAbsolutePath']}/src/calibrate/traffic-design.json", 'r', encoding="utf8") as file:
                     trafficDesign: "list[TrafficDesign]" = [json.load(file)]
 
-            totalDuration: int = calculateTrafficDuration(trafficDesign)
+            totalDuration: int = calculateTrafficDuration(trafficDesign[0])
 
             topology: Topology = {
                 "hosts": [
