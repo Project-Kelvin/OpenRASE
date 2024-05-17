@@ -29,7 +29,7 @@ class SingleHostData(dict):
     vnfs: "dict[str, VNFData]"
 
 
-HostData = Union["dict[str, SingleHostData]", "dict['timeStamp': int]"]
+HostData = dict[str, SingleHostData]
 
 class SrcDstData(dict):
     """

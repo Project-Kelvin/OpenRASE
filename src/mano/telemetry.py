@@ -12,6 +12,7 @@ from re import match
 import socket
 from struct import pack, unpack
 from sys import maxsize
+from threading import Thread
 from typing import Any
 from urllib.request import HTTPHandler, Request, build_opener
 import requests
@@ -22,7 +23,7 @@ from shared.utils.container import doesContainerExist
 from mininet.net import Mininet
 from mininet.util import quietRun
 from constants.container import MININET_PREFIX
-from constants.notification import EMBEDDING_GRAPH_DELETED, EMBEDDING_GRAPH_DEPLOYED
+from constants.notification import EMBEDDING_GRAPH_DELETED, EMBEDDING_GRAPH_DEPLOYED, TOPOLOGY_INSTALLED
 from mano.notification_system import NotificationSystem, Subscriber
 from models.telemetry import HostData, SwitchData
 from utils.container import connectToDind
@@ -35,6 +36,14 @@ import time
 SFLOW_CONTAINER: str = "sflow"
 SFLOW_IMAGE: str = "sflow/sflow-rt"
 
+
+class SingleHostStatsFuture(dict):
+    stats: Future
+    vnfs: "dict[str, Future]"
+
+HostStatsFuture = dict[str, SingleHostStatsFuture]
+
+HostStats = tuple[tuple[float, float, float], tuple[float, float, float], tuple[float, float]]
 
 class Telemetry(Subscriber):
     """
@@ -190,86 +199,95 @@ class Telemetry(Subscriber):
         """
 
         hosts: "list[Host]" = self._topology["hosts"]
-        hostDataFutures: HostData = {}
+        hostDataFutures: HostStatsFuture = {}
         hostData: HostData = {}
+        threads: "list[Thread]" = []
+
+        def createHostThread(host: Host) -> None:
+            client: DockerClient = from_env()
+            hostContainer: Container = client.containers.get(
+                f"{MININET_PREFIX}.{host['id']}Node")
+            stats: Future = executor.submit(self._getHostStats, host["id"], hostContainer)
+            hostDataFutures[host["id"]] = {
+                "stats": stats,
+                "vnfs": {}
+            }
+
+            dindClient: DockerClient = connectToDind(f"{host['id']}Node")
+
+            if host["id"] in self._vnfsInHosts and len(self._vnfsInHosts[host["id"]]) > 0:
+                for vnf in self._vnfsInHosts[host["id"]]:
+                    t = default_timer()
+                    container: Container = dindClient.containers.get(
+                        vnf["name"])
+                    stats: Future = executor.submit(
+                        self._getHostStats, host["id"], container)
+                    hostDataFutures[host["id"]]["vnfs"][vnf["name"]] = stats
 
         with ThreadPoolExecutor() as executor:
             for host in hosts:
-                client: DockerClient = from_env()
-                hostContainer: Container = client.containers.get(
-                    f"{MININET_PREFIX}.{host['id']}Node")
-                memoryLimit: float = hostContainer.stats(
-                    stream=False)["memory_stats"]["limit"]
+                thread: Thread = Thread(target=createHostThread, args=(host,))
+                thread.start()
+                threads.append(thread)
 
-                hostCPUUsage: Future = executor.submit(self._calculateCPUUsage,
-                    host["id"], hostContainer)
-                hostMemoryUsage: Future = executor.submit(self._calculateMemoryUsage,
-                    hostContainer, memoryLimit)
-                hostNetworkUsage: Future = executor.submit(self._calculateNetworkUsage,
-                    hostContainer)
-
-                hostDataFutures[host["id"]] = {
-                    "cpuUsage": hostCPUUsage,
-                    "memoryUsage": hostMemoryUsage,
-                    "networkUsage": hostNetworkUsage,
-                    "vnfs": {}
-                }
-
-                dindClient: DockerClient = connectToDind(f"{host['id']}Node")
-
-                if host["id"] in self._vnfsInHosts and len(self._vnfsInHosts[host["id"]]) > 0:
-                    for vnf in self._vnfsInHosts[host["id"]]:
-                        container: Container = dindClient.containers.get(
-                            vnf["name"])
-                        vnfCPUUsage: Future = executor.submit(self._calculateCPUUsage,
-                            host["id"], container)
-                        vnfMemoryUsage: Future = executor.submit(self._calculateMemoryUsage,
-                            container, memoryLimit)
-                        vnfNetworkUsage: Future = executor.submit(self._calculateNetworkUsage,
-                            container)
-                        hostDataFutures[host["id"]]["vnfs"][vnf["name"]] = {
-                            "cpuUsage": vnfCPUUsage,
-                            "memoryUsage": vnfMemoryUsage,
-                            "networkUsage": vnfNetworkUsage
-                        }
+            for thread in threads:
+                thread.join()
 
             for hostKey, host in hostDataFutures.items():
+                stats: HostStats = hostDataFutures[hostKey]["stats"].result()
                 hostData[hostKey] = {
-                    "cpuUsage": hostDataFutures[hostKey]["cpuUsage"].result(),
-                    "memoryUsage": hostDataFutures[hostKey]["memoryUsage"].result(),
-                    "networkUsage": hostDataFutures[hostKey]["networkUsage"].result(),
+                    "cpuUsage": stats[0],
+                    "memoryUsage": stats[1],
+                    "networkUsage": stats[2],
                     "vnfs": {}
                 }
 
                 if hostDataFutures[hostKey]["vnfs"] != {}:
-                    for vnfKey, vnf in hostDataFutures[hostKey]["vnfs"].items():
+                    for vnfKey, _vnf in hostDataFutures[hostKey]["vnfs"].items():
+                        stats: HostStats = hostDataFutures[hostKey]["vnfs"][vnfKey].result()
                         hostData[hostKey]["vnfs"][vnfKey] = {
-                            "cpuUsage": hostDataFutures[hostKey]["vnfs"][vnfKey]["cpuUsage"].result(),
-                            "memoryUsage": hostDataFutures[hostKey]["vnfs"][vnfKey]["memoryUsage"].result(),
-                            "networkUsage": hostDataFutures[hostKey]["vnfs"][vnfKey]["networkUsage"].result()
+                            "cpuUsage": stats[0],
+                            "memoryUsage": stats[1],
+                            "networkUsage": stats[2]
                         }
-
-
-        timestamp: int = int(time.time())
-        hostData["timestamp"] = timestamp
 
         return hostData
 
-    def _calculateCPUUsage(self, host: str, container: Container) -> "tuple[float, float, float]":
+    def _getHostStats(self, host: str, container: Container)-> HostStats:
+        """
+        Fetch the CPU, memory and network usage stats of a host.
+
+        Parameters:
+            host (str): The host.
+            container (Any): The container.
+
+        Returns:
+            host stats (HostStats):
+            The CPU, memory and network usage stats of the host in a tuple.
+        """
+
+        stats: Any = container.stats(stream=False)
+
+        cpuUsage: "tuple[float, float, float]" = self._calculateCPUUsage(host, stats)
+        memoryUsage: "tuple[float, float, float]" = self._calculateMemoryUsage(stats)
+        networkUsage: "tuple[float, float]" = self._calculateNetworkUsage(stats)
+
+        return (cpuUsage, memoryUsage, networkUsage)
+
+    def _calculateCPUUsage(self, host: str, stats: Any) -> "tuple[float, float, float]":
         """
         Calculate the CPU usage of the container.
 
         Parameters:
-            container (Any): The container.
+            host (str): The host.
+            stats (Any): The stats.
 
         Returns:
             "tuple[float, float, float]": The CPU usage of the container (used CPU, remaining CPU, usage percentage).
         """
 
-        stats: Any = container.stats(stream=False)
         # no. of CPUs in the machine.
         totalCPUs: int = stats["cpu_stats"]["online_cpus"]
-
         # host CPU
         cpu: float = 0.0
 
@@ -296,34 +314,33 @@ class Telemetry(Subscriber):
             return (0.0, 0.0, 0.0)
 
 
-    def _calculateMemoryUsage(self, container: Container, memoryLimit: float) -> "tuple[float, float, float]":
+    def _calculateMemoryUsage(self, stats: Any) -> "tuple[float, float, float]":
         """
         Calculate the memory usage of the container.
 
         Parameters:
-            container (Any): The container.
+            stats (Any): The stats.
 
         Returns:
             tuple[float, float, float]:
             The memory usage of the container (used memory, remaining memory, usage percentage).
         """
 
-        stats: Any = container.stats(stream=False)
+        memoryLimit: int = stats["memory_stats"]["limit"]
         memUsage: float = stats["memory_stats"]["usage"]
 
         return (memUsage, memoryLimit - memUsage, memUsage / memoryLimit * 100.0)
 
-    def _calculateNetworkUsage(self, container: Container) -> "tuple[float, float]":
+    def _calculateNetworkUsage(self, stats: Any) -> "tuple[float, float]":
         """
         Calculate the network usage of the container.
 
         Parameters:
-            container (Any): The container.
+            stats (Any): The stats.
 
         Returns:
             tuple[float, float]: The network usage of the container (Rx, Tx).
         """
-        stats: Any = container.stats(stream=False)
 
         rx, tx = 0, 0
         for network in stats["networks"]:
