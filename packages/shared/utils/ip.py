@@ -115,7 +115,7 @@ def generateLocalNetworkIP(mask: int, existingIPs: "list[IPv4Network]") -> IPv4N
     return nextIP
 
 
-def generateIP(existingIPs: "list[IPv4Network]") -> "Tuple[IPv4Network, IPv4Address, IPv4Address]":
+def generateIP(existingIPs: "list[IPv4Network]") -> "Tuple[IPv4Network, IPv4Address]":
     """
     Generate an IP address for the network.
 
@@ -123,7 +123,7 @@ def generateIP(existingIPs: "list[IPv4Network]") -> "Tuple[IPv4Network, IPv4Addr
         existingIPs (list[IPv4Network]): The list of existing IPs in the network.
 
     Returns:
-        Tuple[IPv4Network, IPv4Address, IPv4Address]: The generated IP address and the first two host IPs.
+        Tuple[IPv4Network, IPv4Address]: The generated IP network and host address.
     """
 
     config: Config = getConfig()
@@ -133,6 +133,5 @@ def generateIP(existingIPs: "list[IPv4Network]") -> "Tuple[IPv4Network, IPv4Addr
     existingIPs.append(ip)
     hosts: "Iterator[IPv4Address]" = ip.hosts()
     ip1: IPv4Address = next(hosts)
-    ip2: IPv4Address = next(hosts)
 
-    return (ip, ip1, ip2)
+    return (ip, ip1)
