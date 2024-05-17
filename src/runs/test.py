@@ -205,7 +205,7 @@ trafficDesign: "list[TrafficDesign]" = [
     [
         {
             "target": 100,
-            "duration": "1m"
+            "duration": "30s"
         }
     ]
 ]
@@ -229,22 +229,24 @@ class SFCSolver(Solver):
         Generate the embedding graphs.
         """
 
-        self._orchestrator.sendEmbeddingGraphs([simpleEG])
-        TUI.appendToSolverLog("Starting traffic generation.")
-        #sleep(60)
-        #self._orchestrator.sendEmbeddingGraphs([simpleEGUpdated])
-        duration = 1*60
-        elapsed = 0
-        while elapsed < duration:
-            sleep(5)
-            data: "list[TrafficData]" = self._trafficGenerator.getData("5s")
-            httpReqs: int = data[simpleEG["sfcID"]]["httpReqs"] if simpleEG["sfcID"] in data else 0
-            averageLatency: float = data[simpleEG["sfcID"]]["averageLatency"] if simpleEG["sfcID"] in data else 0
-            httpReqsRate: float = httpReqs / 5 if httpReqs != 0 else 0
+        def updateTUI():
+            TUI.appendToSolverLog("Starting traffic generation.")
+            duration = 0.5*60
+            elapsed = 0
+            while elapsed < duration:
+                sleep(5)
+                data: "list[TrafficData]" = self._trafficGenerator.getData("5s")
+                httpReqs: int = data[simpleEG["sfcID"]]["httpReqs"] if simpleEG["sfcID"] in data else 0
+                averageLatency: float = data[simpleEG["sfcID"]]["averageLatency"] if simpleEG["sfcID"] in data else 0
+                httpReqsRate: float = httpReqs / 5 if httpReqs != 0 else 0
 
-            TUI.appendToSolverLog(f"{httpReqsRate} requests took {averageLatency} seconds on average.")
-            elapsed += 5
-        TUI.appendToSolverLog("Solver has finished.")
+                TUI.appendToSolverLog(f"{httpReqsRate} requests took {averageLatency} seconds on average.")
+                elapsed += 5
+            TUI.appendToSolverLog("Solver has finished.")
+        self._orchestrator.sendEmbeddingGraphs([simpleEG])
+        updateTUI()
+        self._orchestrator.sendEmbeddingGraphs([simpleEGUpdated])
+        updateTUI()
         TUI.exit()
 
 
@@ -255,4 +257,5 @@ def run () -> None:
 
     sfcEmulator = SFCEmulator(SFCR, SFCSolver)
     sfcEmulator.startTest(topo, trafficDesign)
+    sfcEmulator.startCLI()
     sfcEmulator.end()
