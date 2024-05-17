@@ -7,6 +7,8 @@ import json
 from time import sleep
 from timeit import default_timer
 from typing import Union
+from mano.telemetry import Telemetry
+from models.telemetry import HostData
 from models.traffic_generator import TrafficData
 from packages.shared.models.sfc_request import SFCRequest
 from shared.models.config import Config
@@ -32,6 +34,150 @@ configPath: str = f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algori
 
 topology1: Topology = generateFatTreeTopology(4, 1000, 1, None)
 topologyPointFive: Topology = generateFatTreeTopology(4, 1000, 0.5, None)
+logFilePath: str = f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/data/experiments.csv"
+hostDataFilePath: str = f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/data/host_data.csv"
+latencyDataFilePath: str = f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/data/latency_data.csv"
+
+with open(logFilePath, "w", encoding="utf8") as log:
+    log.write("Experiment,Failed FGs,Accepted FGs,Execution Time,Deployment Time\n")
+
+with open(hostDataFilePath, "w", encoding="utf8") as hostData:
+    hostData.write("Experiment,Host,CPU,Memory,Duration\n")
+
+with open(latencyDataFilePath, "w", encoding="utf8") as latencyData:
+    latencyData.write("Experiment,SFC,Requests,Average Latency,Duration\n")
+
+experiment: str = ""
+
+@click.command()
+@click.option("--experiment", type=int, help="The experiment to run.")
+def run(experiment: int) -> None:
+    """
+    Run the Simple Dijkstra Algorithm.
+
+    Parameters:
+        experiment (int): The experiment to run.
+    """
+
+    def runExperiment(fgr: FGR, topology: Topology) -> None:
+        """
+        Run an experiment.
+
+        Parameters:
+            fgr (FGR): The FG Request Generator.
+            topology (Topology): The topology.
+        """
+
+        global experiment
+        sfcEm: SFCEmulator = SFCEmulator(fgr, SFCSolver)
+        sfcEm.startTest(topology, trafficDesign)
+        sfcEm.end()
+        experiment = ""
+
+    def experiment1() -> None:
+        """
+        Run Experiment 1.
+        """
+
+        # Experiment 1 - 4 SFCs 0.5
+        global experiment
+        experiment = "SFCs:4-Topology:0.5"
+        runExperiment(FGR4SFC, topologyPointFive)
+
+    def experiment2() -> None:
+        """
+        Run Experiment 2.
+        """
+
+        # Experiment 2 - 8 SFCs 0.5
+        global experiment
+        experiment = "SFCs:8-Topology:0.5"
+        runExperiment(FGR8SFC, topologyPointFive)
+
+    def experiment3() -> None:
+        """
+        Run Experiment 3.
+        """
+
+        # Experiment 3 - 32 SFCs 0.5
+        experiment = "SFCs:32-Topology:0.5"
+        runExperiment(FGR32SFC, topologyPointFive)
+
+    def experiment4() -> None:
+        """
+        Run Experiment 4.
+        """
+
+        # Experiment 4 - 16 SFCs 0.5
+        global experiment
+        experiment = "SFCs:16-Topology:0.5"
+        runExperiment(FGR16SFC, topologyPointFive)
+
+    def experiment5() -> None:
+        """
+        Run Experiment 5.
+        """
+
+        # Experiment 5 - 4 SFCs 1
+        global experiment
+        experiment = "SFCs:4-Topology:1"
+        runExperiment(FGR4SFC, topology1)
+
+    def experiment6() -> None:
+        """
+        Run Experiment 6.
+        """
+
+        # Experiment 6 - 8 SFCs 1
+        global experiment
+        experiment = "SFCs:8-Topology:1"
+        runExperiment(FGR8SFC, topology1)
+
+    def experiment7() -> None:
+        """
+        Run Experiment 7.
+        """
+
+        # Experiment 7 - 32 SFCs 1
+        global experiment
+        experiment = "SFCs:22-Topology:1"
+        runExperiment(FGR32SFC, topology1)
+
+    def experiment8() -> None:
+        """
+        Run Experiment 8.
+        """
+
+        # Experiment 8 - 16 SFCs 1
+        global experiment
+        experiment = "SFCs:16-Topology:1"
+        runExperiment(FGR16SFC, topology1)
+
+    if experiment == 1:
+        experiment1()
+    elif experiment == 2:
+        experiment2()
+    elif experiment == 3:
+        experiment3()
+    elif experiment == 4:
+        experiment4()
+    elif experiment == 5:
+        experiment5()
+    elif experiment == 6:
+        experiment6()
+    elif experiment == 7:
+        experiment7()
+    elif experiment == 8:
+        experiment8()
+    else:
+        experiment1()
+        experiment2()
+        experiment3()
+        experiment4()
+        experiment5()
+        experiment6()
+        experiment7()
+        experiment8()
 
 def appendToLog(message: str) -> None:
     """
@@ -41,7 +187,7 @@ def appendToLog(message: str) -> None:
         message (str): The message to append.
     """
 
-    with open(f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/data/test.log", "a", encoding="utf8") as log:
+    with open(logFilePath, "a", encoding="utf8") as log:
         log.write(f"{message}\n")
 
 with open(f"{configPath}/traffic-design.json", "r", encoding="utf8") as trafficFile:
@@ -181,162 +327,78 @@ class SFCSolver(Solver):
             fgs, failedFGs, _nodes = sda.run()
             end: float = default_timer()
             executionTime = end - start
+
+            logRow: "list[str]" = []
+            logRow.append(experiment)
             TUI.appendToSolverLog(f"Failed FGs: {len(failedFGs)}")
             TUI.appendToSolverLog(f"Accepted FGs: {len(fgs)}")
-            appendToLog(f"Acceptance Ratio: {len(fgs) / (len(fgs) + len(failedFGs)) * 100:.2f}%")
+            logRow.append(str(len(failedFGs)))
+            logRow.append(str(len(fgs)))
             TUI.appendToSolverLog(f"Acceptance Ratio: {len(fgs) / (len(fgs) + len(failedFGs)) * 100:.2f}%")
-            appendToLog(f"Execution Time: {executionTime:.6f}s")
+            logRow.append(f"{executionTime:.6f}")
             TUI.appendToSolverLog(f"Execution Time: {executionTime:.6f}s")
 
+            TUI.appendToSolverLog(f"Deploying Embedding Graphs.")
             start = default_timer()
             self._orchestrator.sendEmbeddingGraphs(fgs)
             end = default_timer()
-
+            TUI.appendToSolverLog(f"Finished deploying Embedding Graphs.")
             deploymentTime = end - start
 
-            appendToLog(f"Deployment Time: {deploymentTime:.6f}s")
+            logRow.append(f"{deploymentTime:.6f}")
             TUI.appendToSolverLog(f"Deployment Time: {deploymentTime:.6f}s")
+
+            with open(logFilePath, "a", encoding="utf8") as log:
+                log.write(f"{','.join(logRow)}\n")
 
             trafficDuration: int = calculateTrafficDuration(self._trafficGenerator.getDesign()[0])
             TUI.appendToSolverLog(f"Waiting for {trafficDuration}s.")
-            sleep(trafficDuration)
+            time: int = 0
+            telemetry: Telemetry = self._orchestrator.getTelemetry()
+
+            try:
+                while time < trafficDuration:
+                    start: float = default_timer()
+                    hostData: HostData = telemetry.getHostData()
+                    end: float = default_timer()
+                    duration: int = round(end - start, 0)
+                    trafficData: "dict[str, TrafficData]" = self._trafficGenerator.getData(
+                        f"{duration:.0f}s")
+
+                    for key, data in hostData.items():
+                        hostRow: "list[str]" = []
+                        hostRow.append(experiment)
+                        hostRow.append(key)
+
+                        hostRow.append(str(data["cpuUsage"][0]))
+                        hostRow.append(str(data["memoryUsage"][0]/(1024*1024) if data["memoryUsage"][0] != 0 else 0))
+                        hostRow.append(str(duration))
+                        with open(hostDataFilePath, "a", encoding="utf8") as hostDataFile:
+                            hostDataFile.write(f"{','.join(hostRow)}\n")
+
+                    for key, data in trafficData.items():
+                        row: "list[str]" = []
+                        row.append(experiment)
+                        row.append(key)
+                        row.append(str(data["httpReqs"]))
+                        row.append(str(data["averageLatency"]))
+                        row.append(str(duration))
+                        with open(latencyDataFilePath, "a", encoding="utf8") as latencyDataFile:
+                            latencyDataFile.write(f"{','.join(row)}\n")
+
+                    time += duration
+            except Exception as e:
+                TUI.appendToSolverLog("c"+str(e), True)
+
             TUI.appendToSolverLog(f"Finished waiting.")
 
             data: "dict[str, TrafficData]" = self._trafficGenerator.getData(f"{trafficDuration}s")
-            appendToLog("Average latency in each SFC:")
-            TUI.appendToSolverLog("Average latency in each SFC:")
-            for key, value in data.items():
-                appendToLog(f"{key}: {value['averageLatency']:.2f}")
-                TUI.appendToSolverLog(f"{key}: {value['averageLatency']:.2f}")
+
             TUI.appendToSolverLog(f"Finished experiment.")
             sleep(2)
         except Exception as e:
             TUI.appendToSolverLog(str(e), True)
         TUI.exit()
-
-@click.command()
-@click.option("--experiment", type=int, help="The experiment to run.")
-def run(experiment: int) -> None:
-    """
-    Run the Simple Dijkstra Algorithm.
-
-    Parameters:
-        experiment (int): The experiment to run.
-    """
-
-    def runExperiment(fgr: FGR, topology: Topology) -> None:
-        """
-        Run an experiment.
-
-        Parameters:
-            fgr (FGR): The FG Request Generator.
-            topology (Topology): The topology.
-        """
-
-        sfcEm: SFCEmulator = SFCEmulator(fgr, SFCSolver)
-        sfcEm.startTest(topology, trafficDesign)
-        sfcEm.end()
-        appendToLog("--------------------------")
-
-    def experiment1() -> None:
-        """
-        Run Experiment 1.
-        """
-
-        # Experiment 1 - 4 SFCs 0.5
-        appendToLog("SFCs: 4, Topology: 0.5")
-        runExperiment(FGR4SFC, topologyPointFive)
-
-    def experiment2() -> None:
-        """
-        Run Experiment 2.
-        """
-
-        # Experiment 2 - 8 SFCs 0.5
-        appendToLog("SFCs: 8, Topology: 0.5")
-        runExperiment(FGR8SFC, topologyPointFive)
-
-    def experiment3() -> None:
-        """
-        Run Experiment 3.
-        """
-
-        # Experiment 3 - 32 SFCs 0.5
-        appendToLog("SFCs: 32, Topology: 0.5")
-        runExperiment(FGR32SFC, topologyPointFive)
-
-    def experiment4() -> None:
-        """
-        Run Experiment 4.
-        """
-
-        # Experiment 4 - 16 SFCs 0.5
-        appendToLog("SFCs: 16, Topology: 0.5")
-        runExperiment(FGR16SFC, topologyPointFive)
-
-    def experiment5() -> None:
-        """
-        Run Experiment 5.
-        """
-
-        # Experiment 5 - 4 SFCs 1
-        appendToLog("SFCs: 4, Topology: 1")
-        runExperiment(FGR4SFC, topology1)
-
-    def experiment6() -> None:
-        """
-        Run Experiment 6.
-        """
-
-        # Experiment 6 - 8 SFCs 1
-        appendToLog("SFCs: 8, Topology: 1")
-        runExperiment(FGR8SFC, topology1)
-
-    def experiment7() -> None:
-        """
-        Run Experiment 7.
-        """
-
-        # Experiment 7 - 32 SFCs 1
-        appendToLog("SFCs: 32, Topology: 1")
-        runExperiment(FGR32SFC, topology1)
-
-    def experiment8() -> None:
-        """
-        Run Experiment 8.
-        """
-
-        # Experiment 8 - 16 SFCs 1
-        appendToLog("SFCs: 16, Topology: 1")
-        runExperiment(FGR16SFC, topology1)
-
-    if experiment == 1:
-        experiment1()
-    elif experiment == 2:
-        experiment2()
-    elif experiment == 3:
-        experiment3()
-    elif experiment == 4:
-        experiment4()
-    elif experiment == 5:
-        experiment5()
-    elif experiment == 6:
-        experiment6()
-    elif experiment == 7:
-        experiment7()
-    elif experiment == 8:
-        experiment8()
-    else:
-        experiment1()
-        experiment2()
-        experiment3()
-        experiment4()
-        experiment5()
-        experiment6()
-        experiment7()
-        experiment8()
-
-
 
 def getTrafficDesign() -> None:
     """
