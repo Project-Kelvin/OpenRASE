@@ -3,16 +3,14 @@ Defines the class that manipulates the Ryu SDN controller.
 """
 
 from ipaddress import IPv4Address, IPv4Network
+import re
 from threading import Thread
 from typing import Tuple
 from requests import Response
 import requests
 from shared.models.embedding_graph import EmbeddingGraph, ForwardingLink
-from shared.models.topology import Link
 from shared.models.config import Config
 from shared.utils.config import getConfig
-from shared.models.topology import Topology
-from shared.utils.ip import generateIP
 from mininet.node import OVSKernelSwitch
 from utils.ryu import getRyuRestUrl
 from utils.tui import TUI
@@ -29,175 +27,148 @@ class SDNController():
 
         self._switchLinks: "dict[str, IPv4Address]" = {}
 
-    def assignIP(self, ip: IPv4Address, switch: OVSKernelSwitch) -> None:
-        """
-        Assign an IP address to a switch.
-
-        Parameters:
-            ip (str): The IP address to assign.
-            switch (OVSKernelSwitch): The switch to assign the IP address to.
-
-        Raises:
-            RuntimeError: If the IP address could not be assigned.
-        """
-        config: Config = getConfig()
-
-        data = {
-            "address": f"{str(ip)}/{config['ipRange']['mask']}",
-        }
-
-        response: Response = requests.request(
-            method="POST",
-            url=getRyuRestUrl(switch.dpid),
-            json=data,
-            timeout=config["general"]["requestTimeout"]
-        )
-
-        if "failure" in str(response.content):
-            raise RuntimeError(
-                f"Failed to assign IP address {str(ip)} to switch {switch.name}.\n{response.json()}")
-
-    def _installFlow(self, destination: IPv4Network, gateway: IPv4Address, switch: OVSKernelSwitch) -> None:
+    def _installFlow(self, destination: IPv4Network, gateway: int, switch: OVSKernelSwitch, destinationMAC: str = None) -> None:
         """
         Install a flow in a switch.
 
         Parameters:
             destination (IPv4Network): The destination of the flow.
-            gateway (IPv4Address): The gateway of the flow.
+            gateway (int): The gateway of the flow.
             switch (OVSKernelSwitch): The switch to install the flow in.
+            destinationMAC (str): The MAC address of the destination. `None` if the switch is not a host gateway.
 
         Raises:
             RuntimeError: If the flow could not be installed.
         """
 
         config: Config = getConfig()
+        actions: "list[dict]" = [
+            {
+                "port": gateway,
+                "type": "OUTPUT"
+            }
+        ]
+
+        if destinationMAC is not None:
+            actions.insert(0, {
+                "type": "SET_FIELD",
+                "field": "eth_dst",
+                "value": destinationMAC
+            })
 
         data = {
-            "gateway": str(gateway),
-            "destination": str(destination),
+            "dpid": int(self._getSwitchID(switch.name)),
+            "cookie": 1,
+            "cookie_mask": 1,
+            "hard_timeout": 3000,
+            "priority": 1000,
+            "match": {
+                "ipv4_dst": str(destination),
+                "eth_type": 2048
+            },
+            "instructions": [
+                {
+                    "type": "APPLY_ACTIONS",
+                    "actions": actions
+                }
+            ]
         }
 
-        response: Response = requests.request(
-            method="POST",
-            url=getRyuRestUrl(switch.dpid),
-            json=data,
-            timeout=config["general"]["requestTimeout"]
-        )
+        try:
+            response: Response = requests.request(
+                method="POST",
+                url=f"{getRyuRestUrl()}/flowentry/add",
+                json=data,
+                timeout=config["general"]["requestTimeout"]
+            )
 
-        if "failure" in str(response.content):
-            if "Destination overlaps" not in str(response.content):
+            if response.status_code != 200:
                 raise RuntimeError(
+                    f"Failed to install flow in switch {switch.name}.")
+        except Exception:
+            raise RuntimeError(
                     f"Failed to install flow in switch {switch.name}.\n{response.json()}")
 
-    def _deleteFlow(self, destination: IPv4Network, gateway: IPv4Address, switch: OVSKernelSwitch) -> None:
+        TUI.appendToLog(f"      Installed flow from {switch.name} to {destination} via port {gateway}.")
+
+    def _deleteFlow(self, destination: IPv4Network, gateway: int, switch: OVSKernelSwitch, destinationMAC: str = None) -> None:
         """
         Delete a flow in a switch.
 
         Parameters:
             destination (IPv4Network): The destination of the flow.
-            gateway (IPv4Address): The gateway of the flow.
-            switch (OVSKernelSwitch): The switch to delete the flow from.
+            gateway (int): The gateway of the flow.
+            switch (OVSKernelSwitch): The switch to install the flow in.
+            destinationMAC (str): The MAC address of the destination. `None` if the switch is not a host gateway.
 
         Raises:
-            RuntimeError: If the flow could not be deleted.
+            RuntimeError: If the flow could not be installed.
         """
 
-        TUI.appendToLog(f"    Deleting flow from {switch.name} to {destination} via {gateway}")
-        response: Response = requests.request(
-            method="GET",
-            url=getRyuRestUrl(switch.dpid),
-            timeout=getConfig()["general"]["requestTimeout"]
-        )
+        config: Config = getConfig()
+        actions: "list[dict]" = [
+            {
+                "port": gateway,
+                "type": "OUTPUT"
+            }
+        ]
 
-        if "failure" in str(response.content):
+        if destinationMAC is not None:
+            actions.insert(0, {
+                "type": "SET_FIELD",
+                "field": "eth_dst",
+                "value": destinationMAC
+            })
+
+        data = {
+            "dpid": int(self._getSwitchID(switch.name)),
+            "cookie": 1,
+            "cookie_mask": 1,
+            "hard_timeout": 3000,
+            "priority": 1000,
+            "match": {
+                "ipv4_dst": str(destination),
+                "eth_type": 2048
+            },
+            "instructions": [
+                {
+                    "type": "APPLY_ACTIONS",
+                    "actions": actions
+                }
+            ]
+        }
+
+        try:
+            response: Response = requests.request(
+                method="POST",
+                url=f"{getRyuRestUrl()}/flowentry/delete",
+                json=data,
+                timeout=config["general"]["requestTimeout"]
+            )
+            if response.status_code != 200:
+                raise RuntimeError(
+                    f"Failed to delete flow in switch {switch.name}.")
+        except Exception:
             raise RuntimeError(
-                f"Failed to delete flow in switch {switch.name}.\n{response.json()}")
-        else:
-            flows: "list[dict]" = response.json()[0]["internal_network"][0]["route"]
+                    f"Failed to delete flow in switch {switch.name}.")
 
-            for flow in flows:
-                if flow["destination"] == str(destination) and flow["gateway"] == str(gateway):
-                    data = {
-                        "route_id": flow["route_id"]
-                    }
-                    response = requests.request(
-                        method="DELETE",
-                        url=getRyuRestUrl(switch.dpid),
-                        json=data,
-                        timeout=getConfig()["general"]["requestTimeout"]
-                    )
-
-                    if "failure" in str(response.content):
-                        raise RuntimeError(
-                            f"Failed to delete flow in switch {switch.name}.\n{response.json()}")
-
-                    TUI.appendToLog(f"    Deleted flow from {switch.name} to {destination} via {gateway}")
-                    break
-
-    def assignSwitchIPs(self, topology: Topology, switches: "dict[str, OVSKernelSwitch]",
-                        hostIPs: "dict[str, (IPv4Network, IPv4Address, IPv4Address)]",
-                        existingIPs: "list[IPv4Network]") -> None:
-        """
-        Assign IP addresses to the switches in the topology.
-
-        Parameters:
-            topology (Topology): The topology to assign IP addresses to.
-            switches (dict[str, OVSKernelSwitch]): The switches to assign IP addresses to.
-            hostIPs (dict[str, (IPv4Network, IPv4Address, IPv4Address)]):
-                The gateways of the hosts in the topology.
-            existingIPs (list[IPv4Network]): The IP addresses that are already in use.
-        """
-
-        links: "list[Link]" = topology["links"]
-
-        for link in links:
-            if link["source"] in switches and link["destination"] in switches:
-                _networkAddr, addr1, addr2 = generateIP(existingIPs)
-                self.assignIP(addr1, switches[link["source"]])
-                self.assignIP(addr2, switches[link["destination"]])
-                self._switchLinks[f'{link["source"]}-{link["destination"]}'] = addr1
-                self._switchLinks[f'{link["destination"]}-{link["source"]}'] = addr2
-            else:
-                if link["source"] in switches:
-                    self.assignIP(hostIPs[link["destination"]][1], switches[link["source"]])
-                    self._switchLinks[f'{link["source"]}-{link["destination"]}'] = hostIPs[link["destination"]][1]
-                elif link["destination"] in switches:
-                    self.assignIP(hostIPs[link["source"]][1], switches[link["destination"]])
-                    self._switchLinks[f'{link["source"]}-{link["destination"]}'] = hostIPs[link["source"]][1]
-
-    def assignGatewayIP(self, topology: Topology, host: str, ip: IPv4Address,
-                        switches: "dict[str, OVSKernelSwitch]") -> None:
-        """
-        Assign IP addresses to the gateways of the hosts in the topology.
-
-        Parameters:
-            topology (Topology): The topology to assign IP addresses to.
-            host (str): The host to assign the gateway IP address to.
-            ip (IPv4Address): The IP address to assign.
-            switches (dict[str, OVSKernelSwitch]): The switches to assign IP addresses to.
-        """
-
-        links: "list[Link]" = topology["links"]
-
-        for link in links:
-            if link["source"] == host:
-                TUI.appendToLog(f"    Assigning IP {ip} to {switches[link['destination']].name}")
-                self.assignIP(ip, switches[link["destination"]])
-            elif link["destination"] == host:
-                TUI.appendToLog(f"    Assigning IP {ip} to {switches[link['source']].name}")
-                self.assignIP(ip, switches[link["source"]])
+        TUI.appendToLog(f"      Deleted flow from {switch.name} to {destination} via port {gateway}.")
 
     def installFlows(self, eg: EmbeddingGraph,
-                     vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]",
-                     switches: "dict[str, OVSKernelSwitch]") -> EmbeddingGraph:
+                     vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address]]",
+                     switches: "dict[str, OVSKernelSwitch]",
+                     linkedPorts: "dict[str, tuple[int, int]]",
+                     hostMACs: "dict[str, str]") -> EmbeddingGraph:
         """
         Install flows in the switches in the topology.
 
         Parameters:
             eg (EmbeddingGraph): The embedding graph to install flows in.
-            vnfHosts (dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
+            vnfHosts (dict[str, Tuple[IPv4Network, IPv4Address]]):
             The hosts of the VNFs in the embedding graph.
             switches (dict[str, OVSKernelSwitch]"): The switches to install flows in.
+            linkedPorts (dict[str, tuple[int, int]]): The ports that are linked between switches.
+            hostMACs (dict[str, str]): The MAC addresses of the hosts in the topology.
 
         Returns:
             EmbeddingGraph: The embedding graph with the flows installed.
@@ -207,54 +178,74 @@ class SDNController():
 
         for link in links:
             sourceNetwork: IPv4Network = vnfHosts[link["source"]["id"]][0]
-            link["source"]["ip"] = str(vnfHosts[link["source"]["id"]][2])
+            link["source"]["ip"] = str(vnfHosts[link["source"]["id"]][1])
             destinationNetwork: IPv4Network = vnfHosts[link["destination"]["id"]][0]
-            link["destination"]["ip"] = str(vnfHosts[link["destination"]["id"]][2])
+            link["destination"]["ip"] = str(vnfHosts[link["destination"]["id"]][1])
 
             for index, switch in enumerate(link["links"]):
                 nextSwitch: str = link["links"][index + 1] if index < len(link["links"]) - 1 else None
                 prevSwitch: str = link["links"][index - 1] if index > 0 else None
 
-                if nextSwitch is not None:
-                    self._installFlow(destinationNetwork, self._switchLinks[f"{nextSwitch}-{switch}"],
-                                     switches[switch])
-                if prevSwitch is not None:
-                    self._installFlow(sourceNetwork, self._switchLinks[f"{prevSwitch}-{switch}"],
-                                     switches[switch])
+                if nextSwitch is None:
+                    self._installFlow(destinationNetwork, linkedPorts[f"{switch}-{link['destination']['id']}"][0],
+                                        switches[switch], hostMACs[link["destination"]["id"]])
+                else:
+                    self._installFlow(destinationNetwork, linkedPorts[f"{switch}-{nextSwitch}"][0],
+                                        switches[switch])
+                if prevSwitch is None:
+                    self._installFlow(sourceNetwork, linkedPorts[f"{switch}-{link['source']['id']}"][0],
+                                        switches[switch], hostMACs[link["source"]["id"]])
+                else:
+                    self._installFlow(sourceNetwork, linkedPorts[f"{switch}-{prevSwitch}"][0],
+                                        switches[switch])
 
         return eg
 
     def deleteFlows(self, eg: EmbeddingGraph,
-                     vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]",
-                     switches: "dict[str, OVSKernelSwitch]") -> None:
+                     vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address]]",
+                     switches: "dict[str, OVSKernelSwitch]",
+                     linkedPorts: "dict[str, tuple[int, int]]",
+                     hostMACs: "dict[str, str]") -> EmbeddingGraph:
         """
         Delete flows in the switches in the topology.
 
         Parameters:
-            eg (EmbeddingGraph): The embedding graph to delete flows from.
-            vnfHosts (dict[str, Tuple[IPv4Network, IPv4Address, IPv4Address]]):
+            eg (EmbeddingGraph): The embedding graph to install flows in.
+            vnfHosts (dict[str, Tuple[IPv4Network, IPv4Address]]):
             The hosts of the VNFs in the embedding graph.
-            switches (dict[str, OVSKernelSwitch]"): The switches to delete flows from.
+            switches (dict[str, OVSKernelSwitch]"): The switches to install flows in.
+            linkedPorts (dict[str, tuple[int, int]]): The ports that are linked between switches.
+            hostMACs (dict[str, str]): The MAC addresses of the hosts in the topology.
+
+        Returns:
+            EmbeddingGraph: The embedding graph with the flows installed.
         """
 
         links: "list[ForwardingLink]" = eg["links"]
 
         for link in links:
             sourceNetwork: IPv4Network = vnfHosts[link["source"]["id"]][0]
+            link["source"]["ip"] = str(vnfHosts[link["source"]["id"]][1])
             destinationNetwork: IPv4Network = vnfHosts[link["destination"]["id"]][0]
+            link["destination"]["ip"] = str(vnfHosts[link["destination"]["id"]][1])
 
             for index, switch in enumerate(link["links"]):
-                nextSwitch: str = link["links"][index +
-                                                1] if index < len(link["links"]) - 1 else None
-                prevSwitch: str = link["links"][index -
-                                                1] if index > 0 else None
+                nextSwitch: str = link["links"][index + 1] if index < len(link["links"]) - 1 else None
+                prevSwitch: str = link["links"][index - 1] if index > 0 else None
 
-                if nextSwitch is not None:
-                    self._deleteFlow(destinationNetwork, self._switchLinks[f"{nextSwitch}-{switch}"],
-                                      switches[switch])
-                if prevSwitch is not None:
-                    self._deleteFlow(sourceNetwork, self._switchLinks[f"{prevSwitch}-{switch}"],
-                                      switches[switch])
+                if nextSwitch is None:
+                    self._deleteFlow(destinationNetwork, linkedPorts[f"{switch}-{link['destination']['id']}"][0],
+                                        switches[switch], hostMACs[link["destination"]["id"]])
+                else:
+                    self._deleteFlow(destinationNetwork, linkedPorts[f"{switch}-{nextSwitch}"][0],
+                                        switches[switch])
+                if prevSwitch is None:
+                    self._deleteFlow(sourceNetwork, linkedPorts[f"{switch}-{link['source']['id']}"][0],
+                                        switches[switch], hostMACs[link["source"]["id"]])
+                else:
+                    self._deleteFlow(sourceNetwork, linkedPorts[f"{switch}-{prevSwitch}"][0],
+                                        switches[switch])
+
 
     def waitTillReady(self, switches: "dict[str, OVSKernelSwitch]" ) -> None:
         """
@@ -274,12 +265,13 @@ class SDNController():
                 try:
                     response: Response = requests.request(
                         method="GET",
-                        url=getRyuRestUrl(switch.dpid),
+                        url=f"{getRyuRestUrl()}/flow/{self._getSwitchID(switch.name)}",
                         timeout=config["general"]["requestTimeout"]
                     )
-                    if "failure" not in str(response.content):
+
+                    if response.status_code == 200:
                         isReady = True
-                        TUI.appendToLog(f"  {switch.name} is ready.")                        
+                        TUI.appendToLog(f"  {switch.name} is ready.")
                 except:
                     pass
 
@@ -290,3 +282,16 @@ class SDNController():
 
         for thread in threads:
             thread.join()
+
+    def _getSwitchID(self, name: str) -> int:
+        """
+        Get the ID of a switch.
+
+        Parameters:
+            name (str): The name of the switch.
+
+        Returns:
+            int: The ID of the switch.
+        """
+
+        return int(re.findall(r'\d+', name)[0])
