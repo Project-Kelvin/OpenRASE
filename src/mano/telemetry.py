@@ -217,7 +217,6 @@ class Telemetry(Subscriber):
 
             if host["id"] in self._vnfsInHosts and len(self._vnfsInHosts[host["id"]]) > 0:
                 for vnf in self._vnfsInHosts[host["id"]]:
-                    t = default_timer()
                     container: Container = dindClient.containers.get(
                         vnf["name"])
                     stats: Future = executor.submit(
