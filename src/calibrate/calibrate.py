@@ -293,23 +293,22 @@ class Calibrate:
                             trafficData: "dict[str, TrafficData]" = self._trafficGenerator.getData(
                                 f"{duration:.0f}s")
                             row = []
+                            data = list(hostData.items())[0][1]
+                            row.append(data["cpuUsage"][0])
+                            row.append(data["memoryUsage"][0]/(1024*1024) if data["memoryUsage"][0] != 0 else 0)
+                            row.append(data["networkUsage"][0])
+                            row.append(data["networkUsage"][1])
 
-                            for _key, data in hostData.items():
-                                row.append(data["cpuUsage"][0])
-                                row.append(data["memoryUsage"][0]/(1024*1024) if data["memoryUsage"][0] != 0 else 0)
-                                row.append(data["networkUsage"][0])
-                                row.append(data["networkUsage"][1])
+                            if data["networkUsage"][0] == 0 or data["networkUsage"][1] == 0:
+                                row.append(0)
+                            else:
+                                row.append((data["networkUsage"][0]/data["networkUsage"][1]))
 
-                                if data["networkUsage"][0] == 0 or data["networkUsage"][1] == 0:
-                                    row.append(0)
-                                else:
-                                    row.append((data["networkUsage"][0]/data["networkUsage"][1]))
-
-                                httpReqs: int = trafficData[eg["sfcID"]]["httpReqs"] if eg["sfcID"] in trafficData else 0
-                                averageLatency: float = trafficData[eg["sfcID"]]["averageLatency"] if eg["sfcID"] in trafficData else 0
-                                httpReqsRate: float = httpReqs / duration if httpReqs != 0 or duration !=0 else 0
-                                row.append(httpReqsRate)
-                                row.append(averageLatency)
+                            httpReqs: int = trafficData[eg["sfcID"]]["httpReqs"] if eg["sfcID"] in trafficData else 0
+                            averageLatency: float = trafficData[eg["sfcID"]]["averageLatency"] if eg["sfcID"] in trafficData else 0
+                            httpReqsRate: float = httpReqs / duration if httpReqs != 0 or duration !=0 else 0
+                            row.append(httpReqsRate)
+                            row.append(averageLatency)
 
                             TUI.appendToSolverLog(f"{httpReqsRate} requests took {averageLatency} seconds on average.")
 
