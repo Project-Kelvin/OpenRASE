@@ -34,9 +34,9 @@ configPath: str = f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algori
 
 topology1: Topology = generateFatTreeTopology(4, 1000, 1, None)
 topologyPointFive: Topology = generateFatTreeTopology(4, 1000, 0.5, None)
-logFilePath: str = f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/data/experiments.csv"
-hostDataFilePath: str = f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/data/host_data.csv"
-latencyDataFilePath: str = f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/data/latency_data.csv"
+logFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm/experiments.csv"
+hostDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm/host_data.csv"
+latencyDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm/latency_data.csv"
 
 with open(logFilePath, "w", encoding="utf8") as log:
     log.write("Experiment,Failed FGs,Accepted FGs,Execution Time,Deployment Time\n")
