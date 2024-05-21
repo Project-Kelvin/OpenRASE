@@ -34,7 +34,7 @@ from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
 
 
-EPOCHS: int = 1000
+EPOCHS: int = 6000
 
 class Calibrate:
     """
@@ -162,6 +162,7 @@ class Calibrate:
             epochs (int): The number of epochs to train the model for.
         """
 
+        epochs = epochs if epochs is not None else EPOCHS
         if not train:
 
             if not os.path.exists(f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"):

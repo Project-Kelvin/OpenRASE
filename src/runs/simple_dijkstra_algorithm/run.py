@@ -100,6 +100,7 @@ def run(experiment: int) -> None:
         """
 
         # Experiment 3 - 32 SFCs 0.5
+        global experiment
         experiment = "SFCs:32-Topology:0.5"
         runExperiment(FGR32SFC, topologyPointFive)
 
@@ -140,7 +141,7 @@ def run(experiment: int) -> None:
 
         # Experiment 7 - 32 SFCs 1
         global experiment
-        experiment = "SFCs:22-Topology:1"
+        experiment = "SFCs:32-Topology:1"
         runExperiment(FGR32SFC, topology1)
 
     def experiment8() -> None:
@@ -251,14 +252,12 @@ class FGR32SFC(FGR):
             copiedFG4: EmbeddingGraph = copy.deepcopy(fg)
             copiedFG5: EmbeddingGraph = copy.deepcopy(fg)
             copiedFG6: EmbeddingGraph = copy.deepcopy(fg)
-            copiedFG7: EmbeddingGraph = copy.deepcopy(fg)
             copiedFG1["sfcrID"] = f"sfc{index}-2"
             copiedFG2["sfcrID"] = f"sfc{index}-3"
             copiedFG3["sfcrID"] = f"sfc{index}-4"
             copiedFG4["sfcrID"] = f"sfc{index}-5"
             copiedFG5["sfcrID"] = f"sfc{index}-6"
             copiedFG6["sfcrID"] = f"sfc{index}-7"
-            copiedFG7["sfcrID"] = f"sfc{index}-8"
             copiedFGs.append(copiedFG)
             copiedFGs.append(copiedFG1)
             copiedFGs.append(copiedFG2)
@@ -266,7 +265,6 @@ class FGR32SFC(FGR):
             copiedFGs.append(copiedFG4)
             copiedFGs.append(copiedFG5)
             copiedFGs.append(copiedFG6)
-            copiedFGs.append(copiedFG7)
 
         self._fgs.extend(copiedFGs)
 

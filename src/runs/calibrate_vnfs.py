@@ -11,7 +11,7 @@ import click
 @click.option("--vnf", default="", help="The VNF to calibrate.")
 @click.option("--metric", default = "", help="The metric to calibrate.")
 @click.option("--train", default = False, is_flag=True, help="If set, only ML training would be performed on existing data.")
-@click.option("--epochs", default = 1000, help="The number of epochs to train the model.")
+@click.option("--epochs", help="The number of epochs to train the model.")
 def run(algorithm: str, vnf: str, metric: str, train: bool, epochs: int) -> None:
     """
     Run the calibration.
