@@ -28,9 +28,16 @@ from utils.topology import generateFatTreeTopology
 from utils.traffic_design import calculateTrafficDuration, generateTrafficDesign
 import click
 from utils.tui import TUI
+import os
 
 config: Config = getConfig()
 configPath: str = f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/configs"
+
+
+directory = f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm"
+
+if not os.path.exists(directory):
+    os.makedirs(directory)
 
 topology1: Topology = generateFatTreeTopology(4, 1000, 1, None)
 topologyPointFive: Topology = generateFatTreeTopology(4, 1000, 0.5, None)
@@ -39,13 +46,13 @@ hostDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/sim
 latencyDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm/latency_data.csv"
 
 with open(logFilePath, "w", encoding="utf8") as log:
-    log.write("Experiment,Failed FGs,Accepted FGs,Execution Time,Deployment Time\n")
+    log.write("experiment,failed_fgs,accepted_fgs,execution_time,deployment_time\n")
 
 with open(hostDataFilePath, "w", encoding="utf8") as hostData:
-    hostData.write("Experiment,Host,CPU,Memory,Duration\n")
+    hostData.write("experiment,host,cpu,memory,duration\n")
 
 with open(latencyDataFilePath, "w", encoding="utf8") as latencyData:
-    latencyData.write("Experiment,SFC,Requests,Average Latency,Duration\n")
+    latencyData.write("experiment,sfc,requests,average_latency,duration\n")
 
 experiment: str = ""
 
@@ -71,6 +78,7 @@ def run(experiment: int) -> None:
         global experiment
         sfcEm: SFCEmulator = SFCEmulator(fgr, SFCSolver)
         sfcEm.startTest(topology, trafficDesign)
+        sfcEm.startCLI()
         sfcEm.end()
         experiment = ""
 
@@ -374,6 +382,7 @@ class SFCSolver(Solver):
                         with open(hostDataFilePath, "a", encoding="utf8") as hostDataFile:
                             hostDataFile.write(f"{','.join(hostRow)}\n")
 
+                    TUI.appendToSolverLog(str(len(trafficData)))
                     for key, data in trafficData.items():
                         row: "list[str]" = []
                         row.append(experiment)
@@ -381,6 +390,7 @@ class SFCSolver(Solver):
                         row.append(str(data["httpReqs"]))
                         row.append(str(data["averageLatency"]))
                         row.append(str(duration))
+                        TUI.appendToSolverLog(str(data["averageLatency"]))
                         with open(latencyDataFilePath, "a", encoding="utf8") as latencyDataFile:
                             latencyDataFile.write(f"{','.join(row)}\n")
 
