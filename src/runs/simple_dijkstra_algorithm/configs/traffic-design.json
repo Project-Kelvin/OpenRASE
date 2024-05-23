@@ -1,6 +1,674 @@
 [
     {
         "target": 92,
-        "duration": "1m"
+        "duration": "4s"
+    },
+    {
+        "target": 117,
+        "duration": "4s"
+    },
+    {
+        "target": 94,
+        "duration": "4s"
+    },
+    {
+        "target": 91,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 95,
+        "duration": "4s"
+    },
+    {
+        "target": 96,
+        "duration": "4s"
+    },
+    {
+        "target": 97,
+        "duration": "4s"
+    },
+    {
+        "target": 97,
+        "duration": "4s"
+    },
+    {
+        "target": 97,
+        "duration": "4s"
+    },
+    {
+        "target": 97,
+        "duration": "4s"
+    },
+    {
+        "target": 97,
+        "duration": "4s"
+    },
+    {
+        "target": 95,
+        "duration": "4s"
+    },
+    {
+        "target": 94,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 90,
+        "duration": "4s"
+    },
+    {
+        "target": 90,
+        "duration": "4s"
+    },
+    {
+        "target": 90,
+        "duration": "4s"
+    },
+    {
+        "target": 86,
+        "duration": "4s"
+    },
+    {
+        "target": 74,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 66,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 67,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 70,
+        "duration": "4s"
+    },
+    {
+        "target": 71,
+        "duration": "4s"
+    },
+    {
+        "target": 71,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 68,
+        "duration": "4s"
+    },
+    {
+        "target": 69,
+        "duration": "4s"
+    },
+    {
+        "target": 71,
+        "duration": "4s"
+    },
+    {
+        "target": 72,
+        "duration": "4s"
+    },
+    {
+        "target": 78,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 95,
+        "duration": "4s"
+    },
+    {
+        "target": 95,
+        "duration": "4s"
+    },
+    {
+        "target": 95,
+        "duration": "4s"
+    },
+    {
+        "target": 95,
+        "duration": "4s"
+    },
+    {
+        "target": 95,
+        "duration": "4s"
+    },
+    {
+        "target": 95,
+        "duration": "4s"
+    },
+    {
+        "target": 95,
+        "duration": "4s"
+    },
+    {
+        "target": 95,
+        "duration": "4s"
+    },
+    {
+        "target": 95,
+        "duration": "4s"
+    },
+    {
+        "target": 94,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 93,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
+    },
+    {
+        "target": 92,
+        "duration": "4s"
     }
 ]
