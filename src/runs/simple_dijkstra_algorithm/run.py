@@ -382,7 +382,6 @@ class SFCSolver(Solver):
                         with open(hostDataFilePath, "a", encoding="utf8") as hostDataFile:
                             hostDataFile.write(f"{','.join(hostRow)}\n")
 
-                    TUI.appendToSolverLog(str(len(trafficData)))
                     for key, data in trafficData.items():
                         row: "list[str]" = []
                         row.append(experiment)
@@ -390,7 +389,7 @@ class SFCSolver(Solver):
                         row.append(str(data["httpReqs"]))
                         row.append(str(data["averageLatency"]))
                         row.append(str(duration))
-                        TUI.appendToSolverLog(str(data["averageLatency"]))
+                        TUI.appendToSolverLog(f"{key}: {str(data['averageLatency'])}")
                         with open(latencyDataFilePath, "a", encoding="utf8") as latencyDataFile:
                             latencyDataFile.write(f"{','.join(row)}\n")
 
