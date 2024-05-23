@@ -88,7 +88,7 @@ def rx() -> Response:
 
     # pylint: disable=broad-except
     except Exception as e:
-        return f"The SFF running on\n {', '.join(hosts)} encountered:\n{str(e)}\n{str(request.headers)}", 400
+        return f"The rx endpoint of SFF running on\n {', '.join(hosts)} encountered:\n{str(e)}\n{str(request.headers)}", 400
 
 
 @app.route("/tx", strict_slashes=False)
@@ -146,11 +146,10 @@ def tx() -> Response:
         headers[SFC_HEADER] = sfcBase64
         headers[SFC_TRAVERSED_HEADER] = sfcTraversed
 
-        source = source.SourceAddressAdapter(sourceIPAddress)
-
         response: Response = None
         with requests.Session() as session:
-            session.mount("http://", source)
+            #sourceAdapter = source.SourceAddressAdapter(sourceIPAddress)
+            #session.mount("http://", sourceAdapter)
             response: Response = session.request(
                 method=request.method,
                 url=request.url.replace(f'{request.host_url}tx', nextDest),
@@ -165,7 +164,7 @@ def tx() -> Response:
 
     # pylint: disable=broad-except
     except Exception as e:
-        return f"The SFF running on\n {', '.join(hosts)} encountered: \n" + str(e), 400
+        return f"The rx endpoint of SFF running on\n {', '.join(hosts)} encountered:\n{str(e)}\n{str(request.headers)}", 400
 
 
 @app.route("/add-host", methods=["POST"], strict_slashes=False)
