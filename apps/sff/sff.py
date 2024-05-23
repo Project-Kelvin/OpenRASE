@@ -15,7 +15,7 @@ from shared.utils.config import getConfig
 from shared.utils.ip import checkIPBelongsToNetwork
 from flask import Flask, Response, request, Request
 import requests
-
+from requests_toolbelt.adapters import source
 
 app: Flask = Flask(__name__)
 config: Config = getConfig()
@@ -88,7 +88,7 @@ def rx() -> Response:
 
     # pylint: disable=broad-except
     except Exception as e:
-        return str(e), 400
+        return f"The SFF running on\n {', '.join(hosts)} encountered:\n{str(e)}\n{str(request.headers)}", 400
 
 
 @app.route("/tx", strict_slashes=False)
@@ -113,6 +113,7 @@ def tx() -> Response:
         sfcUpdated: VNF = sfc.copy()
         del sfcUpdated["next"]
         sfcTraversed.append(sfcUpdated)
+        sourceIPAddress: str = sfcUpdated["host"]["ip"]
 
         # Handles branching of SFC.
         if isinstance(sfc["next"], list):
@@ -145,21 +146,26 @@ def tx() -> Response:
         headers[SFC_HEADER] = sfcBase64
         headers[SFC_TRAVERSED_HEADER] = sfcTraversed
 
-        response = requests.request(
-            method=request.method,
-            url=request.url.replace(f'{request.host_url}tx', nextDest),
-            headers=headers,
-            data=request.get_data(),
-            cookies=request.cookies,
-            allow_redirects=False,
-            timeout=config["general"]["requestTimeout"]
-        )
+        source = source.SourceAddressAdapter(sourceIPAddress)
+
+        response: Response = None
+        with requests.Session() as session:
+            session.mount("http://", source)
+            response: Response = session.request(
+                method=request.method,
+                url=request.url.replace(f'{request.host_url}tx', nextDest),
+                headers=headers,
+                data=request.get_data(),
+                cookies=request.cookies,
+                allow_redirects=False,
+                timeout=config["general"]["requestTimeout"]
+            )
 
         return Response(response, status=response.status_code)
 
     # pylint: disable=broad-except
     except Exception as e:
-        return str(e), 400
+        return f"The SFF running on\n {', '.join(hosts)} encountered: \n" + str(e), 400
 
 
 @app.route("/add-host", methods=["POST"], strict_slashes=False)
