@@ -78,7 +78,6 @@ def run(experiment: int) -> None:
         global experiment
         sfcEm: SFCEmulator = SFCEmulator(fgr, SFCSolver)
         sfcEm.startTest(topology, trafficDesign)
-        sfcEm.startCLI()
         sfcEm.end()
         experiment = ""
 
