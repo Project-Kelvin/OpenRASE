@@ -148,8 +148,10 @@ def tx() -> Response:
 
         response: Response = None
         with requests.Session() as session:
-            #sourceAdapter = source.SourceAddressAdapter(sourceIPAddress)
-            #session.mount("http://", sourceAdapter)
+            if sfcUpdated["host"]["id"] != sfc["host"]["id"]:
+                sourceAdapter = source.SourceAddressAdapter(sourceIPAddress)
+                session.mount("http://", sourceAdapter)
+
             response: Response = session.request(
                 method=request.method,
                 url=request.url.replace(f'{request.host_url}tx', nextDest),
