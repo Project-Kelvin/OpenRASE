@@ -97,7 +97,7 @@ def default():
 
     # pylint: disable=broad-except
     except Exception as exception:
-        return str(exception), 400
+        return "The SFCC encountered:\n"+ str(exception), 400
 
 
 if __name__ == "__main__":

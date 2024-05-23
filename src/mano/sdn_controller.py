@@ -87,7 +87,7 @@ class SDNController():
                     f"Failed to install flow in switch {switch.name}.")
         except Exception:
             raise RuntimeError(
-                    f"Failed to install flow in switch {switch.name}.\n{response.json()}")
+                    f"Failed to install flow in switch {switch.name}.\n{response.content}")
 
         TUI.appendToLog(f"      Installed flow from {switch.name} to {destination} via port {gateway}.")
 
