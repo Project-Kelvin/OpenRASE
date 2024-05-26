@@ -4,8 +4,10 @@ Defines the TrafficGenerator class.
 
 from datetime import datetime
 import json
+import os
 import random
-from time import sleep
+from threading import Thread
+from time import sleep, time
 from typing import Any
 from jinja2 import Template, TemplateSyntaxError
 from shared.models.config import Config
@@ -20,6 +22,7 @@ from mano.notification_system import NotificationSystem, Subscriber
 from models.traffic_generator import TrafficData
 from utils.container import connectToDind, getContainerIP, waitTillContainerReady
 from docker import DockerClient, from_env, errors
+from docker.models.containers import Container
 from utils.tui import TUI
 
 
@@ -33,7 +36,7 @@ INFLUX_DB_CONFIG = {
 }
 INFLUXDB: str = "influxdb"
 K6: str = "K6"
-
+logsPath: str = f"{getConfig()['repoAbsolutePath']}/artifacts/logs/traffic"
 
 class TrafficGenerator(Subscriber):
     """
@@ -53,6 +56,9 @@ class TrafficGenerator(Subscriber):
 
         NotificationSystem.subscribe(EMBEDDING_GRAPH_DEPLOYED, self)
         NotificationSystem.subscribe(EMBEDDING_GRAPH_DELETED, self)
+
+        if not os.path.exists(logsPath):
+            os.makedirs(logsPath)
 
     def startParentContainer(self) -> None:
         """
@@ -170,8 +176,13 @@ class TrafficGenerator(Subscriber):
                                       })
         self._tgClient.containers.get(name).exec_run(
             ["sh", "-c", f"echo '{outputFileContent}' > script.js"])
-        self._tgClient.containers.get(name).exec_run(
-            f"k6 run -e MY_HOSTNAME={getContainerIP(SFCC)} -e SFC_ID={sfcID} script.js", detach=True)
+        logs: Any = self._tgClient.containers.get(name).exec_run(
+            f"k6 run -e MY_HOSTNAME={getContainerIP(SFCC)} -e SFC_ID={sfcID} script.js", detach=False)
+
+        for log in logs:
+            with open(f"{logsPath}/{name}-{time()}.log", "a", encoding="utf8") as logFile:
+                logFile.write(f"{log}\n")
+
         TUI.appendToLog(f"  Traffic generation started for SFC {sfcID}.")
 
     def _stopTrafficGeneration(self, sfcID: str) -> None:
@@ -228,7 +239,8 @@ class TrafficGenerator(Subscriber):
     def receiveNotification(self, topic, *args: "list[Any]") -> None:
         if topic == EMBEDDING_GRAPH_DEPLOYED:
             eg: EmbeddingGraph = args[0]
-            self._generateTraffic(eg["sfcID"])
+            thread: Thread = Thread(target=self._generateTraffic, args=(eg["sfcID"],))
+            thread.start()
         elif topic == EMBEDDING_GRAPH_DELETED:
             eg: EmbeddingGraph = args[0]
             self._stopTrafficGeneration(eg["sfcID"])
