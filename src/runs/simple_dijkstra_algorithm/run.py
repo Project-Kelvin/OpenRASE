@@ -55,6 +55,7 @@ with open(latencyDataFilePath, "w", encoding="utf8") as latencyData:
     latencyData.write("experiment,sfc,requests,average_latency,duration\n")
 
 experiment: str = ""
+expName: str = ""
 
 @click.command()
 @click.option("--experiment", type=int, help="The experiment to run.")
@@ -88,6 +89,8 @@ def run(experiment: int) -> None:
 
         # Experiment 1 - 4 SFCs 0.5
         global experiment
+        global expName
+        expName = "one"
         experiment = "SFCs:4-Topology:0.5"
         runExperiment(FGR4SFC, topologyPointFive)
 
@@ -98,6 +101,8 @@ def run(experiment: int) -> None:
 
         # Experiment 2 - 8 SFCs 0.5
         global experiment
+        global expName
+        expName = "two"
         experiment = "SFCs:8-Topology:0.5"
         runExperiment(FGR8SFC, topologyPointFive)
 
@@ -108,6 +113,8 @@ def run(experiment: int) -> None:
 
         # Experiment 3 - 32 SFCs 0.5
         global experiment
+        global expName
+        expName = "three"
         experiment = "SFCs:32-Topology:0.5"
         runExperiment(FGR32SFC, topologyPointFive)
 
@@ -118,6 +125,8 @@ def run(experiment: int) -> None:
 
         # Experiment 4 - 16 SFCs 0.5
         global experiment
+        global expName
+        expName = "four"
         experiment = "SFCs:16-Topology:0.5"
         runExperiment(FGR16SFC, topologyPointFive)
 
@@ -128,6 +137,8 @@ def run(experiment: int) -> None:
 
         # Experiment 5 - 4 SFCs 1
         global experiment
+        global expName
+        expName = "five"
         experiment = "SFCs:4-Topology:1"
         runExperiment(FGR4SFC, topology1)
 
@@ -138,6 +149,8 @@ def run(experiment: int) -> None:
 
         # Experiment 6 - 8 SFCs 1
         global experiment
+        global expName
+        expName = "six"
         experiment = "SFCs:8-Topology:1"
         runExperiment(FGR8SFC, topology1)
 
@@ -148,6 +161,8 @@ def run(experiment: int) -> None:
 
         # Experiment 7 - 32 SFCs 1
         global experiment
+        global expName
+        expName = "seven"
         experiment = "SFCs:32-Topology:1"
         runExperiment(FGR32SFC, topology1)
 
@@ -158,6 +173,8 @@ def run(experiment: int) -> None:
 
         # Experiment 8 - 16 SFCs 1
         global experiment
+        global expName
+        expName = "eight"
         experiment = "SFCs:16-Topology:1"
         runExperiment(FGR16SFC, topology1)
 
@@ -178,14 +195,15 @@ def run(experiment: int) -> None:
     elif experiment == 8:
         experiment8()
     else:
-        experiment1()
-        experiment2()
-        experiment3()
-        experiment4()
         experiment5()
         experiment6()
         experiment7()
         experiment8()
+        experiment1()
+        experiment2()
+        experiment3()
+        experiment4()
+
 
 def appendToLog(message: str) -> None:
     """
@@ -222,7 +240,7 @@ class FGR4SFC(FGR):
 
     def generateRequests(self) -> None:
         for index, fg in enumerate(self._fgs):
-            fg["sfcrID"] = f"sfc{index}"
+            fg["sfcrID"] = f"sfc{index}-{expName}"
 
         self._orchestrator.sendRequests(self._fgs)
 
@@ -234,12 +252,12 @@ class FGR8SFC(FGR):
     def generateRequests(self) -> None:
         copiedFGs: "list[EmbeddingGraph]" = []
         for index, fg in enumerate(self._fgs):
-            fg["sfcrID"] = f"sfc{index}-1"
-            copiedFG: EmbeddingGraph = copy.deepcopy(fg)
-            copiedFG["sfcrID"] = f"sfc{index}-2"
-            copiedFGs.append(copiedFG)
+            for i in range(0, 2):
+                copiedFG: EmbeddingGraph = copy.deepcopy(fg)
+                copiedFG["sfcrID"] = f"sfc{index}-{i}-{expName}"
+                copiedFGs.append(copiedFG)
 
-        self._fgs.extend(copiedFGs)
+        self._fgs = copiedFGs
 
         self._orchestrator.sendRequests(self._fgs)
 
@@ -251,29 +269,12 @@ class FGR32SFC(FGR):
     def generateRequests(self) -> None:
         copiedFGs: "list[EmbeddingGraph]" = []
         for index, fg in enumerate(self._fgs):
-            fg["sfcrID"] = f"sfc{index}-1"
-            copiedFG: EmbeddingGraph = copy.deepcopy(fg)
-            copiedFG1: EmbeddingGraph = copy.deepcopy(fg)
-            copiedFG2: EmbeddingGraph = copy.deepcopy(fg)
-            copiedFG3: EmbeddingGraph = copy.deepcopy(fg)
-            copiedFG4: EmbeddingGraph = copy.deepcopy(fg)
-            copiedFG5: EmbeddingGraph = copy.deepcopy(fg)
-            copiedFG6: EmbeddingGraph = copy.deepcopy(fg)
-            copiedFG1["sfcrID"] = f"sfc{index}-2"
-            copiedFG2["sfcrID"] = f"sfc{index}-3"
-            copiedFG3["sfcrID"] = f"sfc{index}-4"
-            copiedFG4["sfcrID"] = f"sfc{index}-5"
-            copiedFG5["sfcrID"] = f"sfc{index}-6"
-            copiedFG6["sfcrID"] = f"sfc{index}-7"
-            copiedFGs.append(copiedFG)
-            copiedFGs.append(copiedFG1)
-            copiedFGs.append(copiedFG2)
-            copiedFGs.append(copiedFG3)
-            copiedFGs.append(copiedFG4)
-            copiedFGs.append(copiedFG5)
-            copiedFGs.append(copiedFG6)
+            for i in range(0, 8):
+                copiedFG: EmbeddingGraph = copy.deepcopy(fg)
+                copiedFG["sfcrID"] = f"sfc{index}-{i}-{expName}"
+                copiedFGs.append(copiedFG)
 
-        self._fgs.extend(copiedFGs)
+        self._fgs = copiedFGs
 
         self._orchestrator.sendRequests(self._fgs)
 
@@ -285,18 +286,12 @@ class FGR16SFC(FGR):
     def generateRequests(self) -> None:
         copiedFGs: "list[EmbeddingGraph]" = []
         for index, fg in enumerate(self._fgs):
-            fg["sfcrID"] = f"sfc{index}-1"
-            copiedFG: EmbeddingGraph = copy.deepcopy(fg)
-            copiedFG1: EmbeddingGraph = copy.deepcopy(fg)
-            copiedFG2: EmbeddingGraph = copy.deepcopy(fg)
-            copiedFG["sfcrID"] = f"sfc{index}-2"
-            copiedFG1["sfcrID"] = f"sfc{index}-3"
-            copiedFG2["sfcrID"] = f"sfc{index}-4"
-            copiedFGs.append(copiedFG)
-            copiedFGs.append(copiedFG1)
-            copiedFGs.append(copiedFG2)
+            for i in range(0, 4):
+                copiedFG: EmbeddingGraph = copy.deepcopy(fg)
+                copiedFG["sfcrID"] = f"sfc{index}-{i}-{expName}"
+                copiedFGs.append(copiedFG)
 
-        self._fgs.extend(copiedFGs)
+        self._fgs = copiedFGs
 
         self._orchestrator.sendRequests(self._fgs)
 
