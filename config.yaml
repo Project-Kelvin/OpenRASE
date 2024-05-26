@@ -13,7 +13,7 @@ sff:
 
 k6:
   vus: 10
-  maxVus: 100
+  maxVus: 500
   timeUnit: 1s
   startRate: 0
   executor: ramping-arrival-rate
