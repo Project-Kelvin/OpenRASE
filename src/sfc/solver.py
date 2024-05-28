@@ -38,8 +38,6 @@ class Solver(ABC):
         TUI.appendToLog(f"Receiving {len(requests)} requests:")
         for request in requests:
             TUI.appendToLog(f"  {request['sfcrID']}")
-
-        for request in requests:
             self._requests.put(request)
 
     @abstractmethod
