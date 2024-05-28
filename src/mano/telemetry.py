@@ -23,7 +23,7 @@ from shared.utils.container import doesContainerExist
 from mininet.net import Mininet
 from mininet.util import quietRun
 from constants.container import MININET_PREFIX
-from constants.notification import EMBEDDING_GRAPH_DELETED, EMBEDDING_GRAPH_DEPLOYED, TOPOLOGY_INSTALLED
+from constants.notification import EMBEDDING_GRAPH_DELETED, EMBEDDING_GRAPH_DEPLOYED
 from mano.notification_system import NotificationSystem, Subscriber
 from models.telemetry import HostData, SwitchData
 from utils.container import connectToDind
@@ -502,7 +502,8 @@ class Telemetry(Subscriber):
         """
 
         if topic == EMBEDDING_GRAPH_DEPLOYED:
-            self._mapVNFsToHosts(args[0])
+            for eg in args[0]:
+                self._mapVNFsToHosts(eg)
         elif topic == EMBEDDING_GRAPH_DELETED:
             eg: EmbeddingGraph = args[0]
             self._mapVNFsToHosts(eg, delete=True)

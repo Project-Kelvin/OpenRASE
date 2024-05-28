@@ -2,6 +2,7 @@
 Defines the VNFManager class that corresponds to the VNF Manager in the NFV architecture.
 """
 
+from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Thread, Lock
 import requests
 from shared.models.embedding_graph import VNF, EmbeddingGraph, VNFEntity
@@ -38,12 +39,15 @@ class VNFManager():
         self._embeddingGraphs: "dict[str, EmbeddingGraph]" = {}
         self._ports: "dict[str, int]" = {}
 
-    def _deployEmbeddingGraph(self, eg: EmbeddingGraph) -> None:
+    def _deployEmbeddingGraph(self, eg: EmbeddingGraph) -> EmbeddingGraph:
         """
         Deploy the embedding graph.
 
         Parameters:
             eg (EmbeddingGraph): The embedding graph to be deployed.
+
+        Returns:
+            EmbeddingGraph: The updated embedding graph.
         """
 
         if eg["sfcID"] in self._embeddingGraphs:
@@ -132,7 +136,8 @@ class VNFManager():
         )
 
         TUI.appendToLog(f"  Deployed embedding graph {sfcId} successfully.")
-        NotificationSystem.publish(EMBEDDING_GRAPH_DEPLOYED, updatedEG)
+
+        return updatedEG
 
     def _deleteEmbeddingGraph(self, eg: EmbeddingGraph) -> None:
         """
@@ -193,14 +198,15 @@ class VNFManager():
 
         TUI.appendToLog(f"Deploying {len(egs)} embedding graphs:")
 
-        threads: "list[Thread]" = []
-        for eg in egs:
-            TUI.appendToLog(f"  {eg['sfcID']}")
-            thread: Thread = Thread(
-                target=self._deployEmbeddingGraph, args=(eg,))
-            thread.start()
+        futures: "list[Future[EmbeddingGraph]]" = []
+        updatedEGs: "list[EmbeddingGraph]" = []
 
-            threads.append(thread)
+        with ThreadPoolExecutor() as executor:
+            for eg in egs:
+                TUI.appendToLog(f"  {eg['sfcID']}")
+                futures.append(executor.submit(self._deployEmbeddingGraph, eg))
 
-        for thread in threads:
-            thread.join()
+            for future in futures:
+                updatedEGs.append(future.result())
+
+        NotificationSystem.publish(EMBEDDING_GRAPH_DEPLOYED, updatedEGs)
