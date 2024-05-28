@@ -77,10 +77,12 @@ def run(experiment: int) -> None:
         """
 
         global experiment
+        global expName
         sfcEm: SFCEmulator = SFCEmulator(fgr, SFCSolver)
         sfcEm.startTest(topology, trafficDesign)
         sfcEm.end()
         experiment = ""
+        expName = ""
 
     def experiment1() -> None:
         """
@@ -195,14 +197,14 @@ def run(experiment: int) -> None:
     elif experiment == 8:
         experiment8()
     else:
-        experiment5()
-        experiment6()
-        experiment7()
-        experiment8()
         experiment1()
         experiment2()
         experiment3()
         experiment4()
+        experiment5()
+        experiment6()
+        experiment7()
+        experiment8()
 
 
 def appendToLog(message: str) -> None:
@@ -321,6 +323,7 @@ class SFCSolver(Solver):
             requests: "list[Union[FGR, SFCRequest]]" = []
             while not self._requests.empty():
                 requests.append(self._requests.get())
+                sleep(0.1)
             self._topology: Topology = self._orchestrator.getTopology()
             sda = SimpleDijkstraAlgorithm(requests, self._topology, self._resourceDemands)
             start: float = default_timer()
