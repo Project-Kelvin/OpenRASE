@@ -2,12 +2,10 @@
 Defines the TrafficGenerator class.
 """
 
-from datetime import datetime
 import json
-import os
 import random
 from threading import Thread
-from time import sleep, time
+from time import sleep
 from typing import Any
 from jinja2 import Template, TemplateSyntaxError
 from shared.models.config import Config
@@ -22,7 +20,6 @@ from mano.notification_system import NotificationSystem, Subscriber
 from models.traffic_generator import TrafficData
 from utils.container import connectToDind, getContainerIP, waitTillContainerReady
 from docker import DockerClient, from_env, errors
-from docker.models.containers import Container
 from utils.tui import TUI
 
 
@@ -36,7 +33,6 @@ INFLUX_DB_CONFIG = {
 }
 INFLUXDB: str = "influxdb"
 K6: str = "K6"
-logsPath: str = f"{getConfig()['repoAbsolutePath']}/artifacts/logs/traffic"
 
 class TrafficGenerator(Subscriber):
     """
@@ -57,8 +53,6 @@ class TrafficGenerator(Subscriber):
         NotificationSystem.subscribe(EMBEDDING_GRAPH_DEPLOYED, self)
         NotificationSystem.subscribe(EMBEDDING_GRAPH_DELETED, self)
 
-        if not os.path.exists(logsPath):
-            os.makedirs(logsPath)
 
     def startParentContainer(self) -> None:
         """
@@ -167,21 +161,25 @@ class TrafficGenerator(Subscriber):
         name: str = f"{sfcID}-{K6}"
         TUI.appendToLog(f"  Starting to generate traffic using k6 for SFC {sfcID}.")
         self._tgClient.containers.run(f"{TAG}/k6:latest", cap_add="NET_ADMIN", name=name,
-                                      detach=True, environment={
-                                          "K6_OUT": f"xk6-influxdb=http://{influxDBhost}:8086",
-                                          "K6_INFLUXDB_ORGANIZATION": INFLUX_DB_CONFIG["ORG"],
-                                          "K6_INFLUXDB_BUCKET": INFLUX_DB_CONFIG["BUCKET"],
-                                          "K6_INFLUXDB_INSECURE": "true",
-                                          "K6_INFLUXDB_TOKEN": INFLUX_DB_CONFIG["TOKEN"]
-                                      })
-        self._tgClient.containers.get(name).exec_run(
-            ["sh", "-c", f"echo '{outputFileContent}' > script.js"])
-        logs: Any = self._tgClient.containers.get(name).exec_run(
-            f"k6 run -e MY_HOSTNAME={getContainerIP(SFCC)} -e SFC_ID={sfcID} script.js", detach=False)
+                                    detach=True, environment={
+                                        "K6_OUT": f"xk6-influxdb=http://{influxDBhost}:8086",
+                                        "K6_INFLUXDB_ORGANIZATION": INFLUX_DB_CONFIG["ORG"],
+                                        "K6_INFLUXDB_BUCKET": INFLUX_DB_CONFIG["BUCKET"],
+                                        "K6_INFLUXDB_INSECURE": "true",
+                                        "K6_INFLUXDB_TOKEN": INFLUX_DB_CONFIG["TOKEN"]
+                                    })
+        try:
+            self._tgClient.containers.get(name).exec_run(
+                ["sh", "-c", f"echo '{outputFileContent}' > script.js"])
+        except Exception as e:
+            # sometimes this exception is thrown: filedescriptor out of range in select().
+            # seems like a Docker Py issue fixed by: https://github.com/docker/docker-py/pull/2865
+            # since OpenRASE uses version 4.1.0, this doesn't include the fix.
+            # Ignoring this issue as the script is created fine nevertheless.
+            pass
 
-        for log in logs:
-            with open(f"{logsPath}/{name}-{time()}.log", "a", encoding="utf8") as logFile:
-                logFile.write(f"{log}\n")
+        self._tgClient.containers.get(name).exec_run(
+            f"k6 run -e MY_HOSTNAME={getContainerIP(SFCC)} -e SFC_ID={sfcID} script.js", detach=True)
 
         TUI.appendToLog(f"  Traffic generation started for SFC {sfcID}.")
 
@@ -238,9 +236,10 @@ class TrafficGenerator(Subscriber):
 
     def receiveNotification(self, topic, *args: "list[Any]") -> None:
         if topic == EMBEDDING_GRAPH_DEPLOYED:
-            eg: EmbeddingGraph = args[0]
-            thread: Thread = Thread(target=self._generateTraffic, args=(eg["sfcID"],))
-            thread.start()
+            egs: "list[EmbeddingGraph]" = args[0]
+            for eg in egs:
+                thread: Thread = Thread(target=self._generateTraffic, args=(eg["sfcID"],))
+                thread.start()
         elif topic == EMBEDDING_GRAPH_DELETED:
             eg: EmbeddingGraph = args[0]
             self._stopTrafficGeneration(eg["sfcID"])
