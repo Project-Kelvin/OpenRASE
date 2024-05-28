@@ -14,7 +14,7 @@ from sfc.solver import Solver
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
-
+from docker import from_env, DockerClient
 
 class SFCEmulator(Subscriber):
     """
@@ -82,6 +82,12 @@ class SFCEmulator(Subscriber):
         self._mano.getOrchestrator().end()
         self._trafficGenerator.end()
         NotificationSystem.unsubscribeAll()
+
+        client: DockerClient = from_env()
+        client.containers.prune()
+        client.images.prune()
+        client.networks.prune()
+        client.volumes.prune()
 
     def _wait(self) -> None:
         """
