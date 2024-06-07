@@ -2,8 +2,8 @@
 
 net capture -iface eth0 -dpi -debug &
 
-cd /home/sfc-emulator/apps/vnf_proxy
-poetry run python vnf_proxy.py &
+cd /home/OpenRASE/apps/vnf_proxy
+pnpm run start &
 
 # Wait for any process to exit
 wait -n

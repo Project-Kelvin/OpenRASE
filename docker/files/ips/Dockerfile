@@ -17,20 +17,23 @@ RUN apt-get install -y \
     bash \
     iptables
 
-ENV POETRY_HOME="/opt/poetry"
-ENV PATH="$POETRY_HOME/bin:$PATH"
-RUN curl -sSL https://install.python-poetry.org | python3 -
+RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+RUN apt-get install -y nodejs
 
+RUN corepack enable pnpm
 WORKDIR /home
-RUN mkdir sfc-emulator
-COPY ./packages/ /home/sfc-emulator/packages/
+RUN mkdir OpenRASE
+COPY ./package.json /home/OpenRASE/package.json
+COPY ./pnpm-lock.yaml /home/OpenRASE/pnpm-lock.yaml
+COPY ./pnpm-workspace.yaml /home/OpenRASE/pnpm-workspace.yaml
+COPY ./packages/typescript /home/OpenRASE/packages/typescript
+COPY ./apps/vnf_proxy/ /home/OpenRASE/apps/vnf_proxy/
+COPY config.yaml /home/OpenRASE/apps/vnf_proxy/config.yaml
+WORKDIR /home/OpenRASE
+RUN pnpm install
 
-COPY ./apps/vnf_proxy/ /home/sfc-emulator/apps/vnf_proxy/
-COPY config.yaml /home/sfc-emulator/apps/vnf_proxy/
-
-WORKDIR /home/sfc-emulator/apps/vnf_proxy/
-RUN poetry config virtualenvs.in-project true && \
-    poetry install --no-root --only main
+WORKDIR /home/OpenRASE/apps/vnf_proxy/
+RUN pnpm install
 
 WORKDIR /home
 COPY ./docker/files/ips/shared/startup.sh /home/startup.sh

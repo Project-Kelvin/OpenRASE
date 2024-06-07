@@ -168,3 +168,4 @@ docker/files/waf/shared/Caddyfile
 docker/compose/tester/tester.yaml
 
 apps/**/config.yaml
+**/node_modules
