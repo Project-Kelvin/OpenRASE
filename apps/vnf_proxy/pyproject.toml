@@ -9,7 +9,7 @@ license = "Apache-2.0 license"
 python = "^3.8"
 Flask = "^3.0.0"
 requests = "^2.31.0"
-packages = {path = "../../packages"}
+packages = {path = "../../packages/python"}
 
 [build-system]
 requires = ["poetry-core"]

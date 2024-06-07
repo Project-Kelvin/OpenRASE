@@ -4,16 +4,16 @@ Provides the encoding and decoding functions to encode/decode the SFC metadata i
 
 import json
 import base64
-from typing import Any
+from typing import Any, Union
 from shared.models.embedding_graph import VNF
 
 
-def sfcEncode(data: VNF) -> Any:
+def sfcEncode(data: "Union[VNF, list[VNF]]") -> Any:
     """
     Encode the SFC metadata in the HTTP headers.
 
     Parameters:
-        data (dict): SFC metadata to be encoded
+        data (Union[VNF, list[VNF]]): SFC metadata to be encoded
 
     Returns:
         Any: Base64-encoded data
@@ -25,7 +25,7 @@ def sfcEncode(data: VNF) -> Any:
     return base64Data
 
 
-def sfcDecode(data: Any) -> VNF:
+def sfcDecode(data: Any) -> "Union[VNF, list[VNF]]":
     """
     Decode the SFC metadata in the HTTP headers.
 
@@ -33,7 +33,7 @@ def sfcDecode(data: Any) -> VNF:
         data (Any): Base64-encoded data
 
     Returns:
-        dict: Python Dictionary containing the decoded SFC metadata
+        dict(Union[VNF, list[VNF]]): Decoded SFC metadata
     """
 
     jsonData: str = base64.b64decode(data.encode("ascii")).decode("ascii")

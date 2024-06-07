@@ -48,7 +48,7 @@ def extractAndValidateSFCHeader(requestObj: Request) -> VNF:
     if sfcBase64 == "" or sfcBase64 is None:
         raise ValueError(f"The SFF running on\n {', '.join(hosts)}\n" +
                                         " could not find the SFC header " +
-                                        f"attribute request from:\n{requestObj.host_url}.\n")
+                                        f"attribute in the request from:\n{requestObj.host_url}.\n")
     sfc: VNF = sfcDecode(sfcBase64)
 
     if sfc["host"]["ip"] not in hosts:
@@ -102,11 +102,10 @@ def tx() -> Response:
         sfc: VNF = extractAndValidateSFCHeader(request)
 
         # Gets the `SFC-Traversed` header from the request.
-        sfcTraversed: "list[VNF]" = request.headers.get(SFC_TRAVERSED_HEADER)
-        if sfcTraversed != "" and sfcTraversed is not None:
+        sfcTraversedStr: str = request.headers.get(SFC_TRAVERSED_HEADER)
+        sfcTraversed: "list[VNF]" = []
+        if sfcTraversedStr != "" and sfcTraversedStr is not None:
             sfcTraversed = sfcDecode(sfcTraversed)
-        else:
-            sfcTraversed = []
 
         # Sets the `isTraversed` attribute of the current VNF to True.
         sfc["isTraversed"] = True

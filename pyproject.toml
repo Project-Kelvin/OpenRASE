@@ -13,7 +13,7 @@ packages = [
     { include = "algorithms", from = "src" },
     { include = "calibrate", from = "src" },
     { include = "runs", from = "src" },
-    { include = "shared", from = "packages"}
+    { include = "shared", from = "packages/python"}
 ]
 
 [tool.poetry.dependencies]

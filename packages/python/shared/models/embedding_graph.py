@@ -49,6 +49,7 @@ class EmbeddingGraph(dict):
     sfcID: str
     vnfs: VNF
     links: "list[ForwardingLink]"
+    isTraversed: Optional[bool]
 
 # pylint: disable=invalid-name
 EmbeddingGraphs = "list[EmbeddingGraph]"
