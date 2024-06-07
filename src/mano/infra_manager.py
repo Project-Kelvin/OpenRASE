@@ -18,7 +18,7 @@ from mininet.net import Containernet
 from mininet.cli import CLI
 from constants.notification import TOPOLOGY_INSTALLED
 from constants.topology import SERVER, SFCC
-from constants.container import CPU_PERIOD, DIND_IMAGE, SERVER_IMAGE, SFCC_IMAGE, SFF_IMAGE
+from constants.container import CPU_PERIOD, DIND_IMAGE, SERVER_IMAGE, SFCC_IMAGE, SFF_IMAGE, SFCC_CMD, SERVER_CMD, SFF_CMD
 from mano.notification_system import NotificationSystem
 from mano.sdn_controller import SDNController
 from mano.telemetry import Telemetry
@@ -80,7 +80,7 @@ class InfraManager():
                 SFCC,
                 ip=f"{ipSFCC[1]}/{ipSFCC[0].prefixlen}",
                 dimage=SFCC_IMAGE,
-                dcmd="poetry run python sfc_classifier.py",
+                dcmd=SFCC_CMD,
                 defaultRoute=f"dev {SFCC}-eth0"
             )
             self._hosts[SFCC] = sfcc
@@ -97,7 +97,7 @@ class InfraManager():
                 SERVER,
                 ip=f"{ipServer[1]}/{ipServer[0].prefixlen}",
                 dimage=SERVER_IMAGE,
-                dcmd="poetry run python server.py",
+                dcmd=SERVER_CMD,
                 defaultRoute=f"dev {SERVER}-eth0"
             )
             self._hosts[SERVER] = server
@@ -111,7 +111,7 @@ class InfraManager():
                     host['id'],
                     ip=f"{getConfig()['sff']['network1']['sffIP']}/{getConfig()['sff']['network1']['mask']}",
                     dimage=SFF_IMAGE,
-                    dcmd="poetry run python sff.py",
+                    dcmd=SFF_CMD,
                     defaultRoute=f"dev {host['id']}-eth1"
                 )
 
