@@ -38,7 +38,7 @@ function extractAndValidateSFCHeader(request: Request): VNF {
     if (!sfcBase64) {
         throw new Error(
             `The SFF running on ${hosts.join(', ')} could not find the SFC header ` +
-                `attribute in the request from: ${request.baseUrl}.\n`
+                `attribute in the request from: ${request.ip}.\n`
         );
     }
 
@@ -75,7 +75,7 @@ app.get('/rx', (req: Request, res: Response) => {
             headers: req.headers,
             data: req.body,
             maxRedirects: 0,
-            timeout: config.general.requestTimeout * 5000,
+            timeout: config.general.requestTimeout * 1000,
         };
 
         axios(requestOptions)
@@ -83,10 +83,10 @@ app.get('/rx', (req: Request, res: Response) => {
                 res.status(response.status).send(response.data);
             })
             .catch((error: AxiosError) => {
-                res.status(400).send(error.message);
+                res.status(400).send(error.response?.data);
             });
     } catch (error: any) {
-        res.status(400).send(error.toString());
+        res.status(400).send(error.message);
     }
 });
 
@@ -108,7 +108,7 @@ app.get('/tx', (req: Request, res: Response) => {
         const sfcUpdated: VNFUpdated = { ...sfc };
         delete sfcUpdated.next;
         sfcTraversed.push(sfcUpdated);
-        let next: VNF | string;
+        let next: VNF;
         if (Array.isArray(sfc.next)) {
             const network1IP: string = config.sff.network1.networkIP;
 
@@ -118,21 +118,21 @@ app.get('/tx', (req: Request, res: Response) => {
                 next = sfc.next[1] as VNF;
             }
         } else {
-            next = sfc.next;
+            next = sfc.next as VNF;
         }
 
         let nextDest = "";
-        if (sfc.next === TERMINAL) {
-            nextDest = `http://${ sfc.host.ip }`;
-        } else if (sfcUpdated.host.id === (next as VNF).host.id) {
-            nextDest = `http://${(next as VNF).vnf.ip}`;
+        if (next.next === TERMINAL) {
+            nextDest = `http://${ next.host.ip }`;
+        } else if (sfcUpdated.host.id === next.host.id) {
+            nextDest = `http://${next.vnf.ip}`;
         } else {
-            nextDest = `http://${(next as VNF).host.ip}/rx`;
+            nextDest = `http://${next.host.ip}/rx`;
         }
 
-        (next as VNF).isTraversed = false;
+        next.isTraversed = false;
         const headers = { ...req.headers };
-        headers[ SFC_HEADER ] = sfcEncode(next as VNF);
+        headers[ SFC_HEADER ] = sfcEncode(next);
         headers[SFC_TRAVERSED_HEADER] = sfcEncode(sfcTraversed);
 
         const requestOptions: AxiosRequestConfig = {
@@ -141,7 +141,7 @@ app.get('/tx', (req: Request, res: Response) => {
             headers,
             data: req.body,
             maxRedirects: 0,
-            timeout: config.general.requestTimeout * 5000,
+            timeout: config.general.requestTimeout * 1000,
         };
 
         axios(requestOptions)
@@ -149,10 +149,10 @@ app.get('/tx', (req: Request, res: Response) => {
                 res.status(response.status).send(response.data);
             })
             .catch((error: AxiosError) => {
-                res.status(400).send(error.message);
+                res.status(400).send(error.response?.data);
             });
     } catch (error: any) {
-        res.status(400).send(error.toString());
+        res.status(400).send(error.message);
     }
 });
 
@@ -168,6 +168,6 @@ app.post('/add-host', (req: Request, res: Response) => {
     res.sendStatus(200);
 });
 
-app.listen(3000, '0.0.0.0', () => {
+app.listen(config.sff.port, '0.0.0.0', () => {
     console.log(`Server is running on port ${config.sff.port}`);
 });

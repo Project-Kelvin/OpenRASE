@@ -54,7 +54,7 @@ app.get('/', (req: Request, res: Response) => {
         }).then((response: AxiosResponse) => {
             res.status(response.status).send(response.data);
         }).catch((error: AxiosError) => {
-            res.status(400).send(error.message);
+            res.status(400).send(error.response?.data);
         });
     } catch (exception: any) {
         res.status(400).send(exception.toString());
