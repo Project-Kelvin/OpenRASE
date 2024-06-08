@@ -157,20 +157,25 @@ simpleEG: EmbeddingGraph = {
 }
 
 simpleEGUpdated: EmbeddingGraph = {
-    "sfcID": "sfc2",
+    "sfcID": "sfc3",
     "vnfs": {
         "host": {
-            "id": "h2"
+            "id": "h1"
         },
         "vnf": {
-            "id": "waf"
+            "id": "lb"
         },
-        "next": {
+        "next": [{
             "host": {
                 "id": SERVER
             },
             "next": TERMINAL
-        }
+        }, {
+            "host": {
+                "id": SERVER
+            },
+            "next": TERMINAL
+        }]
     },
     "links": [
         {
@@ -178,18 +183,18 @@ simpleEGUpdated: EmbeddingGraph = {
                 "id": SFCC
             },
             "destination": {
-                "id": "h2"
+                "id": "h1"
             },
-            "links": ["s1", "s2"]
+            "links": ["s1"]
         },
         {
             "source": {
-                "id": "h2"
+                "id": "h1"
             },
             "destination": {
                 "id": SERVER
             },
-            "links": ["s2"]
+            "links": ["s1", "s2"]
         }
     ]
 }
@@ -235,15 +240,16 @@ class SFCSolver(Solver):
             elapsed = 0
             while elapsed < duration:
                 sleep(5)
-                data: "list[TrafficData]" = self._trafficGenerator.getData("5s")
-                httpReqs: int = data[simpleEG["sfcID"]]["httpReqs"] if simpleEG["sfcID"] in data else 0
-                averageLatency: float = data[simpleEG["sfcID"]]["averageLatency"] if simpleEG["sfcID"] in data else 0
-                httpReqsRate: float = httpReqs / 5 if httpReqs != 0 else 0
+                data: "dict[str, TrafficData]" = self._trafficGenerator.getData("5s")
 
-                TUI.appendToSolverLog(f"{httpReqsRate} requests took {averageLatency} seconds on average.")
+                for key, value in data.items():
+                    httpReqs: int = value["httpReqs"]
+                    averageLatency: float = value["averageLatency"]
+                    httpReqsRate: float = httpReqs / 5 if httpReqs != 0 else 0
+                    TUI.appendToSolverLog(f"{httpReqsRate} requests took {averageLatency} seconds on average for {key}.")
                 elapsed += 5
             TUI.appendToSolverLog("Solver has finished.")
-        self._orchestrator.sendEmbeddingGraphs([simpleEG])
+        self._orchestrator.sendEmbeddingGraphs([simpleEG, simpleEGUpdated])
         updateTUI()
         self._orchestrator.sendEmbeddingGraphs([simpleEGUpdated])
         updateTUI()
