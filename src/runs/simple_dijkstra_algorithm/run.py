@@ -10,7 +10,7 @@ from typing import Union
 from mano.telemetry import Telemetry
 from models.telemetry import HostData
 from models.traffic_generator import TrafficData
-from packages.shared.models.sfc_request import SFCRequest
+from packages.python.shared.models.sfc_request import SFCRequest
 from shared.models.config import Config
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
@@ -18,8 +18,8 @@ from algorithms.simple_dijkstra_algorithm import SimpleDijkstraAlgorithm
 from calibrate.calibrate import Calibrate
 from mano.orchestrator import Orchestrator
 from models.calibrate import ResourceDemand
-from packages.shared.models.embedding_graph import EmbeddingGraph
-from packages.shared.models.topology import Topology
+from packages.python.shared.models.embedding_graph import EmbeddingGraph
+from packages.python.shared.models.topology import Topology
 from sfc.fg_request_generator import FGRequestGenerator
 from sfc.sfc_emulator import SFCEmulator
 from sfc.solver import Solver
