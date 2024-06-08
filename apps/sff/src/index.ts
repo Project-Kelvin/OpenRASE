@@ -7,6 +7,7 @@ import { VNF, VNFUpdated } from "shared/src/models/embedding-graph";
 import { SFC_HEADER, SFC_TRAVERSED_HEADER } from "shared/src/constants/sfc";
 import { Config } from "shared/src/models/config";
 import {TERMINAL} from "shared/src/constants/embedding-graph";
+import http from "http";
 
 const app: Express = express();
 const config: Config = getConfig();
@@ -143,6 +144,12 @@ app.get('/tx', (req: Request, res: Response) => {
             maxRedirects: 0,
             timeout: config.general.requestTimeout * 1000,
         };
+
+        if (sfcUpdated.host.id !== next.host.id) {
+            const options = { localAddress: sfcUpdated.host.ip };
+            const httpAgent = new http.Agent(options);
+            requestOptions.httpAgent = httpAgent;
+        }
 
         axios(requestOptions)
             .then((response: AxiosResponse) => {
