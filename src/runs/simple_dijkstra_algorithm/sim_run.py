@@ -35,10 +35,9 @@ def run():
     with open(f"{configPath}/forwarding-graphs.json", "r", encoding="utf8") as fgFile:
         fgs: "list[EmbeddingGraph]" = json.load(fgFile)
         for i, fg in enumerate(fgs):
-            for _i in range (2):
-                fg["sfcID"] = f"sfc{i}{_i}"
+            for _i in range (1):
+                fg["sfcrID"] = f"sfc{i}{_i}"
                 requests.append(copy.deepcopy(fg))
-
     sda = SimpleDijkstraAlgorithm(requests, topology, resourceDemands)
     fgs, failedFGs, nodeResources = sda.run()
     print(nodeResources)
