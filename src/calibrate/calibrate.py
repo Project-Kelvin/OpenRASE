@@ -9,7 +9,7 @@ from timeit import default_timer
 import csv
 import json
 from typing import Any
-from packages.python.shared.models.embedding_graph import VNF
+from shared.models.embedding_graph import VNF
 from shared.constants.embedding_graph import TERMINAL
 from shared.models.config import Config
 from shared.models.embedding_graph import EmbeddingGraph
