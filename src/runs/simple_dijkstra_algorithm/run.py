@@ -406,7 +406,7 @@ class SFCSolver(Solver):
 
                     time += duration
             except Exception as e:
-                TUI.appendToSolverLog("c"+str(e), True)
+                TUI.appendToSolverLog(str(e), True)
 
             TUI.appendToSolverLog(f"Finished waiting.")
 

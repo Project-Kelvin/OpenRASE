@@ -59,6 +59,7 @@ class TrafficGenerator(Subscriber):
         Start the parent container.
         """
 
+        TUI.appendToLog("Starting traffic generator parent container.")
         config: Config = getConfig()
         dockerClient: DockerClient = from_env()
 
@@ -67,22 +68,30 @@ class TrafficGenerator(Subscriber):
         except errors.NotFound:
             pass
 
-        dockerClient.containers.run(DIND_IMAGE, detach=True, name=TRAFFIC_GENERATOR, privileged=True, volumes=[
-            f"{config['repoAbsolutePath']}/docker/files/influxdb:{TG_HOME_PATH}"
-        ], command="dockerd", ports={"8086/tcp": 8086})
+        try:
+            dockerClient.containers.run(DIND_IMAGE, detach=True, name=TRAFFIC_GENERATOR, privileged=True, volumes=[
+                f"{config['repoAbsolutePath']}/docker/files/influxdb:{TG_HOME_PATH}"
+            ], command="dockerd", ports={"8086/tcp": 8086})
+        except Exception as e:
+            TUI.appendToLog(f"Error starting traffic generator parent container: {e}", True)
 
+        TUI.appendToLog("Waiting for traffic generator parent container to start.")
         waitTillContainerReady(TRAFFIC_GENERATOR, False)
+        TUI.appendToLog("Waiitng for traffic generator parent container to start is over.")
 
         self._tgClient = connectToDind(TRAFFIC_GENERATOR, False)
-        self._tgClient.containers.run(f"{TAG}/influxdb:latest", name=INFLUXDB, detach=True, environment={
-            "DOCKER_INFLUXDB_INIT_MODE": "setup",
-            "DOCKER_INFLUXDB_INIT_USERNAME": INFLUX_DB_CONFIG["USERNAME"],
-            "DOCKER_INFLUXDB_INIT_PASSWORD": INFLUX_DB_CONFIG["PASSWORD"],
-            "DOCKER_INFLUXDB_INIT_ORG": INFLUX_DB_CONFIG["ORG"],
-            "DOCKER_INFLUXDB_INIT_BUCKET": INFLUX_DB_CONFIG["BUCKET"],
-            "DOCKER_INFLUXDB_INIT_ADMIN_TOKEN": INFLUX_DB_CONFIG["TOKEN"]
-        }, ports={"8086/tcp": 8086},
-            volumes=[f"{TG_HOME_PATH}/data:/var/lib/influxdb2"])
+        try:
+            self._tgClient.containers.run(f"{TAG}/influxdb:latest", name=INFLUXDB, detach=True, environment={
+                "DOCKER_INFLUXDB_INIT_MODE": "setup",
+                "DOCKER_INFLUXDB_INIT_USERNAME": INFLUX_DB_CONFIG["USERNAME"],
+                "DOCKER_INFLUXDB_INIT_PASSWORD": INFLUX_DB_CONFIG["PASSWORD"],
+                "DOCKER_INFLUXDB_INIT_ORG": INFLUX_DB_CONFIG["ORG"],
+                "DOCKER_INFLUXDB_INIT_BUCKET": INFLUX_DB_CONFIG["BUCKET"],
+                "DOCKER_INFLUXDB_INIT_ADMIN_TOKEN": INFLUX_DB_CONFIG["TOKEN"]
+            }, ports={"8086/tcp": 8086},
+                volumes=[f"{TG_HOME_PATH}/data:/var/lib/influxdb2"])
+        except Exception as e:
+            TUI.appendToLog(f"Error starting InfluxDB container: {e}", True)
 
         self._influxDBClient = InfluxDBClient(
             url="http://localhost:8086",
