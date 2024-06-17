@@ -32,6 +32,8 @@ from docker import DockerClient, from_env
 from docker.models.containers import Container
 import time
 
+from utils.tui import TUI
+
 
 SFLOW_CONTAINER: str = "sflow"
 SFLOW_IMAGE: str = "sflow/sflow-rt"
@@ -285,8 +287,11 @@ class Telemetry(Subscriber):
             "tuple[float, float, float]": The CPU usage of the container (used CPU, remaining CPU, usage percentage).
         """
 
-        # no. of CPUs in the machine.
-        totalCPUs: int = stats["cpu_stats"]["online_cpus"]
+        try:
+            # no. of CPUs in the machine.
+            totalCPUs: int = stats["cpu_stats"]["online_cpus"]
+        except KeyError:
+            return (0.0, 0.0, 0.0)
         # host CPU
         cpu: float = 0.0
 
@@ -325,8 +330,11 @@ class Telemetry(Subscriber):
             The memory usage of the container (used memory, remaining memory, usage percentage).
         """
 
-        memoryLimit: int = stats["memory_stats"]["limit"]
-        memUsage: float = stats["memory_stats"]["usage"]
+        try:
+            memoryLimit: int = stats["memory_stats"]["limit"]
+            memUsage: float = stats["memory_stats"]["usage"]
+        except KeyError:
+            return (0.0, 0.0, 0.0)
 
         return (memUsage, memoryLimit - memUsage, memUsage / memoryLimit * 100.0)
 
@@ -342,9 +350,12 @@ class Telemetry(Subscriber):
         """
 
         rx, tx = 0, 0
-        for network in stats["networks"]:
-            rx += stats["networks"][network]["rx_bytes"]
-            tx += stats["networks"][network]["tx_bytes"]
+        try:
+            for network in stats["networks"]:
+                rx += stats["networks"][network]["rx_bytes"]
+                tx += stats["networks"][network]["tx_bytes"]
+        except KeyError:
+            return (0.0, 0.0)
 
         return rx/1024, tx/1024
 
