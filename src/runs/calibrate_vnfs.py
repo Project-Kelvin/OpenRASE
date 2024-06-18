@@ -26,8 +26,18 @@ def run(algorithm: str, vnf: str, metric: str, train: bool, epochs: int) -> None
 
 
     calibrate = Calibrate()
-    designFile: str = ""
+    designFile: str = f"{getConfig()['repoAbsolutePath']}/src/calibrate/traffic-design.json"
     if algorithm == "dijkstra":
         designFile = f"{getConfig()['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/configs/traffic-design.json"
 
     calibrate.calibrateVNFs(designFile, vnf, metric, train, epochs)
+
+    with open(designFile, "r", encoding="utf8") as traffic:
+        design = json.load(traffic)
+    maxTarget: int = max(design, key=lambda x: x["target"])["target"]
+    resourceDemands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(maxTarget)
+    demandsDirectory = f"{getConfig()['repoAbsolutePath']}/calibrations"
+    if not os.path.exists(demandsDirectory):
+        os.makedirs(demandsDirectory)
+    with open(f"{demandsDirectory}/resource_demands_of_vnfs.json", "w", encoding="utf8") as demandsFile:
+        json.dump(eval(str(resourceDemands)), demandsFile, indent=4)

@@ -59,14 +59,12 @@ expName: str = ""
 
 @click.command()
 @click.option("--experiment", type=int, help="The experiment to run.")
-@click.option("--demands", type=bool, is_flag=True, help="Writes the resource demands to a file in the artifacts/demands directory.")
-def run(experiment: int, demands: bool) -> None:
+def run(experiment: intl) -> None:
     """
     Run the Simple Dijkstra Algorithm.
 
     Parameters:
         experiment (int): The experiment to run.
-        demands (bool): Writes the resource demands to a file in the artifacts/demands directory.
     """
 
     def runExperiment(fgr: FGR, topology: Topology) -> None:
@@ -181,44 +179,32 @@ def run(experiment: int, demands: bool) -> None:
         expName = "eight"
         experiment = "SFCs:16-Topology:1"
         runExperiment(FGR16SFC, topology1)
-    if demands:
-        trafficDesignPath = f"{configPath}/traffic-design.json"
-        with open(trafficDesignPath, "r", encoding="utf8") as traffic:
-            design = json.load(traffic)
-        maxTarget: int = max(design, key=lambda x: x["target"])["target"]
-        calibrate = Calibrate()
-        resourceDemands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(maxTarget)
-        demandsDirectory = f"{config['repoAbsolutePath']}/artifacts/demands"
-        if not os.path.exists(demandsDirectory):
-            os.makedirs(demandsDirectory)
-        with open(f"{demandsDirectory}/resource_demands_of_vnfs.json", "w", encoding="utf8") as demandsFile:
-            json.dump(eval(str(resourceDemands)), demandsFile, indent=4)
+
+    if experiment == 1:
+        experiment1()
+    elif experiment == 2:
+        experiment2()
+    elif experiment == 3:
+        experiment3()
+    elif experiment == 4:
+        experiment4()
+    elif experiment == 5:
+        experiment5()
+    elif experiment == 6:
+        experiment6()
+    elif experiment == 7:
+        experiment7()
+    elif experiment == 8:
+        experiment8()
     else:
-        if experiment == 1:
-            experiment1()
-        elif experiment == 2:
-            experiment2()
-        elif experiment == 3:
-            experiment3()
-        elif experiment == 4:
-            experiment4()
-        elif experiment == 5:
-            experiment5()
-        elif experiment == 6:
-            experiment6()
-        elif experiment == 7:
-            experiment7()
-        elif experiment == 8:
-            experiment8()
-        else:
-            experiment1()
-            experiment2()
-            experiment3()
-            experiment4()
-            experiment5()
-            experiment6()
-            experiment7()
-            experiment8()
+        experiment1()
+        experiment2()
+        experiment3()
+        experiment4()
+        experiment5()
+        experiment6()
+        experiment7()
+        experiment8()
 
 
 def appendToLog(message: str) -> None:
