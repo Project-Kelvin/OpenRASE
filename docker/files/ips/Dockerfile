@@ -2,15 +2,13 @@ FROM ubuntu:20.04
 
 RUN apt-get update && apt-get install software-properties-common -y
 RUN add-apt-repository ppa:oisf/suricata-stable -y
-RUN add-apt-repository ppa:deadsnakes/ppa -y
 
 RUN apt-get update && apt-get dist-upgrade -y
 
 RUN apt-get install -y \
     suricata \
     jq \
-    python3.10 \
-    python3-pip \net-tools \
+    net-tools \
     iputils-ping \
     iproute2 \
     curl \

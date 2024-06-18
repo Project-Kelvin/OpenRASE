@@ -1,16 +1,11 @@
 FROM ntop/ntopng:stable
 
-RUN apt-get update && apt-get install software-properties-common -y
-RUN add-apt-repository ppa:deadsnakes/ppa -y
-
 RUN apt-get update && apt-get install -y \
     bash \
     tcpdump \
     iperf \
     iproute2 \
-    curl \
-    python3.10 \
-    python3-pip
+    curl
 
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 RUN apt-get install -y nodejs

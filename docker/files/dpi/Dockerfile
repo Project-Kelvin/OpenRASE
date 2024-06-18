@@ -8,8 +8,7 @@ RUN apk add --update --no-cache \
     busybox-extras \
     iproute2 \
     iputils \
-    curl \
-    python3
+    curl
 
 RUN curl -fsSL https://unofficial-builds.nodejs.org/download/release/v22.2.0/node-v22.2.0-linux-x64-musl.tar.gz | tar -xz -C /usr/local --strip-components=1
 RUN corepack enable pnpm
