@@ -12,9 +12,15 @@
   },
   "typesVersions": {
     "*": {
-      "models": ["./build/models/index.d.ts"],
-      "utils": ["./build/utils/index.d.ts"],
-      "constants": ["./build/constants/index.d.ts"]
+      "models": [
+        "./build/models/index.d.ts"
+      ],
+      "utils": [
+        "./build/utils/index.d.ts"
+      ],
+      "constants": [
+        "./build/constants/index.d.ts"
+      ]
     }
   },
   "scripts": {
@@ -28,6 +34,7 @@
   "dependencies": {
     "@types/node": "^20.14.2",
     "ip-range-check": "^0.2.0",
+    "winston": "^3.13.0",
     "yaml": "^2.4.3"
   },
   "devDependencies": {

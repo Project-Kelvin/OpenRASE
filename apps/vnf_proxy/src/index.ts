@@ -1,7 +1,8 @@
 import express, { Express, Request, Response } from "express";
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-import { getConfig } from "shared/utils";
+import { getConfig, logger } from "shared/utils";
 import { Config } from "shared/models";
+import { SFC_ID } from "shared/constants";
 
 const app: Express = express();
 const config: Config = getConfig();
@@ -25,6 +26,7 @@ app.get('/', (req: Request, res: Response) => {
             res.status(response.status).send(response.data);
         })
         .catch((error: AxiosError) => {
+            logger.error(`[${ req.headers[ SFC_ID ] as string}] ${error.response?.data}`);
             res.status(error.response?.status ?? 500).send(error?.response?.data);
         });
 });

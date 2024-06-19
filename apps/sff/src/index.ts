@@ -1,8 +1,8 @@
 import express, { Express, Request, Response } from "express";
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-import { checkIPBelongsToNetwork, getConfig, sfcDecode, sfcEncode } from "shared/utils";
+import { checkIPBelongsToNetwork, getConfig, sfcDecode, sfcEncode, logger } from "shared/utils";
 import { Config, VNF, VNFUpdated } from "shared/models";
-import { TERMINAL, SFC_HEADER, SFC_TRAVERSED_HEADER } from "shared/constants";
+import { TERMINAL, SFC_HEADER, SFC_TRAVERSED_HEADER, SFC_ID } from "shared/constants";
 import http from "http";
 
 const app: Express = express();
@@ -59,9 +59,11 @@ function extractAndValidateSFCHeader(request: Request): VNF {
 app.get('/rx', (req: Request, res: Response) => {
     try {
         const sfc: VNF = extractAndValidateSFCHeader(req);
-
+        const sfcID: string = req.headers[SFC_ID] as string;
         if (sfc.isTraversed) {
-            return res.status(400).send(`VNF ${sfc.vnf.id} has already processed this request.`);
+            logger.error(`[${sfcID}] VNF ${sfc.vnf.id} has already processed this request.`);
+
+            return res.status(400).send(`VNF ${ sfc.vnf.id } has already processed this request.`);
         }
 
         const vnfIP = sfc.vnf.ip;
@@ -80,9 +82,11 @@ app.get('/rx', (req: Request, res: Response) => {
                 res.status(response.status).send(response.data);
             })
             .catch((error: AxiosError) => {
+                logger.error(`[${ sfcID }] [${sfc.vnf.id}] ${error.response?.data}`);
                 res.status(400).send(error.response?.data);
             });
     } catch (error: any) {
+        logger.error(`[${ req.headers[ SFC_ID ] as string}] ${error.message}`);
         res.status(400).send(error.message);
     }
 });
@@ -94,6 +98,7 @@ app.get('/rx', (req: Request, res: Response) => {
 app.get('/tx', (req: Request, res: Response) => {
     try {
         let sfc: VNF = extractAndValidateSFCHeader(req);
+        const sfcID: string = req.headers[SFC_ID] as string;
 
         const sfcTraversedStr: string = req.headers[ SFC_TRAVERSED_HEADER ] as string ?? "";
         let sfcTraversed: VNFUpdated[] = [];
@@ -152,9 +157,11 @@ app.get('/tx', (req: Request, res: Response) => {
                 res.status(response.status).send(response.data);
             })
             .catch((error: AxiosError) => {
+                logger.error(`[${ sfcID }] [${ sfc.vnf.id }] ${ error.response?.data }`);
                 res.status(400).send(error.response?.data);
             });
     } catch (error: any) {
+        logger.error(`[${ req.headers[ SFC_ID ] as string}] ${error.message}`);
         res.status(400).send(error.message);
     }
 });

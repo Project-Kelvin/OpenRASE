@@ -76,12 +76,17 @@ class InfraManager():
                 self._networkIPs)
 
             TUI.appendToLog("  Installing SFCC.")
+            sfccDir: str = SFCC_IMAGE.split("/")[1].split(":")[0]
             sfcc: Host = self._net.addDocker(
                 SFCC,
                 ip=f"{ipSFCC[1]}/{ipSFCC[0].prefixlen}",
                 dimage=SFCC_IMAGE,
                 dcmd=SFCC_CMD,
-                defaultRoute=f"dev {SFCC}-eth0"
+                defaultRoute=f"dev {SFCC}-eth0",
+                volumes=[
+                    config["repoAbsolutePath"]
+                    + f"/docker/files/{sfccDir}/shared/node-logs:/home/OpenRASE/apps/sfc_classifier/node-logs"
+                ]
             )
             self._hosts[SFCC] = sfcc
             self._hostIPs[SFCC] = ipSFCC
@@ -107,12 +112,17 @@ class InfraManager():
             TUI.appendToLog("  Installing hosts:")
             for host in topology['hosts']:
                 TUI.appendToLog(f"    Installing host {host['id']}.")
+                sffDir: str = SFF_IMAGE.split("/")[1].split(":")[0]
                 sff: Host = self._net.addDocker(
                     host['id'],
                     ip=f"{getConfig()['sff']['network1']['sffIP']}/{getConfig()['sff']['network1']['mask']}",
                     dimage=SFF_IMAGE,
                     dcmd=SFF_CMD,
-                    defaultRoute=f"dev {host['id']}-eth1"
+                    defaultRoute=f"dev {host['id']}-eth1",
+                    volumes=[
+                        config["repoAbsolutePath"]
+                        + f"/docker/files/{sffDir}/shared/node-logs:/home/OpenRASE/apps/sff/node-logs"
+                    ]
                 )
 
                 hostNode: Host = self._net.addDocker(
