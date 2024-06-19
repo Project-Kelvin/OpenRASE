@@ -73,6 +73,7 @@ class Calibrate:
             float: The test loss.
         """
 
+        print(f"Training model for {metric} on {vnf}.")
         directory: str = f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"
         file = f"{directory}/calibration_data.csv"
 
@@ -113,6 +114,7 @@ class Calibrate:
             loss='mean_absolute_error'
         )
 
+        print("Training the model.")
         history: Any = model.fit(
             trainFeatures["http_reqs"],
             trainLabels,
@@ -129,6 +131,7 @@ class Calibrate:
         plt.savefig(f"{directory}/{metric}_loss.png")
         plt.clf()
 
+        print("Evaluating the model.")
         testResult: Any = model.evaluate(
             testFeatures["http_reqs"],
             testLabels, verbose=0
@@ -145,6 +148,7 @@ class Calibrate:
         plt.savefig(f"{directory}/{metric}_trend_line.png")
         plt.clf()
 
+        print("Saving the model.")
         model.save(f"{directory}/{metric}_{self._modelName}")
 
         return testResult
@@ -396,6 +400,8 @@ class Calibrate:
             train (bool): Specifies if only training should be carried out.
             epochs (int): The number of epochs to train the model for.
         """
+
+        print("Calibrating VNFs.")
         if vnf != "":
             self._calibrateVNF(vnf, trafficDesignFile, metric, train, epochs)
         else:

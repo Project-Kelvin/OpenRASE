@@ -1,5 +1,5 @@
 #!/bin/bash
-/etc/init.d/redis-server start &
+/etc/init.d/redis-server start
 ntopng --community -i eth0 &
 
 cd /home/OpenRASE/apps/vnf_proxy

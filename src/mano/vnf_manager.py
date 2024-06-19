@@ -103,7 +103,7 @@ class VNFManager():
                         restart_policy={"Name": "on-failure"},
                     )
                 except Exception as e:
-                    TUI.appendToLog(f"    Error deploying {vnfName}: {e}")
+                    TUI.appendToLog(f"    Error deploying {vnfName}: {e}", True)
                     return
 
                 vnf["ip"] = f"{getConfig()['sff']['network1']['hostIP']}:{port}"
