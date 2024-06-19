@@ -1,7 +1,7 @@
 import express, { Express, Request, Response } from "express";
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-import { getConfig } from "shared/src/utils/config";
-import { Config } from "shared/src/models/config";
+import { getConfig } from "shared/utils";
+import { Config } from "shared/models";
 
 const app: Express = express();
 const config: Config = getConfig();

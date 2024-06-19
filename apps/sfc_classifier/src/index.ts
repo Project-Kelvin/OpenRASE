@@ -1,10 +1,8 @@
 import express, { Express, Request, Response } from 'express';
 import axios, { AxiosError, AxiosResponse } from 'axios';
-import { SFC_HEADER, SFC_ID } from "shared/src/constants/sfc";
-import { VNF, EmbeddingGraph } from "shared/src/models/embedding-graph";
-import { Config } from "shared/src/models/config";
-import { getConfig } from "shared/src/utils/config";
-import { sfcEncode } from "shared/src/utils/encoder-decoder";
+import { SFC_HEADER, SFC_ID } from "shared/constants";
+import { Config, VNF, EmbeddingGraph } from "shared/models";
+import { getConfig, sfcEncode } from "shared/utils";
 import { IncomingHttpHeaders } from 'http';
 
 const app: Express = express();

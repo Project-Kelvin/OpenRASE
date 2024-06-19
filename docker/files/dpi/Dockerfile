@@ -13,6 +13,7 @@ RUN apk add --update --no-cache \
 
 RUN curl -fsSL https://unofficial-builds.nodejs.org/download/release/v22.2.0/node-v22.2.0-linux-x64-musl.tar.gz | tar -xz -C /usr/local --strip-components=1
 RUN corepack enable pnpm
+RUN npm install -g pm2
 
 WORKDIR /home
 RUN mkdir OpenRASE
@@ -24,7 +25,9 @@ COPY ./apps/vnf_proxy/ /home/OpenRASE/apps/vnf_proxy/
 COPY config.yaml /home/OpenRASE/apps/vnf_proxy/config.yaml
 WORKDIR /home/OpenRASE
 RUN pnpm install
-
+WORKDIR /home/OpenRASE/packages/typescript/shared
+RUN pnpm install
+RUN pnpm build
 WORKDIR /home/OpenRASE/apps/vnf_proxy/
 RUN pnpm install
 

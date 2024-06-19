@@ -100,6 +100,7 @@ class VNFManager():
                         name=vnfName,
                         volumes=volumes,
                         ports={"80/tcp": port},
+                        restart_policy={"Name": "on-failure"},
                     )
                 except Exception as e:
                     TUI.appendToLog(f"    Error deploying {vnfName}: {e}")

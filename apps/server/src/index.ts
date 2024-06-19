@@ -1,6 +1,6 @@
 import express, { Express, Request, Response } from "express";
-import { Config } from "shared/src/models/config";
-import { getConfig } from "shared/src/utils/config";
+import { Config } from "shared/models";
+import { getConfig } from "shared/utils";
 
 const config: Config = getConfig();
 

@@ -1,12 +1,8 @@
 import express, { Express, Request, Response } from "express";
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
-import { sfcDecode, sfcEncode } from "shared/src/utils/encoder-decoder";
-import { getConfig } from "shared/src/utils/config";
-import { checkIPBelongsToNetwork } from "shared/src/utils/ip";
-import { VNF, VNFUpdated } from "shared/src/models/embedding-graph";
-import { SFC_HEADER, SFC_TRAVERSED_HEADER } from "shared/src/constants/sfc";
-import { Config } from "shared/src/models/config";
-import {TERMINAL} from "shared/src/constants/embedding-graph";
+import { checkIPBelongsToNetwork, getConfig, sfcDecode, sfcEncode } from "shared/utils";
+import { Config, VNF, VNFUpdated } from "shared/models";
+import { TERMINAL, SFC_HEADER, SFC_TRAVERSED_HEADER } from "shared/constants";
 import http from "http";
 
 const app: Express = express();

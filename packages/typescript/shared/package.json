@@ -1,9 +1,25 @@
 {
   "name": "shared",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "build/index.js",
+  "types": "build/index.d.ts",
+  "module": "build/index.js",
+  "exports": {
+    ".": "./build/index.js",
+    "./constants": "./build/constants/index.js",
+    "./models": "./build/models/index.js",
+    "./utils": "./build/utils/index.js"
+  },
+  "typesVersions": {
+    "*": {
+      "models": ["./build/models/index.d.ts"],
+      "utils": ["./build/utils/index.d.ts"],
+      "constants": ["./build/constants/index.d.ts"]
+    }
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rimraf ./build && tsc"
   },
   "keywords": [],
   "author": "",
@@ -13,5 +29,9 @@
     "@types/node": "^20.14.2",
     "ip-range-check": "^0.2.0",
     "yaml": "^2.4.3"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.7",
+    "typescript": "^5.4.5"
   }
 }

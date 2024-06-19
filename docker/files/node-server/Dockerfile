@@ -10,6 +10,7 @@ RUN apk add --update --no-cache \
     curl
 
 RUN corepack enable pnpm
+RUN npm install -g pm2
 WORKDIR /home
 RUN mkdir OpenRASE
 COPY ./package.json /home/OpenRASE/package.json
@@ -20,7 +21,9 @@ COPY ./apps/server/ /home/OpenRASE/apps/server/
 COPY config.yaml /home/OpenRASE/apps/server/config.yaml
 WORKDIR /home/OpenRASE
 RUN pnpm install
-
+WORKDIR /home/OpenRASE/packages/typescript/shared
+RUN pnpm install
+RUN pnpm build
 WORKDIR /home/OpenRASE/apps/server/
 RUN pnpm install
 
