@@ -43,9 +43,9 @@ def run(stop: bool) -> None:
                 "DOCKER_INFLUXDB_INIT_BUCKET": INFLUX_DB_CONFIG["BUCKET"],
                 "DOCKER_INFLUXDB_INIT_ADMIN_TOKEN": INFLUX_DB_CONFIG["TOKEN"]
             },
-            ports={"8086/tcp": 8086},
+            ports={"8086/tcp": 6000},
             volumes=[f"{getConfig()['repoAbsolutePath']}/docker/files/influxdb/data:/var/lib/influxdb2"],
             auto_remove=True
         )
 
-        print(f"InfluxDB running on: http://localhost:8086")
+        print(f"InfluxDB running on: http://localhost:6000")
