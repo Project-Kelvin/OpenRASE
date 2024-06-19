@@ -59,7 +59,7 @@ expName: str = ""
 
 @click.command()
 @click.option("--experiment", type=int, help="The experiment to run.")
-def run(experiment: intl) -> None:
+def run(experiment: int) -> None:
     """
     Run the Simple Dijkstra Algorithm.
 
