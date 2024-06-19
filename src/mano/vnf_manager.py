@@ -102,7 +102,7 @@ class VNFManager():
                         ports={"80/tcp": port},
                     )
                 except Exception as e:
-                    TUI.appendToLog(f"    Error deploying {vnfName}: {e}")
+                    TUI.appendToLog(f"    Error deploying {vnfName}: {e}", True)
                     return
 
                 vnf["ip"] = f"{getConfig()['sff']['network1']['hostIP']}:{port}"
