@@ -53,12 +53,12 @@ app.get('/', (req: FastifyRequest, res: FastifyReply) => {
         }).then((response: AxiosResponse) => {
             res.status(response.status).send(response.data);
         }).catch((error: AxiosError) => {
-            logger.error(`[${ sfcID }] ${ error.response?.data }`);
+            logger.error(`[${ sfcID }] [${error?.response?.status}] ${ error?.response?.data ?? error.toString() }`);
             res.status(400).send(error.response?.data);
 
         });
     } catch (error: any) {
-        logger.error(`[${ req.headers[ SFC_ID ] as string }] ${ error.message }`);
+        logger.error(`[${ req.headers[ SFC_ID ] as string}] ${ error.message ?? error.toString()}`);
         res.status(400).send(error.message);
     }
 });
