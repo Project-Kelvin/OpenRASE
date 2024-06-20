@@ -1,20 +1,17 @@
-import express, { Express, Request, Response } from 'express';
+import fastify, { FastifyReply, FastifyRequest } from 'fastify';
 import axios, { AxiosError, AxiosResponse } from 'axios';
 import { SFC_HEADER, SFC_ID } from "shared/constants";
 import { Config, VNF, EmbeddingGraph } from "shared/models";
 import { getConfig, sfcEncode, logger } from "shared/utils";
 import { IncomingHttpHeaders } from 'http';
 
-const app: Express = express();
+const app = fastify();
 const config: Config = getConfig();
 
 const embeddingGraphs: { [ sfcID: string ]: EmbeddingGraph; } = {};
 
-
-app.use(express.json());
-
-app.post('/add-eg', (req: Request, res: Response) => {
-    const eg: EmbeddingGraph = req.body;
+app.post('/add-eg', (req: FastifyRequest, res: FastifyReply) => {
+    const eg: EmbeddingGraph = req.body as EmbeddingGraph;
     eg.isTraversed = false;
 
     embeddingGraphs[ eg.sfcID ] = eg;
@@ -22,7 +19,7 @@ app.post('/add-eg', (req: Request, res: Response) => {
     res.status(201).send('The Embedding Graph has been successfully added.\n');
 });
 
-app.get('/', (req: Request, res: Response) => {
+app.get('/', (req: FastifyRequest, res: FastifyReply) => {
     try {
         if (!req.headers[ SFC_ID ]) {
             logger.error('The SFC-ID Header is missing in the request.');
@@ -61,11 +58,11 @@ app.get('/', (req: Request, res: Response) => {
 
         });
     } catch (error: any) {
-        logger.error(`[${ req.headers[ SFC_ID ] as string}] ${ error.message }`);
+        logger.error(`[${ req.headers[ SFC_ID ] as string }] ${ error.message }`);
         res.status(400).send(error.message);
     }
 });
 
-app.listen(config.sfcClassifier.port, '0.0.0.0', () => {
+app.listen({ port: config.sfcClassifier.port }, (): void => {
     console.log(`Server is running on port ${ config.sfcClassifier.port }`);
 });

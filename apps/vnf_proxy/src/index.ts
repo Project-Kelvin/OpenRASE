@@ -1,19 +1,18 @@
-import express, { Express, Request, Response } from "express";
-import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
+import fastify, { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { getConfig, logger } from "shared/utils";
 import { Config } from "shared/models";
 import { SFC_ID } from "shared/constants";
 
-const app: Express = express();
+const app: FastifyInstance = fastify();
 const config: Config = getConfig();
-app.use(express.json())
 
-app.get('/', (req: Request, res: Response) => {
+app.get('/', async (req: FastifyRequest, res: FastifyReply) => {
     const sffIP: string = config.sff.network1.sffIP;
     const sffPort: number = config.sff.port;
 
     const requestConfig: AxiosRequestConfig = {
-        method: req.method,
+        method: req.method as any,
         url: `http://${ sffIP }:${ sffPort }/tx${ req.url }`,
         data: req.body,
         headers: req.headers,
@@ -26,7 +25,7 @@ app.get('/', (req: Request, res: Response) => {
             res.status(response.status).send(response.data);
         })
         .catch((error: AxiosError) => {
-            logger.error(`[${ req.headers[ SFC_ID ] as string}] ${error.response?.data}`);
+            logger.error(`[${ req.headers[ SFC_ID ] as string }] ${ error.response?.data }`);
             res.status(error.response?.status ?? 500).send(error?.response?.data);
         });
 });
@@ -35,6 +34,6 @@ const port: number = !Number.isNaN(parseInt(process.argv[ 2 ]))
     ? parseInt(process.argv[ 2 ])
     : config?.vnfProxy?.port ?? 80;
 
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+app.listen({ port }, (): void => {
+    console.log(`Server is running on port ${ port }`);
 });
