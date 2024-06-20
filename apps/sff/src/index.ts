@@ -78,15 +78,15 @@ app.get('/rx', (req: Request, res: Response) => {
         };
 
         axios(requestOptions)
-            .then((response) => {
+            .then((response: AxiosResponse) => {
                 res.status(response.status).send(response.data);
             })
             .catch((error: AxiosError) => {
-                logger.error(`[${ sfcID }] [${sfc.vnf.id}] ${error.response?.data}`);
+                logger.error(`[rx] [axios] [${ sfcID }] [${sfc.vnf.id}] [${error?.response?.status}] ${error?.response?.data ?? error.toString()}`);
                 res.status(400).send(error.response?.data);
             });
     } catch (error: any) {
-        logger.error(`[${ req.headers[ SFC_ID ] as string}] ${error.message}`);
+        logger.error(`[rx] [${ req.headers[ SFC_ID ] as string}] ${error.message ?? error.toString()}`);
         res.status(400).send(error.message);
     }
 });
@@ -157,11 +157,11 @@ app.get('/tx', (req: Request, res: Response) => {
                 res.status(response.status).send(response.data);
             })
             .catch((error: AxiosError) => {
-                logger.error(`[${ sfcID }] [${ sfc.vnf.id }] ${ error.response?.data }`);
+                logger.error(`[tx] [axios] [${ sfcID }] [${ sfc.vnf.id }] [${error?.response?.status}] ${ error?.response?.data ?? error.toString()}`);
                 res.status(400).send(error.response?.data);
             });
     } catch (error: any) {
-        logger.error(`[${ req.headers[ SFC_ID ] as string}] ${error.message}`);
+        logger.error(`[tx] [${ req.headers[ SFC_ID ] as string}] ${error.message ?? error.toString()}`);
         res.status(400).send(error.message);
     }
 });
