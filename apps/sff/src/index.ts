@@ -5,7 +5,9 @@ import { Config, VNF, VNFUpdated } from "shared/models";
 import { TERMINAL, SFC_HEADER, SFC_TRAVERSED_HEADER, SFC_ID } from "shared/constants";
 import http from "http";
 
-const app: FastifyInstance = fastify();
+const app: FastifyInstance = fastify({
+    ignoreTrailingSlash: true
+});
 const config: Config = getConfig();
 
 // In-memory list of host IP addresses.

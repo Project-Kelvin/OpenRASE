@@ -5,7 +5,10 @@ import { Config, VNF, EmbeddingGraph } from "shared/models";
 import { getConfig, sfcEncode, logger } from "shared/utils";
 import { IncomingHttpHeaders } from 'http';
 
-const app = fastify();
+const app = fastify({
+    ignoreTrailingSlash: true
+});
+
 const config: Config = getConfig();
 
 const embeddingGraphs: { [ sfcID: string ]: EmbeddingGraph; } = {};

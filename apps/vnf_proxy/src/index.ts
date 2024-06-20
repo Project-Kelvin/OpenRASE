@@ -4,7 +4,9 @@ import { getConfig, logger } from "shared/utils";
 import { Config } from "shared/models";
 import { SFC_ID } from "shared/constants";
 
-const app: FastifyInstance = fastify();
+const app: FastifyInstance = fastify({
+    ignoreTrailingSlash: true
+});
 const config: Config = getConfig();
 
 app.get('/', async (req: FastifyRequest, res: FastifyReply) => {
