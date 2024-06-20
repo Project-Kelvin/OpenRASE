@@ -176,6 +176,6 @@ app.post('/add-host', async (req: FastifyRequest, res: FastifyReply) => {
     res.status(200).send();
 });
 
-app.listen({ port: config.sff.port }, (): void => {
+app.listen({ port: config.sff.port, host: "0.0.0.0" }, (): void => {
     console.log(`Server is running on port ${ config.sff.port }`);
 });

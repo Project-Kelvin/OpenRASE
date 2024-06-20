@@ -11,6 +11,6 @@ app.get("/", async (_req: FastifyRequest, res: FastifyReply): Promise<void> => {
     res.send("Hello World!\n");
 });
 
-app.listen({ port }, (): void => {
+app.listen({ port, host: "0.0.0.0" }, (): void => {
     console.log(`Server is running on port ${port}.`);
 });

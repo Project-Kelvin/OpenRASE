@@ -34,6 +34,6 @@ const port: number = !Number.isNaN(parseInt(process.argv[ 2 ]))
     ? parseInt(process.argv[ 2 ])
     : config?.vnfProxy?.port ?? 80;
 
-app.listen({ port }, (): void => {
+app.listen({ port, host: "0.0.0.0" }, (): void => {
     console.log(`Server is running on port ${ port }`);
 });

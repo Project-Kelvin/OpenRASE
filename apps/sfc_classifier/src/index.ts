@@ -63,6 +63,6 @@ app.get('/', (req: FastifyRequest, res: FastifyReply) => {
     }
 });
 
-app.listen({ port: config.sfcClassifier.port }, (): void => {
+app.listen({ port: config.sfcClassifier.port, host: "0.0.0.0" }, (): void => {
     console.log(`Server is running on port ${ config.sfcClassifier.port }`);
 });
