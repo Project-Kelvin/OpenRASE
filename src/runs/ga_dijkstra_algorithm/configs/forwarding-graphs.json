@@ -1,0 +1,151 @@
+[
+    {
+        "vnfs": {
+            "vnf": {
+                "id": "lb"
+            },
+            "next": [
+                {
+                    "vnf": {
+                        "id": "waf"
+                    },
+                    "next": {
+                        "host": {
+                            "id": "server"
+                        },
+                        "next": "terminal"
+                    }
+                },
+                {
+                    "vnf": {
+                        "id": "waf"
+                    },
+                    "next": {
+                        "host": {
+                            "id": "server"
+                        },
+                        "next": "terminal"
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "vnfs": {
+            "vnf": {
+                "id": "ha"
+            },
+            "next": {
+                "vnf": {
+                    "id": "lb"
+                },
+                "next": [
+                    {
+                        "vnf": {
+                            "id": "waf"
+                        },
+                        "next": {
+                            "host": {
+                                "id": "server"
+                            },
+                            "next": "terminal"
+                        }
+                    },
+                    {
+                        "vnf": {
+                            "id": "waf"
+                        },
+                        "next": {
+                            "host": {
+                                "id": "server"
+                            },
+                            "next": "terminal"
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    {
+        "vnfs": {
+            "vnf": {
+                "id": "ha"
+            },
+            "next": {
+                "vnf": {
+                    "id": "tm"
+                },
+                "next": {
+                    "vnf": {
+                        "id": "lb"
+                    },
+                    "next": [
+                        {
+                            "vnf": {
+                                "id": "waf"
+                            },
+                            "next": {
+                                "host": {
+                                    "id": "server"
+                                },
+                                "next": "terminal"
+                            }
+                        },
+                        {
+                            "vnf": {
+                                "id": "waf"
+                            },
+                            "next": {
+                                "host": {
+                                    "id": "server"
+                                },
+                                "next": "terminal"
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    {
+        "vnfs": {
+            "vnf": {
+                "id": "lb"
+            },
+            "next": [
+                {
+                    "vnf": {
+                        "id": "tm"
+                    },
+                    "next": {
+                        "vnf": {
+                            "id": "waf"
+                        },
+                        "next": {
+                            "host": {
+                                "id": "server"
+                            },
+                            "next": "terminal"
+                        }
+                    }
+                },
+                {
+                    "vnf": {
+                        "id": "tm"
+                    },
+                    "next": {
+                        "vnf": {
+                            "id": "waf"
+                        },
+                        "next": {
+                            "host": {
+                                "id": "server"
+                            },
+                            "next": "terminal"
+                        }
+                    }
+                }
+            ]
+        }
+    }
+]

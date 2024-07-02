@@ -32,6 +32,7 @@ matplotlib = "^3.8.3"
 click = "^8.1.7"
 setuptools = "<60" # To suppress 'distutils Version classes are deprecated. Use packaging.version instead.'
 textual = "^0.57.1"
+deap = "^1.4.1"
 
 [build-system]
 requires = ["poetry-core"]
@@ -45,3 +46,4 @@ simdij = "runs.simple_dijkstra_algorithm.sim_run:run"
 dijkstra_gen_traffic_design = "runs.simple_dijkstra_algorithm.run:getTrafficDesign"
 test = "runs.test:run"
 db = "runs.influxdb:run"
+ga_test = "runs.ga_dijkstra_algorithm.run:test"
