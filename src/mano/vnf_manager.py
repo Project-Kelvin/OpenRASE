@@ -188,6 +188,28 @@ class VNFManager():
 
         TUI.appendToLog(f"Deleted embedding graph {eg['sfcID']} successfully.")
 
+    def deleteEmbeddingGraphs(self, egs: "list[EmbeddingGraph]") -> None:
+        """
+        Delete the embedding graphs.
+
+        Parameters:
+            egs (list[EmbeddingGraph]): The embedding graphs to be deleted.
+        """
+
+        TUI.appendToLog(f"Deleting {len(egs)} embedding graphs:")
+
+        futures: "list[Future[None]]" = []
+
+        with ThreadPoolExecutor() as executor:
+            for eg in egs:
+                if(eg["sfcID"] in self._embeddingGraphs):
+                    del self._embeddingGraphs[eg["sfcID"]]
+                    TUI.appendToLog(f"  {eg['sfcID']}")
+                    futures.append(executor.submit(self._deleteEmbeddingGraph, eg))
+
+            for future in futures:
+                future.result()
+
 
     def deployEmbeddingGraphs(self, egs: "list[EmbeddingGraph]") -> None:
         """
