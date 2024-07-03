@@ -99,7 +99,7 @@ class SimpleDijkstraAlgorithm():
 
         return (eg, areAllVNFsDeployed[0], localNodeResourceUsage)
 
-    def _linkNodes(self, fg: EmbeddingGraph) -> EmbeddingGraph:
+    def linkNodes(self, fg: EmbeddingGraph) -> EmbeddingGraph:
         """
         Link nodes
 
@@ -155,7 +155,7 @@ class SimpleDijkstraAlgorithm():
             eg, isEmbeddable, localNodeResourceUsage = self._findNode(fg)
             if isEmbeddable:
                 try:
-                    linkedEG: EmbeddingGraph = self._linkNodes(eg)
+                    linkedEG: EmbeddingGraph = self.linkNodes(eg)
                     egs.append(linkedEG)
                     self._nodeResourceUsage = copy.deepcopy(localNodeResourceUsage)
                 except Exception:

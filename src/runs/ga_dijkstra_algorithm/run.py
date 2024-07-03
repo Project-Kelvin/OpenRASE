@@ -7,7 +7,7 @@ import json
 import os
 from time import sleep
 from typing import Union
-from algorithms.ga_dijkstra_algorithm.utils import convertIndividualToEmbeddingGraph, generateRandomIndividual, getVNFsfromFGRs, validateIndividual
+from algorithms.ga_dijkstra_algorithm.utils import convertIndividualToEmbeddingGraph, generateRandomIndividual, getVNFsfromFGRs, mutate, validateIndividual
 from calibrate.calibrate import Calibrate
 from mano.orchestrator import Orchestrator
 from models.calibrate import ResourceDemand
@@ -215,3 +215,4 @@ def test() -> None:
     print(validateIndividual(sampleInvalidInd, limitedTopo, resourceDemands, getFGRs()))
     print(validateIndividual(sampleValidInd, limitedTopo, resourceDemands, getFGRs()))
     print(convertIndividualToEmbeddingGraph(ind, getFGRs()))
+    print(mutate(ind, 1))

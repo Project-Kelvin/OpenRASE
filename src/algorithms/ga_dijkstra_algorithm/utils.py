@@ -84,7 +84,7 @@ def validateIndividual(individual: "list[list[int]]", topo: Topology, resourceDe
 
     return True
 
-def generateRandomIndividual(noOfHosts: int, topo: Topology, resourceDemands: "dict[str, ResourceDemand]", fgrs: "list[EmbeddingGraph]") -> "list[list[int]]":
+def generateRandomIndividual(topo: Topology, resourceDemands: "dict[str, ResourceDemand]", fgrs: "list[EmbeddingGraph]") -> "list[list[int]]":
     """
     Generate a random individual.
 
@@ -102,6 +102,7 @@ def generateRandomIndividual(noOfHosts: int, topo: Topology, resourceDemands: "d
 
     vnfs: "list[VNF]" = getVNFsfromFGRs(fgrs)
     noOfVNFs: int = len(vnfs)
+    noOfHosts: int = len(topo["hosts"])
 
     validIndividual: bool = False
 
@@ -129,21 +130,21 @@ def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list
     """
 
     egs: "list[EmbeddingGraph]" = []
-    offset: "tuple[int]" = (0,)
+    offset: "list[int]" = [0]
 
     for index, fgr in enumerate(fgrs):
         vnfs: VNF = fgr["vnfs"]
-        embeddingNotFound: "tuple[bool]" = (False, )
+        embeddingNotFound: "list[bool]" = [False]
 
-        def parseVNF(vnf: VNF, _depth: int, embeddingNotFound: "tuple[bool]", offset: "tuple[int]") -> None:
+        def parseVNF(vnf: VNF, _depth: int, embeddingNotFound: "list[bool]", offset: "list[int]") -> None:
             """
             Parse the VNF.
 
             Parameters:
                 vnf (VNF): the VNF.
                 _depth (int): the depth.
-                embeddingNotFound (tuple[bool]): the embedding not found.
-                offset (tuple[int]): the offset.
+                embeddingNotFound (list[bool]): the embedding not found.
+                offset (list[int]): the offset.
 
             Returns:
                 None
@@ -156,9 +157,9 @@ def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list
                 vnf["host"] = {
                     "id": f"h{individual[offset[0]].index(1) + 1}"
                 }
-                offset = (offset[0] + 1,)
+                offset[0] = offset[0] + 1
             except ValueError:
-                embeddingNotFound = (True,)
+                embeddingNotFound = [True]
 
 
         traverseVNF(vnfs, parseVNF, embeddingNotFound, offset, shouldParseTerminal=False)
@@ -225,19 +226,19 @@ def evalutaionThunk(fgrs: "list[EmbeddingGraph]", vnfManager: VNFManager, traffi
 
     return evaluation
 
-def mutate(individual: "list[int]", indpb: float) -> "list[int]":
+def mutate(individual: "list[list[int]]", indpb: float) -> "list[list[int]]":
     """
     Mutate the individual.
 
     Parameters:
-        individual (list[int]): the individual to mutate.
+        individual (list[list[int]]): the individual to mutate.
         indpb (float): the probability of mutation.
 
     Returns:
-        list[int]: the mutated individual.
+        list[list[int]]: the mutated individual.
     """
 
-    mutatedIndividual: "list[int]" = deepcopy(individual)
+    mutatedIndividual: "list[list[int]]" = deepcopy(individual)
 
     for ind in mutatedIndividual:
         if random.random() < indpb:
