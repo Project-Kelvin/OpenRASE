@@ -39,6 +39,16 @@ class Orchestrator():
 
         self._vnfManager.deployEmbeddingGraphs(egs)
 
+    def deleteEmbeddingGraphs(self, egs: "list[EmbeddingGraph]") -> None:
+        """
+        Delete the embedding graphs from the orchestrator.
+
+        Parameters:
+            egs (list[EmbeddingGraph]): The list of embedding graphs.
+        """
+
+        self._vnfManager.deleteEmbeddingGraphs(egs)
+
     def getTopology(self) -> Topology:
         """
         Get the topology from the infrastructure manager.

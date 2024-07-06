@@ -161,20 +161,20 @@ def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list
                 nodes[fgr["sfcID"]].append(SERVER)
 
                 return
-
-            try:
-                vnf["host"] = {
-                    "id": f"h{individual[offset[0]].index(1) + 1}"
-                }
-                # pylint: disable=cell-var-from-loop
-                if nodes[fgr["sfcID"]][-1] != vnf["host"]["id"]:
+            else:
+                try:
+                    vnf["host"] = {
+                        "id": f"h{individual[offset[0]].index(1) + 1}"
+                    }
                     # pylint: disable=cell-var-from-loop
-                    nodes[fgr["sfcID"]].append(vnf["host"]["id"])
-                offset[0] = offset[0] + 1
-            except ValueError:
-                embeddingNotFound[0] = True
+                    if nodes[fgr["sfcID"]][-1] != vnf["host"]["id"]:
+                        # pylint: disable=cell-var-from-loop
+                        nodes[fgr["sfcID"]].append(vnf["host"]["id"])
+                    offset[0] = offset[0] + 1
+                except ValueError:
+                    embeddingNotFound[0] = True
 
-        traverseVNF(vnfs, parseVNF, embeddingNotFound, offset, shouldParseTerminal=False)
+        traverseVNF(vnfs, parseVNF, embeddingNotFound, offset)
 
         if not embeddingNotFound[0]:
             if "sfcrID" in fgr:
@@ -206,11 +206,12 @@ def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list
                         "destination": {"id": path.nodes[-1]},
                         "links": path.nodes[1:-1]
                     })
-                egs.append(fgr)
+
+            egs.append(eg)
 
     return egs
 
-def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology, resourceDemands: "dict[str, ResourceDemand]") -> "tuple[int]":
+def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology, resourceDemands: "dict[str, ResourceDemand]") -> "tuple[int]":
     """
     Evaluate the individual.
 
@@ -220,6 +221,7 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
         gen (int): the generation.
         ngen (int): the number of generations.
         sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
+        deleteEGs (Callable[[list[EmbeddingGraph]], None]): the function to delete the Embedding Graphs.
         trafficDesign (TrafficDesign): The Traffic Design.
         trafficGenerator (TrafficGenerator): The Traffic Generator.
         topology (Topology): The Topology.
@@ -232,7 +234,7 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
     egs: EmbeddingGraph = convertIndividualToEmbeddingGraph(individual, fgrs, topology)
 
     acceptanceRatio: float = len(egs) / len(fgrs)
-    print(len(egs), len(fgrs))
+    TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgrs)} = {acceptanceRatio}")
     hosts = []
 
     for vnf in individual:
@@ -243,31 +245,30 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
             pass
 
     isValid: bool = validateIndividual(individual, topology, resourceDemands, fgrs)
+    if isValid:
+        sendEGs(egs)
 
-    sendEGs(egs)
+        duration: int = calculateTrafficDuration(trafficDesign)
+        time: int = 0
 
-    duration: int = calculateTrafficDuration(trafficDesign)
-    time: int = 0
+        while time < duration:
+            waitDuration: int = 2
+            sleep(waitDuration)
+            TUI.appendToSolverLog(f"{duration-time}s more to go.")
 
-    while time < duration:
-        waitDuration: int = 2
-        sleep(waitDuration)
-        TUI.appendToSolverLog(f"{duration-time}s more to go.")
+        trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
+                        f"{duration:.0f}s")
+        latency: float = 0
+        for _key, value in trafficData.items():
+            latency += value["averageLatency"]
 
-    trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
-                    f"{duration:.0f}s")
-    latency: float = 0
-    for _key, value in trafficData.items():
-        latency += value["averageLatency"]
+        latency = latency / len(trafficData)
 
-    latency = latency / len(trafficData)
-
-    vnfManager.deleteEmbeddingGraphs(egs)
-
-    if not isValid:
+        deleteEGs(egs)
+    else:
         penalty: float = gen/ngen
         acceptanceRatio = acceptanceRatio - penalty
-        latency = latency * (penalty * 10)
+        latency = 1000
 
     return (acceptanceRatio, latency)
 

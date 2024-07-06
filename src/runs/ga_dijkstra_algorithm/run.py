@@ -112,7 +112,7 @@ class SFCSolver(Solver):
                 sleep(0.1)
             self._topology: Topology = self._orchestrator.getTopology()
 
-            GADijkstraAlgorithm(self._topology, self._resourceDemands, requests, self._orchestrator.sendEmbeddingGraphs, trafficDesign, self._trafficGenerator)
+            GADijkstraAlgorithm(self._topology, self._resourceDemands, requests, self._orchestrator.sendEmbeddingGraphs, self._orchestrator.deleteEmbeddingGraphs, trafficDesign, self._trafficGenerator)
             TUI.appendToSolverLog(f"Finished experiment.")
             sleep(2)
         except Exception as e:
