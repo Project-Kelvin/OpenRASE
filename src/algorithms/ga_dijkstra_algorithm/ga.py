@@ -22,7 +22,7 @@ NO_OF_INDIVIDUALS: int = 2
 with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/data.csv", "w", encoding="utf8") as topologyFile:
     topologyFile.write("generation, average_ar, max_ar, min_ar, average_latency, max_latency, min_latency\n")
 
-def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, ResourceDemand]", fgrs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator) -> "tuple[tools.ParetoFront]":
+def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, ResourceDemand]", fgrs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator) -> "tuple[tools.ParetoFront]":
     """
     Run the Genetic Algorithm + Dijkstra Algorithm.
 
@@ -37,7 +37,6 @@ def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, Resource
     Returns:
         tuple[tools.ParetoFront]: the Pareto Front
     """
-
 
     creator.create("MaxARMinLatency", base.Fitness, weights=(1.0, -1.0))
     creator.create("Individual", list, fitness=creator.MaxARMinLatency)
@@ -62,7 +61,7 @@ def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, Resource
         offspring = algorithm(pop, toolbox, CXPB, MUTPB, topology, resourceDemands, fgrs)
         pop = pop + offspring
         for ind in pop:
-            ind.fitness.values = evaluation(ind, fgrs, gen, NGEN, sendEGs, trafficDesign, trafficGenerator, topology, resourceDemands)
+            ind.fitness.values = evaluation(ind, fgrs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, resourceDemands)
         pop = toolbox.select(pop, k=NO_OF_INDIVIDUALS)
         hof.update(pop)
 
