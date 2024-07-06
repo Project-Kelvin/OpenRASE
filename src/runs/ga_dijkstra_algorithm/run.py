@@ -67,7 +67,6 @@ class FGR(FGRequestGenerator):
             fgs: "list[EmbeddingGraph]" = json.load(fgFile)
             for fg in fgs:
                 self._fgs.append(copy.deepcopy(fg))
-                break
 
     def generateRequests(self) -> None:
         """
@@ -76,7 +75,7 @@ class FGR(FGRequestGenerator):
 
         copiedFGs: "list[EmbeddingGraph]" = []
         for index, fg in enumerate(self._fgs):
-            for i in range(0, 1):
+            for i in range(0, 8):
                 copiedFG: EmbeddingGraph = copy.deepcopy(fg)
                 copiedFG["sfcrID"] = f"sfc{index}-{i}"
                 copiedFGs.append(copiedFG)
