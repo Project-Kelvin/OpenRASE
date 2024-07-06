@@ -7,7 +7,9 @@ import json
 import os
 from time import sleep
 from typing import Union
-from algorithms.ga_dijkstra_algorithm.utils import convertIndividualToEmbeddingGraph, generateRandomIndividual, getVNFsfromFGRs, mutate, validateIndividual
+from algorithms.ga_dijkstra_algorithm.ga import GADijkstraAlgorithm
+from algorithms.ga_dijkstra_algorithm.utils import convertIndividualToEmbeddingGraph, crossover, generateRandomIndividual, getVNFsfromFGRs, mutate, validateIndividual
+from algorithms.simple_dijkstra_algorithm import SimpleDijkstraAlgorithm
 from calibrate.calibrate import Calibrate
 from mano.orchestrator import Orchestrator
 from models.calibrate import ResourceDemand
@@ -39,12 +41,6 @@ topology: Topology = generateFatTreeTopology(4, 1000, 2, None)
 logFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/experiments.csv"
 latencyDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/latency_data.csv"
 
-with open(logFilePath, "w", encoding="utf8") as log:
-    log.write("experiment,failed_fgs,accepted_fgs,execution_time,deployment_time\n")
-
-with open(latencyDataFilePath, "w", encoding="utf8") as latencyData:
-    latencyData.write("experiment,sfc,requests,average_latency,duration\n")
-
 def appendToLog(message: str) -> None:
     """
     Append to the log.
@@ -70,7 +66,12 @@ def getFGRs() -> "list[EmbeddingGraph]":
 
     fgs: "list[EmbeddingGraph]" = []
     with open(f"{configPath}/forwarding-graphs.json", "r", encoding="utf8") as fgFile:
-            fgs = json.load(fgFile)
+            fgsFile = json.load(fgFile)
+            for index, fg in enumerate(fgsFile):
+                for i in range(0, 8):
+                    fgCopy = copy.deepcopy(fg)
+                    fgCopy["sfcrID"] = f"sfcr{index}-{i}"
+                    fgs.append(fgCopy)
 
     return fgs
 
@@ -95,7 +96,7 @@ class FGR(FGRequestGenerator):
 
         copiedFGs: "list[EmbeddingGraph]" = []
         for index, fg in enumerate(self._fgs):
-            for i in range(0, 8):
+            for i in range(0, 1):
                 copiedFG: EmbeddingGraph = copy.deepcopy(fg)
                 copiedFG["sfcrID"] = f"sfc{index}-{i}"
                 copiedFGs.append(copiedFG)
@@ -132,7 +133,7 @@ class SFCSolver(Solver):
                 sleep(0.1)
             self._topology: Topology = self._orchestrator.getTopology()
 
-
+            GADijkstraAlgorithm(self._topology, self._resourceDemands, requests, self._vnfManager, self._trafficDesign, self._trafficGenerator)
             TUI.appendToSolverLog(f"Finished experiment.")
             sleep(2)
         except Exception as e:
@@ -159,6 +160,7 @@ def run() -> None:
     sfcEm.startTest(topology, trafficDesign)
     sfcEm.end()
 
+
 def test() -> None:
     """
     Tests
@@ -170,7 +172,7 @@ def test() -> None:
     maxTarget: int = max(design, key=lambda x: x["target"])["target"]
     calibrate: Calibrate = Calibrate()
     resourceDemands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(maxTarget)
-    ind: "list[list[int]]" = generateRandomIndividual(14, topology, resourceDemands, getFGRs())
+    #ind: "list[list[int]]" = generateRandomIndividual(14, topology, resourceDemands, getFGRs())
     sampleInvalidInd: "list[list[int]]" = [
         [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -210,9 +212,10 @@ def test() -> None:
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]
     ]
     limitedTopo: Topology = generateFatTreeTopology(4, 1000, 0.5, None)
-    print(getVNFsfromFGRs(getFGRs()))
+    """ print(getVNFsfromFGRs(getFGRs()))
     print(ind)
     print(validateIndividual(sampleInvalidInd, limitedTopo, resourceDemands, getFGRs()))
     print(validateIndividual(sampleValidInd, limitedTopo, resourceDemands, getFGRs()))
     print(convertIndividualToEmbeddingGraph(ind, getFGRs()))
-    print(mutate(ind, 1))
+    print(mutate(ind, 1)) """
+    print(crossover(sampleValidInd, sampleInvalidInd))

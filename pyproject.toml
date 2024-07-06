@@ -47,3 +47,4 @@ dijkstra_gen_traffic_design = "runs.simple_dijkstra_algorithm.run:getTrafficDesi
 test = "runs.test:run"
 db = "runs.influxdb:run"
 ga_test = "runs.ga_dijkstra_algorithm.run:test"
+ga = "runs.ga_dijkstra_algorithm.run:run"
