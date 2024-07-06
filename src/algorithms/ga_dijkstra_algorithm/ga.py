@@ -17,7 +17,9 @@ from models.calibrate import ResourceDemand
 
 import numpy as np
 
-NO_OF_INDIVIDUALS: int = 2
+from utils.tui import TUI
+
+NO_OF_INDIVIDUALS: int = 10
 
 with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/data.csv", "w", encoding="utf8") as topologyFile:
     topologyFile.write("generation, average_ar, max_ar, min_ar, average_latency, max_latency, min_latency\n")
@@ -51,12 +53,13 @@ def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, Resource
 
     pop = toolbox.population(n=NO_OF_INDIVIDUALS)
 
-    CXPB, MUTPB, NGEN = 0.8, 0.2, 1
+    CXPB, MUTPB, NGEN = 0.8, 0.2, 10
 
     gen = 0
     hof = tools.ParetoFront()
 
     while gen < NGEN:
+        TUI.appendToSolverLog(f"Generation: {gen}")
         gen = gen + 1
         offspring = algorithm(pop, toolbox, CXPB, MUTPB, topology, resourceDemands, fgrs)
         pop = pop + offspring

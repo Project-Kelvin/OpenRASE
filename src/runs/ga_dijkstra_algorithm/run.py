@@ -52,7 +52,7 @@ def appendToLog(message: str) -> None:
         log.write(f"{message}\n")
 
 with open(f"{configPath}/traffic-design.json", "r", encoding="utf8") as trafficFile:
-    TrafficDesign = [json.load(trafficFile)]
+    trafficDesign = [json.load(trafficFile)]
 
 class FGR(FGRequestGenerator):
     """
@@ -67,6 +67,7 @@ class FGR(FGRequestGenerator):
             fgs: "list[EmbeddingGraph]" = json.load(fgFile)
             for fg in fgs:
                 self._fgs.append(copy.deepcopy(fg))
+                break
 
     def generateRequests(self) -> None:
         """
