@@ -3,6 +3,7 @@ This defines a Genetic Algorithm (GA) to produce an Embedding Graph from a Forwa
 GA is sued for VNf Embedding and Dijkstra isu sed for link embedding.
 """
 
+from typing import Callable
 from mano.vnf_manager import VNFManager
 from packages.python.shared.models.traffic_design import TrafficDesign
 from packages.python.shared.utils.config import getConfig
@@ -21,7 +22,7 @@ NO_OF_INDIVIDUALS: int = 2
 with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/data.csv", "w", encoding="utf8") as topologyFile:
     topologyFile.write("generation, average_ar, max_ar, min_ar, average_latency, max_latency, min_latency\n")
 
-def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, ResourceDemand]", fgrs: "list[EmbeddingGraph]", vnfManager: VNFManager, trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator) -> "tuple[tools.ParetoFront]":
+def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, ResourceDemand]", fgrs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator) -> "tuple[tools.ParetoFront]":
     """
     Run the Genetic Algorithm + Dijkstra Algorithm.
 
@@ -29,6 +30,9 @@ def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, Resource
         topology (Topology): the topology.
         resourceDemands (dict[str, ResourceDemand]): the resource demands.
         fgrs (list[EmbeddingGraph]): the FG Requests.
+        sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
+        trafficDesign (TrafficDesign): the traffic design.
+        trafficGenerator (TrafficGenerator): the traffic generator.
 
     Returns:
         tuple[tools.ParetoFront]: the Pareto Front
@@ -40,7 +44,7 @@ def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, Resource
 
     toolbox:base.Toolbox = base.Toolbox()
 
-    toolbox.register("individual", generateRandomIndividual, creator.Individual, topology, resourceDemands, fgrs)
+    toolbox.register("individual", generateRandomIndividual, creator.Individual, topology, fgrs)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("mate", tools.cxTwoPoint)
     toolbox.register("mutate", mutate, indpb=0.05)
@@ -58,7 +62,7 @@ def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, Resource
         offspring = algorithm(pop, toolbox, CXPB, MUTPB, topology, resourceDemands, fgrs)
         pop = pop + offspring
         for ind in pop:
-            ind.fitness.values = evaluation(ind, fgrs, gen, NGEN, None, None, None, topology, resourceDemands)
+            ind.fitness.values = evaluation(ind, fgrs, gen, NGEN, sendEGs, trafficDesign, trafficGenerator, topology, resourceDemands)
         pop = toolbox.select(pop, k=NO_OF_INDIVIDUALS)
         hof.update(pop)
 

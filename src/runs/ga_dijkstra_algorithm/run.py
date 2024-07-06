@@ -8,10 +8,9 @@ import os
 from time import sleep
 from typing import Union
 from algorithms.ga_dijkstra_algorithm.ga import GADijkstraAlgorithm
-from algorithms.ga_dijkstra_algorithm.utils import convertIndividualToEmbeddingGraph, crossover, generateRandomIndividual, getVNFsfromFGRs, mutate, validateIndividual
-from algorithms.simple_dijkstra_algorithm import SimpleDijkstraAlgorithm
 from calibrate.calibrate import Calibrate
 from mano.orchestrator import Orchestrator
+from mano.vnf_manager import VNFManager
 from models.calibrate import ResourceDemand
 from packages.python.shared.models.config import Config
 from packages.python.shared.models.embedding_graph import EmbeddingGraph
@@ -24,7 +23,6 @@ from sfc.sfc_emulator import SFCEmulator
 from sfc.solver import Solver
 from sfc.traffic_generator import TrafficGenerator
 from utils.topology import generateFatTreeTopology
-from utils.traffic_design import generateTrafficDesign
 from utils.tui import TUI
 
 
@@ -38,6 +36,7 @@ if not os.path.exists(directory):
     os.makedirs(directory)
 
 topology: Topology = generateFatTreeTopology(4, 1000, 2, None)
+trafficDesign: "list[TrafficDesign]" = []
 logFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/experiments.csv"
 latencyDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/latency_data.csv"
 
@@ -53,27 +52,7 @@ def appendToLog(message: str) -> None:
         log.write(f"{message}\n")
 
 with open(f"{configPath}/traffic-design.json", "r", encoding="utf8") as trafficFile:
-    trafficDesign: "list[TrafficDesign]" = [json.load(trafficFile)]
-
-
-def getFGRs() -> "list[EmbeddingGraph]":
-    """
-    Get the FG Request.
-
-    Returns:
-        list[EmbeddingGraph]: the FG Request.
-    """
-
-    fgs: "list[EmbeddingGraph]" = []
-    with open(f"{configPath}/forwarding-graphs.json", "r", encoding="utf8") as fgFile:
-            fgsFile = json.load(fgFile)
-            for index, fg in enumerate(fgsFile):
-                for i in range(0, 8):
-                    fgCopy = copy.deepcopy(fg)
-                    fgCopy["sfcrID"] = f"sfcr{index}-{i}"
-                    fgs.append(fgCopy)
-
-    return fgs
+    TrafficDesign = [json.load(trafficFile)]
 
 class FGR(FGRequestGenerator):
     """
@@ -133,23 +112,14 @@ class SFCSolver(Solver):
                 sleep(0.1)
             self._topology: Topology = self._orchestrator.getTopology()
 
-            GADijkstraAlgorithm(self._topology, self._resourceDemands, requests, self._vnfManager, self._trafficDesign, self._trafficGenerator)
+            GADijkstraAlgorithm(self._topology, self._resourceDemands, requests, self._orchestrator.sendEmbeddingGraphs, trafficDesign, self._trafficGenerator)
             TUI.appendToSolverLog(f"Finished experiment.")
             sleep(2)
         except Exception as e:
             TUI.appendToSolverLog(str(e), True)
+
+        sleep(10)
         TUI.exit()
-
-def getTrafficDesign() -> None:
-    """
-    Get the Traffic Design.
-    """
-
-    design: TrafficDesign = generateTrafficDesign(
-        f"{getConfig()['repoAbsolutePath']}/src/runs/ga_dijkstra_algorithm/data/requests.csv", 2)
-
-    with open(f"{configPath}/traffic-design.json", "w", encoding="utf8") as traffic:
-        json.dump(design, traffic, indent=4)
 
 def run() -> None:
     """
@@ -157,65 +127,8 @@ def run() -> None:
     """
 
     sfcEm: SFCEmulator = SFCEmulator(FGR, SFCSolver)
-    sfcEm.startTest(topology, trafficDesign)
+    try:
+        sfcEm.startTest(topology, trafficDesign)
+    except Exception as e:
+        TUI.appendToSolverLog(str(e), True)
     sfcEm.end()
-
-
-def test() -> None:
-    """
-    Tests
-    """
-
-    trafficDesignPath = f"{configPath}/traffic-design.json"
-    with open(trafficDesignPath, "r", encoding="utf8") as traffic:
-        design = json.load(traffic)
-    maxTarget: int = max(design, key=lambda x: x["target"])["target"]
-    calibrate: Calibrate = Calibrate()
-    resourceDemands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(maxTarget)
-    #ind: "list[list[int]]" = generateRandomIndividual(14, topology, resourceDemands, getFGRs())
-    sampleInvalidInd: "list[list[int]]" = [
-        [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-        [1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-        [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-        [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]
-    ]
-    sampleValidInd: "list[list[int]]" = [
-        [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-        [0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
-        [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]
-    ]
-    limitedTopo: Topology = generateFatTreeTopology(4, 1000, 0.5, None)
-    """ print(getVNFsfromFGRs(getFGRs()))
-    print(ind)
-    print(validateIndividual(sampleInvalidInd, limitedTopo, resourceDemands, getFGRs()))
-    print(validateIndividual(sampleValidInd, limitedTopo, resourceDemands, getFGRs()))
-    print(convertIndividualToEmbeddingGraph(ind, getFGRs()))
-    print(mutate(ind, 1)) """
-    print(crossover(sampleValidInd, sampleInvalidInd))

@@ -6,6 +6,7 @@ from copy import deepcopy
 import copy
 import random
 from time import sleep
+from typing import Callable
 from dijkstar import Graph, find_path
 from algorithms.simple_dijkstra_algorithm import SimpleDijkstraAlgorithm
 from constants.topology import SERVER, SFCC
@@ -209,7 +210,7 @@ def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list
 
     return egs
 
-def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen: int, ngen: int, vnfManager: VNFManager, trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology, resourceDemands: "dict[str, ResourceDemand]") -> "tuple[int]":
+def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology, resourceDemands: "dict[str, ResourceDemand]") -> "tuple[int]":
     """
     Evaluate the individual.
 
@@ -218,7 +219,7 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
         fgrs (list[EmbeddingGraph]): The SFC Requests.
         gen (int): the generation.
         ngen (int): the number of generations.
-        vnfManager (VNFManager): The VNF Manager.
+        sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
         trafficDesign (TrafficDesign): The Traffic Design.
         trafficGenerator (TrafficGenerator): The Traffic Generator.
         topology (Topology): The Topology.
@@ -243,7 +244,7 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
 
     isValid: bool = validateIndividual(individual, topology, resourceDemands, fgrs)
 
-    vnfManager.deployEmbeddingGraphs(egs)
+    sendEGs(egs)
 
     duration: int = calculateTrafficDuration(trafficDesign)
     time: int = 0
