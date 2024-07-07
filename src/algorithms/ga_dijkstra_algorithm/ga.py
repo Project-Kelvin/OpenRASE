@@ -52,6 +52,8 @@ def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, Resource
     toolbox.register("select", tools.selNSGA2)
 
     pop = toolbox.population(n=NO_OF_INDIVIDUALS)
+    for ind in pop:
+        ind.fitness.values = evaluation(ind, fgrs, 0, 10, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, resourceDemands)
 
     CXPB, MUTPB, NGEN = 0.8, 0.2, 10
 
@@ -62,10 +64,9 @@ def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, Resource
         TUI.appendToSolverLog(f"Generation: {gen}")
         gen = gen + 1
         offspring = algorithm(pop, toolbox, CXPB, MUTPB, topology, resourceDemands, fgrs)
-        pop = pop + offspring
-        for ind in pop:
+        for ind in offspring:
             ind.fitness.values = evaluation(ind, fgrs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, resourceDemands)
-        pop = toolbox.select(pop, k=NO_OF_INDIVIDUALS)
+        pop = toolbox.select(pop + offspring, k=NO_OF_INDIVIDUALS)
         hof.update(pop)
 
         ars = [ind.fitness.values[0] for ind in pop]
