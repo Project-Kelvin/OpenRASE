@@ -250,13 +250,8 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
 
         duration: int = calculateTrafficDuration(trafficDesign[0])
         TUI.appendToSolverLog(f"Traffic Duration: {duration}s")
-        time: int = 0
-
-        while time < duration:
-            waitDuration: int = 2
-            sleep(waitDuration)
-            TUI.appendToSolverLog(f"{duration-time}s more to go.")
-            time += waitDuration
+        TUI.appendToSolverLog(f"Waiting for {duration}s...")
+        sleep(duration)
 
         trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
                         f"{duration:.0f}s")
@@ -264,13 +259,18 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
         for _key, value in trafficData.items():
             latency += value["averageLatency"]
 
-        latency = latency / len(trafficData)
+        latency = latency / len(trafficData) if len(trafficData) > 0 else 1000
 
         deleteEGs(egs)
     else:
         penalty: float = gen/ngen
         acceptanceRatio = acceptanceRatio - penalty if len(egs) > 0 else acceptanceRatio
-        latency = 1000
+        latency = 10000 * penalty if len(egs) > 0 else 10000
+
+        if not isValid:
+            TUI.appendToSolverLog(f"Invalid Individual.")
+
+    TUI.appendToSolverLog(f"Latency: {latency}ms")
 
     return (acceptanceRatio, latency)
 
