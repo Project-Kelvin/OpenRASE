@@ -13,7 +13,7 @@ from constants.notification import EMBEDDING_GRAPH_DELETED, EMBEDDING_GRAPH_DEPL
 from constants.topology import SERVER, SFCC
 from mano.infra_manager import InfraManager
 from mano.notification_system import NotificationSystem
-from docker import DockerClient
+from docker import DockerClient, from_env
 from utils.container import connectToDind, getContainerIP
 from utils.embedding_graph import traverseVNF
 from utils.tui import TUI
@@ -168,6 +168,11 @@ class VNFManager():
                 TUI.appendToLog(f"    Deleting {vnfName}.")
                 dindClient.containers.get(vnfName).remove(force=True)
 
+                dindClient.containers.prune()
+                dindClient.images.prune()
+                dindClient.networks.prune()
+                dindClient.volumes.prune()
+
         def traverseCallback(vnfs: VNF, _depth: int) -> None:
             """
             Callback function for the traverseVNF function.
@@ -209,6 +214,12 @@ class VNFManager():
 
             for future in futures:
                 future.result()
+
+        client: DockerClient = from_env()
+        client.containers.prune()
+        client.images.prune()
+        client.networks.prune()
+        client.volumes.prune()
 
 
     def deployEmbeddingGraphs(self, egs: "list[EmbeddingGraph]") -> None:
