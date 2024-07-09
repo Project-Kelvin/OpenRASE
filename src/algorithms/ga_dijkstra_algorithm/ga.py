@@ -52,17 +52,17 @@ def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, Resource
     toolbox.register("select", tools.selNSGA2)
 
     pop = toolbox.population(n=NO_OF_INDIVIDUALS)
-    for ind in pop:
-        ind.fitness.values = evaluation(ind, fgrs, 0, 10, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, resourceDemands)
-
+    gen: int = 1
     CXPB, MUTPB, NGEN = 0.8, 0.2, 10
+    for ind in pop:
+        ind.fitness.values = evaluation(ind, fgrs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, resourceDemands)
 
-    gen = 0
+    gen = gen + 1
+
     hof = tools.ParetoFront()
 
     while gen < NGEN:
         TUI.appendToSolverLog(f"Generation: {gen}")
-        gen = gen + 1
         offspring = algorithm(pop, toolbox, CXPB, MUTPB, topology, resourceDemands, fgrs)
         for ind in offspring:
             ind.fitness.values = evaluation(ind, fgrs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, resourceDemands)
@@ -74,5 +74,7 @@ def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, Resource
 
         with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/data.csv", "a", encoding="utf8") as topologyFile:
             topologyFile.write(f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n")
+
+        gen = gen + 1
 
     return hof
