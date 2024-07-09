@@ -236,6 +236,7 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
     acceptanceRatio: float = len(egs) / len(fgrs)
     TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgrs)} = {acceptanceRatio}")
     hosts = []
+    penaltyLatency: int = 10000
 
     for vnf in individual:
         try:
@@ -259,13 +260,13 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
         for _key, value in trafficData.items():
             latency += value["averageLatency"]
 
-        latency = latency / len(trafficData) if len(trafficData) > 0 else 1000
+        latency = latency / len(trafficData) if len(trafficData) > 0 else penaltyLatency
 
         deleteEGs(egs)
     else:
         penalty: float = gen/ngen
         acceptanceRatio = acceptanceRatio - penalty if len(egs) > 0 else acceptanceRatio
-        latency = 10000 * penalty if len(egs) > 0 else 10000
+        latency = penaltyLatency * penalty if len(egs) > 0 else penaltyLatency
 
         if not isValid:
             TUI.appendToSolverLog(f"Invalid Individual.")
