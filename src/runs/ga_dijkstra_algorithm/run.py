@@ -119,7 +119,7 @@ class SFCSolver(Solver):
             TUI.appendToSolverLog(str(e), True)
 
         sleep(10)
-        TUI.exit()
+        #TUI.exit()
 
 def run() -> None:
     """

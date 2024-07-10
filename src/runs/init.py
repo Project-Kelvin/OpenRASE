@@ -294,17 +294,23 @@ def run(template: bool, registry: bool, insecure: bool, images: bool, artifacts:
 
     if template:
         runTemplate()
-    elif registry:
+
+    if registry:
         runRegistry()
-    elif insecure:
+
+    if insecure:
         runInsecure()
-    elif images:
+
+    if images:
         runImages()
-    elif artifacts:
+
+    if artifacts:
         runArtifacts()
-    elif dpi:
+
+    if dpi:
         runDPI()
-    else:
+
+    if not template and not registry and not insecure and not images and not artifacts and not dpi:
         runRegistry()
         runTemplate()
         runInsecure()

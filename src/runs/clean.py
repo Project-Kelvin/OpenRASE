@@ -23,14 +23,17 @@ def removeFiles(log_dir: str) -> None:
                 shutil.rmtree(file_path)
 
 @click.command()
-@click.option("--logs", default=True, type=bool, is_flag=True, help="Delete the log files.")
-@click.option("--docker", default=True, type=bool, is_flag=True, help="Delete the docker containers.")
+@click.option("--logs", default=False, type=bool, is_flag=True, help="Delete the log files.")
+@click.option("--docker", default=False, type=bool, is_flag=True, help="Delete the docker containers.")
 def clean(logs: bool, docker: bool) -> None:
     """
     This function cleans the log files and docker containers.
     """
 
-    if logs:
+    def cleanLogs() -> None:
+        """
+        This function cleans the log files.
+        """
         # Clean the log files
         print("Cleaning the log files.")
         # Code to clean the log files
@@ -46,8 +49,22 @@ def clean(logs: bool, docker: bool) -> None:
         removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/files/node-sff/shared/node-logs")
         removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/files/tm/shared/node-logs")
 
-    if docker:
+    def cleanDocker() -> None:
+        """
+        This function cleans the docker containers.
+        """
+
         # Clean the docker containers
         print("Cleaning the docker containers.")
         # Code to clean the docker containers
         removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/registry")
+
+    if logs:
+        cleanLogs()
+
+    if docker:
+        cleanDocker()
+
+    if not logs and not docker:
+        cleanLogs()
+        cleanDocker()
