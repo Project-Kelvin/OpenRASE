@@ -5,6 +5,7 @@ This defines the function to clean the log files.
 import shutil
 
 import click
+from docker import DockerClient, from_env
 from shared.models.config import Config
 from shared.utils.config import getConfig
 import os
@@ -25,9 +26,15 @@ def removeFiles(log_dir: str) -> None:
 @click.command()
 @click.option("--logs", default=False, type=bool, is_flag=True, help="Delete the log files.")
 @click.option("--docker", default=False, type=bool, is_flag=True, help="Delete the docker containers.")
-def clean(logs: bool, docker: bool) -> None:
+@click.option("--prune", default=False, type=bool, is_flag=True, help="Prune Docker.")
+def clean(logs: bool, docker: bool, prune: bool) -> None:
     """
     This function cleans the log files and docker containers.
+
+    Parameters:
+        logs (bool): A boolean flag to delete the log files.
+        docker (bool): A boolean flag to delete the docker containers.
+        prune (bool): A boolean flag to prune the docker containers.
     """
 
     def cleanLogs() -> None:
@@ -59,12 +66,30 @@ def clean(logs: bool, docker: bool) -> None:
         # Code to clean the docker containers
         removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/registry")
 
+    def prune() -> None:
+        """
+        This function prunes the docker containers.
+        """
+
+        # Prune the docker containers
+        print("Pruning the docker containers.")
+        # Code to prune the docker containers
+        client: DockerClient = from_env()
+        client.containers.prune()
+        client.images.prune()
+        client.networks.prune()
+        client.volumes.prune()
+
     if logs:
         cleanLogs()
 
     if docker:
         cleanDocker()
 
+    if prune:
+        prune()
+
     if not logs and not docker:
         cleanLogs()
         cleanDocker()
+        prune()
