@@ -85,7 +85,7 @@ def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, Resource
 
         for ind in hof:
             with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/pfs.csv", "a", encoding="utf8") as pf:
-                pf.write(f"{gen}, {ind.fitness.values[1]}, {ind.fitness.valuse[0]}\n")
+                pf.write(f"{gen}, {ind.fitness.values[1]}, {ind.fitness.values[0]}\n")
 
         ars = [ind.fitness.values[0] for ind in pop]
         latencies = [ind.fitness.values[1] for ind in pop]
