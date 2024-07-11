@@ -22,14 +22,17 @@ class SFCEmulator(Subscriber):
     """
 
 
-    def __init__(self, requestGenerator: Union[Type[SFCRequestGenerator], Type[FGRequestGenerator]], solver: Type[Solver]) -> None:
+    def __init__(self, requestGenerator: Union[Type[SFCRequestGenerator], Type[FGRequestGenerator]], solver: Type[Solver], headless: bool = False) -> None:
         """
         Constructor for the class.
 
         Parameters:
             requestGenerator (SFCRequestGenerator | FGRequestGenerator): The SFC request generator.
             solver (Type[Solver]): A child class of Solver.
+            headless (bool): Whether to run the emulator in headless mode.
         """
+
+        TUI.setMode(headless)
         self._mano: MANO = MANO()
         self._trafficGenerator: TrafficGenerator = TrafficGenerator()
         Thread(target=self._trafficGenerator.startParentContainer).start()
@@ -39,7 +42,6 @@ class SFCEmulator(Subscriber):
         self._requestGenerator: Union[SFCRequestGenerator, FGRequestGenerator] = requestGenerator(
             self._mano.getOrchestrator())
         self._threads: "list[Thread]" = []
-        self._headless: bool = False
         NotificationSystem.subscribe(TOPOLOGY_INSTALLED, self)
 
     def startTest(self, topology: Topology, trafficDesign: "list[TrafficDesign]") -> None:

@@ -174,8 +174,6 @@ class InfraManager():
                 self._linkedPorts[f"{link['source']}-{link['destination']}"] = (port1, port2)
                 self._linkedPorts[f"{link['destination']}-{link['source']}"] = (port2, port1)
 
-
-
             TUI.appendToLog("Starting Mininet.")
             try:
                 self._net.start()

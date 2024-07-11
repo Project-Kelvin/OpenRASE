@@ -197,11 +197,21 @@ class TUI():
     _disable: bool = False
 
     @classmethod
+    def setMode(cls, disable: bool) -> None:
+        """
+        Set the mode of the TUI.
+
+        Parameters:
+            disable (bool): Whether to disable the TUI.
+        """
+
+        cls._disable = disable
+
+    @classmethod
     def init(cls) -> None:
         """
         Initialize the TUI.
         """
-
 
         cls._isInitialized = False
 
@@ -266,6 +276,8 @@ class TUI():
         """
 
         if cls._disable:
+            print(text)
+
             return
 
         cls._wait()
@@ -282,6 +294,8 @@ class TUI():
         """
 
         if cls._disable:
+            print(text)
+
             return
 
         cls._wait()
@@ -293,10 +307,11 @@ class TUI():
         Exit the TUI.
         """
 
+        cls._isInitialized = False
+
         if cls._disable:
             return
 
-        cls._isInitialized = False
         cls.app.exit()
         cls.app.uninstall_screen("logger")
         cls.app.uninstall_screen("splash")

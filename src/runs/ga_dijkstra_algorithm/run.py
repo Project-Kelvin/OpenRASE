@@ -7,6 +7,8 @@ import json
 import os
 from time import sleep
 from typing import Union
+
+import click
 from algorithms.ga_dijkstra_algorithm.ga import GADijkstraAlgorithm
 from calibrate.calibrate import Calibrate
 from mano.orchestrator import Orchestrator
@@ -121,12 +123,17 @@ class SFCSolver(Solver):
         sleep(10)
         #TUI.exit()
 
-def run() -> None:
+@click.command()
+@click.option("--headless", default=False, is_flag=True, help="If set, the emulator would run in headless mode.")
+def run(headless: bool) -> None:
     """
-    Run the experiment
+    Run the experiment.
+
+    Parameters:
+        headless (bool): Whether to run the emulator in headless mode.
     """
 
-    sfcEm: SFCEmulator = SFCEmulator(FGR, SFCSolver)
+    sfcEm: SFCEmulator = SFCEmulator(FGR, SFCSolver, headless)
     try:
         sfcEm.startTest(topology, trafficDesign)
     except Exception as e:

@@ -3,6 +3,7 @@ This file is used to test the functionality of the SFC Emulator.
 """
 
 from time import sleep
+import click
 from shared.constants.embedding_graph import TERMINAL
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
@@ -247,6 +248,7 @@ class SFCSolver(Solver):
                     averageLatency: float = value["averageLatency"]
                     httpReqsRate: float = httpReqs / 5 if httpReqs != 0 else 0
                     TUI.appendToSolverLog(f"{httpReqsRate} requests took {averageLatency} seconds on average for {key}.")
+                    print(f"{httpReqsRate} requests took {averageLatency} seconds on average for {key}.")
                 elapsed += 5
             TUI.appendToSolverLog("Solver has finished.")
         self._orchestrator.sendEmbeddingGraphs([simpleEG, simpleEGUpdated])
@@ -256,12 +258,17 @@ class SFCSolver(Solver):
         TUI.exit()
 
 
-def run () -> None:
+@click.command()
+@click.option("--headless", default=False, type=bool, is_flag=True, help="Run the emulator in headless mode.")
+def run (headless: bool) -> None:
     """
     Run the test.
+
+    Parameters:
+        headless (bool): Whether to run the emulator in headless mode.
     """
 
-    sfcEmulator = SFCEmulator(SFCR, SFCSolver)
+    sfcEmulator = SFCEmulator(SFCR, SFCSolver, headless)
     sfcEmulator.startTest(topo, trafficDesign)
     sfcEmulator.startCLI()
     sfcEmulator.end()
