@@ -231,6 +231,11 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
         tuple[int]: the evaluation.
     """
 
+    if hasattr(individual.fitness, "values") and len(individual.fitness.values) > 0:
+        TUI.appendToSolverLog(f"Individual already evaluated.")
+
+        return individual.fitness.values
+
     egs: EmbeddingGraph = convertIndividualToEmbeddingGraph(individual, fgrs, topology)
 
     acceptanceRatio: float = len(egs) / len(fgrs)
@@ -319,9 +324,9 @@ def algorithm(pop: "list[list[list[int]]]", toolbox: base.Toolbox, CXPB: float, 
         offspring (list[list[list[int]]]): the offspring.
     """
 
-    offspring: "list[list[list[int]]]" = list(map(toolbox.clone, pop))
+    offspring: "list[list[list[int]]]" = []
 
-    for child1, child2 in zip(offspring[::2], offspring[1::2]):
+    for child1, child2 in zip(pop[::2], pop[1::2]):
         if random.random() < CXPB:
             validOffspring: bool = False
             child1Copy: "list[list[int]]" = []
@@ -337,11 +342,14 @@ def algorithm(pop: "list[list[list[int]]]", toolbox: base.Toolbox, CXPB: float, 
                 if not validateIndividual(child1Copy, topo, resourceDemands, fgrs) or not validateIndividual(child2Copy, topo, resourceDemands, fgrs):
                     validOffspring = True
 
-            child1 = child1Copy
-            child2 = child2Copy
+            child1 = toolbox.clone(child1Copy)
+            child2 = toolbox.clone(child2Copy)
 
             del child1.fitness.values
             del child2.fitness.values
+
+        offspring.append(child1)
+        offspring.append(child2)
 
     for mutant in offspring:
         if random.random() < MUTPB:
@@ -355,8 +363,10 @@ def algorithm(pop: "list[list[list[int]]]", toolbox: base.Toolbox, CXPB: float, 
 
                 if not validateIndividual(mutantCopy, topo, resourceDemands, fgrs):
                     validMutant = True
-            mutant = mutantCopy
+            mutant = toolbox.clone(mutantCopy)
             del mutant.fitness.values
+        offspring.remove(mutant)
+        offspring.append(mutant)
 
     return offspring
 
