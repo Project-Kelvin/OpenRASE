@@ -11,7 +11,6 @@ from dijkstar import Graph, find_path
 from algorithms.simple_dijkstra_algorithm import SimpleDijkstraAlgorithm
 from constants.topology import SERVER, SFCC
 from deap import base
-from mano.vnf_manager import VNFManager
 from models.calibrate import ResourceDemand
 from models.traffic_generator import TrafficData
 from packages.python.shared.models.embedding_graph import VNF, EmbeddingGraph
@@ -199,7 +198,11 @@ def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list
                 if srcDst not in nodePair and dstSrc not in nodePair:
                     nodePair.append(srcDst)
                     nodePair.append(dstSrc)
-                    path = find_path(graph, nodes[eg["sfcID"]][i], nodes[eg["sfcID"]][i + 1])
+                    try:
+                        path = find_path(graph, nodes[eg["sfcID"]][i], nodes[eg["sfcID"]][i + 1])
+                    except Exception as e:
+                        TUI.appendToSolverLog(f"Error: {e}")
+                        continue
 
                     eg["links"].append({
                         "source": {"id": path.nodes[0]},
@@ -324,49 +327,21 @@ def algorithm(pop: "list[list[list[int]]]", toolbox: base.Toolbox, CXPB: float, 
         offspring (list[list[list[int]]]): the offspring.
     """
 
-    offspring: "list[list[list[int]]]" = []
+    offspring: "list[list[list[int]]]" = list(map(toolbox.clone, pop))
 
-    for child1, child2 in zip(pop[::2], pop[1::2]):
+    for child1, child2 in zip(offspring[::2], offspring[1::2]):
         if random.random() < CXPB:
-            validOffspring: bool = False
-            child1Copy: "list[list[int]]" = []
-            child2Copy: "list[list[int]]" = []
 
-            while not validOffspring:
-                validOffspring = True
-                child1Copy = toolbox.clone(child1)
-                child2Copy = toolbox.clone(child2)
-
-                toolbox.mate(child1Copy, child2Copy)
-
-                if not validateIndividual(child1Copy, topo, resourceDemands, fgrs) or not validateIndividual(child2Copy, topo, resourceDemands, fgrs):
-                    validOffspring = True
-
-            child1 = toolbox.clone(child1Copy)
-            child2 = toolbox.clone(child2Copy)
+            toolbox.mate(child1, child2)
 
             del child1.fitness.values
             del child2.fitness.values
 
-        offspring.append(child1)
-        offspring.append(child2)
-
     for mutant in offspring:
         if random.random() < MUTPB:
-            mutantCopy: "list[list[int]]" = []
-            validMutant: bool = False
+            toolbox.mutate(mutant)
 
-            while not validMutant:
-                validMutant = True
-                mutantCopy = toolbox.clone(mutant)
-                toolbox.mutate(mutantCopy)
-
-                if not validateIndividual(mutantCopy, topo, resourceDemands, fgrs):
-                    validMutant = True
-            mutant = toolbox.clone(mutantCopy)
             del mutant.fitness.values
-        offspring.remove(mutant)
-        offspring.append(mutant)
 
     return offspring
 
@@ -391,15 +366,32 @@ def crossover(ind1: "list[list[int]]", ind2: "list[list[int]]") -> "tuple[list[l
 
     ind1Quads: "list[list[list[int]]]" = []
     ind2Quads: "list[list[list[int]]]" = []
-    ind1Quads.append(ind1[:yCutPoint][:xCutPoint])
-    ind1Quads.append(ind1[:yCutPoint][xCutPoint:])
-    ind1Quads.append(ind1[yCutPoint:][:xCutPoint])
-    ind1Quads.append(ind1[yCutPoint:][xCutPoint:])
 
-    ind2Quads.append(ind2[:yCutPoint][:xCutPoint])
-    ind2Quads.append(ind2[:yCutPoint][xCutPoint:])
-    ind2Quads.append(ind2[yCutPoint:][:xCutPoint])
-    ind2Quads.append(ind2[yCutPoint:][xCutPoint:])
+    ind1ySlice1: "list[list[int]]" = ind1[:yCutPoint]
+    ind1ySlice2: "list[list[int]]" = ind1[yCutPoint:]
+
+    ind1xSlice1: "list[int]" = [vnf[:xCutPoint] for vnf in ind1ySlice1]
+    ind1xSlice2: "list[int]" = [vnf[xCutPoint:] for vnf in ind1ySlice1]
+    ind1xSlice3: "list[int]" = [vnf[:xCutPoint] for vnf in ind1ySlice2]
+    ind1xSlice4: "list[int]" = [vnf[xCutPoint:] for vnf in ind1ySlice2]
+
+    ind1Quads.append(ind1xSlice1)
+    ind1Quads.append(ind1xSlice2)
+    ind1Quads.append(ind1xSlice3)
+    ind1Quads.append(ind1xSlice4)
+
+    ind2ySlice1: "list[list[int]]" = ind2[:yCutPoint]
+    ind2ySlice2: "list[list[int]]" = ind2[yCutPoint:]
+
+    ind2xSlice1: "list[int]" = [vnf[:xCutPoint] for vnf in ind2ySlice1]
+    ind2xSlice2: "list[int]" = [vnf[xCutPoint:] for vnf in ind2ySlice1]
+    ind2xSlice3: "list[int]" = [vnf[:xCutPoint] for vnf in ind2ySlice2]
+    ind2xSlice4: "list[int]" = [vnf[xCutPoint:] for vnf in ind2ySlice2]
+
+    ind2Quads.append(ind2xSlice1)
+    ind2Quads.append(ind2xSlice2)
+    ind2Quads.append(ind2xSlice3)
+    ind2Quads.append(ind2xSlice4)
 
     quads: "list[int]" = [0, 1, 2, 3]
     swapQ1: int = random.choice(quads)
@@ -423,18 +415,18 @@ def crossover(ind1: "list[list[int]]", ind2: "list[list[int]]") -> "tuple[list[l
                 continue
             fitness: int = random.randint(0, 1)
             if len(ind1.fitness.values) == 0:
-                vnf2.insert(vnf2.index(1), 0)
+                vnf2[vnf2.index(1)] = 0
             else:
                 if fitness == 0:
                     if ind1.fitness.values[0] > ind2.fitness.values[0]:
-                        vnf2.insert(vnf2.index(1), 0)
+                        vnf2[vnf2.index(1)] = 0
                     else:
-                        vnf1.insert(vnf1.index(1), 0)
+                        vnf1[vnf1.index(1)] = 0
                 else:
                     if ind1.fitness.values[1] < ind2.fitness.values[1]:
-                        vnf1.insert(vnf1.index(1), 0)
+                        vnf2[vnf2.index(1)] = 0
                     else:
-                        vnf2.insert(vnf2.index(1), 0)
+                        vnf1[vnf1.index(1)] = 0
 
     if swapQ1 % 2 == 0:
         fixMultiDeployment(ind1Quads[swapQ1], ind2Quads[swapQ1+1])
@@ -442,6 +434,13 @@ def crossover(ind1: "list[list[int]]", ind2: "list[list[int]]") -> "tuple[list[l
     else:
         fixMultiDeployment(ind1Quads[swapQ1], ind2Quads[swapQ1-1])
         fixMultiDeployment(ind1Quads[swapQ1-1], ind2Quads[swapQ1])
+
+    if swapQ2 % 2 == 0:
+        fixMultiDeployment(ind1Quads[swapQ2], ind2Quads[swapQ2+1])
+        fixMultiDeployment(ind1Quads[swapQ2+1], ind2Quads[swapQ2])
+    else:
+        fixMultiDeployment(ind1Quads[swapQ2], ind2Quads[swapQ2-1])
+        fixMultiDeployment(ind1Quads[swapQ2-1], ind2Quads[swapQ2])
 
 
     tempQ1 = ind1Quads[swapQ1]
@@ -452,7 +451,14 @@ def crossover(ind1: "list[list[int]]", ind2: "list[list[int]]") -> "tuple[list[l
     ind1Quads[swapQ2] = ind2Quads[swapQ2]
     ind2Quads[swapQ2] = tempQ2
 
-    ind1 = ind1Quads[0] + ind1Quads[1] + ind1Quads[2] + ind1Quads[3]
-    ind2 = ind2Quads[0] + ind2Quads[1] + ind2Quads[2] + ind2Quads[3]
+    off1ySlice1: "list[list[int]]" = ind1Quads[0] + ind1Quads[2]
+    off1ySlice2: "list[list[int]]" = ind1Quads[1] + ind1Quads[3]
 
-    return ind1, ind2
+    off1: "list[list[int]]" = [vnf1 + vnf2 for vnf1, vnf2 in zip(off1ySlice1, off1ySlice2)]
+
+    off2ySlice1: "list[list[int]]" = ind2Quads[0] + ind2Quads[2]
+    off2ySlice2: "list[list[int]]" = ind2Quads[1] + ind2Quads[3]
+
+    off2: "list[list[int]]" = [vnf1 + vnf2 for vnf1, vnf2 in zip(off2ySlice1, off2ySlice2)]
+
+    return off1, off2
