@@ -110,7 +110,7 @@ def generateRandomIndividual(container: list, topo: Topology, fgrs: "list[Embedd
 
     for _ in range(noOfVNFs):
         item: "list[int]" = [0] * noOfHosts
-        if random.random() < 0.99:
+        if random.random() < 0.999:
             item[random.randint(0, noOfHosts-1)] = 1
         individual.append(item)
 
@@ -236,7 +236,7 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
     acceptanceRatio: float = len(egs) / len(fgrs)
     TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgrs)} = {acceptanceRatio}")
     hosts = []
-    penaltyLatency: int = 10000
+    penaltyLatency: int = 50000
 
     for vnf in individual:
         try:
@@ -253,6 +253,7 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
         TUI.appendToSolverLog(f"Traffic Duration: {duration}s")
         TUI.appendToSolverLog(f"Waiting for {duration}s...")
         sleep(duration)
+        TUI.appendToSolverLog(f"Done waiting for {duration}s.")
 
         trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
                         f"{duration:.0f}s")
@@ -262,6 +263,7 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
 
         latency = latency / len(trafficData) if len(trafficData) > 0 else penaltyLatency
 
+        TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
         deleteEGs(egs)
     else:
         penalty: float = gen/ngen
