@@ -93,13 +93,18 @@ class TrafficGenerator(Subscriber):
         except Exception as e:
             TUI.appendToLog(f"Error starting InfluxDB container: {e}", True)
 
-        self._influxDBClient = InfluxDBClient(
-            url="http://localhost:8086",
-            token=INFLUX_DB_CONFIG["TOKEN"],
-            org=INFLUX_DB_CONFIG["ORG"])
+        try:
+            self._influxDBClient = InfluxDBClient(
+                url="http://localhost:8086",
+                token=INFLUX_DB_CONFIG["TOKEN"],
+                org=INFLUX_DB_CONFIG["ORG"],
+                timeout=int(config["general"]["requestTimeout"]) * 1000)
+        except Exception as e:
+            TUI.appendToLog(f"Error connecting to InfluxDB: {e}", True)
 
         TUI.appendToLog("Traffic generator parent container started.")
         self._parentContainerStarted = True
+
 
     def setDesign(self, design: "list[TrafficDesign]") -> None:
         """
@@ -200,7 +205,10 @@ class TrafficGenerator(Subscriber):
             sfcID (str): The ID of the SFC.
         """
 
-        self._tgClient.containers.get(f"{sfcID}-{K6}").remove(force=True)
+        try:
+            self._tgClient.containers.get(f"{sfcID}-{K6}").remove(force=True)
+        except Exception as e:
+            TUI.appendToLog(f"Error stopping traffic generator for SFC {sfcID}: {e}. Possibly because it has already been stopped.", True)
 
     def getData(self, dataRange: str) -> "dict[str, TrafficData]":
         """
