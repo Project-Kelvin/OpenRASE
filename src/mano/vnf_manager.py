@@ -38,6 +38,7 @@ class VNFManager():
         self._infraLock: Lock = Lock()
         self._embeddingGraphs: "dict[str, EmbeddingGraph]" = {}
         self._ports: "dict[str, int]" = {}
+        self._deleteLocks: "dict[str, ]" = {}
 
     def _deployEmbeddingGraph(self, eg: EmbeddingGraph) -> EmbeddingGraph:
         """
@@ -159,6 +160,9 @@ class VNFManager():
             host: TopoHost = vnfs["host"]
             vnf: VNFEntity = vnfs["vnf"]
 
+            if host["id"] not in self._deleteLocks:
+                self._deleteLocks[host["id"]] = Lock()
+
             vnfList.append(vnf["id"])
             vnfName: str = vnf["name"]
 
@@ -166,12 +170,14 @@ class VNFManager():
                 dindClient: DockerClient = connectToDind(f"{host['id']}Node")
 
                 TUI.appendToLog(f"    Deleting {vnfName}.")
-                dindClient.containers.get(vnfName).remove(force=True)
+                try:
+                    dindClient.containers.get(vnfName).stop()
+                    dindClient.containers.get(vnfName).remove(force=True)
+                except Exception as e:
+                    TUI.appendToLog(f"    Error deleting {vnfName}: {e}", True)
 
-                dindClient.containers.prune()
-                dindClient.images.prune()
-                dindClient.networks.prune()
-                dindClient.volumes.prune()
+                with self._deleteLocks[host["id"]]:
+                    dindClient.volumes.prune()
 
         def traverseCallback(vnfs: VNF, _depth: int) -> None:
             """
