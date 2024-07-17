@@ -43,6 +43,7 @@ class SFCEmulator(Subscriber):
             self._mano.getOrchestrator())
         self._threads: "list[Thread]" = []
         NotificationSystem.subscribe(TOPOLOGY_INSTALLED, self)
+        self._topologyInstalled: bool = False
 
     def startTest(self, topology: Topology, trafficDesign: "list[TrafficDesign]") -> None:
         """
@@ -50,7 +51,7 @@ class SFCEmulator(Subscriber):
 
         Parameters:
             topology (Topology): The topology of the network.
-            trafficDesign (dict): The design of the traffic generator..
+            trafficDesign (dict): The design of the traffic generator.
         """
 
         self._trafficGenerator.setDesign(trafficDesign)
@@ -66,6 +67,7 @@ class SFCEmulator(Subscriber):
             sfcrThread.start()
             TUI.appendToLog("Starting Solver.")
             solverThread.start()
+            self._topologyInstalled = True
             self._threads.append(sfcrThread)
             self._threads.append(solverThread)
 
@@ -95,6 +97,9 @@ class SFCEmulator(Subscriber):
         """
         Wait for all threads to finish.
         """
+
+        while not self._topologyInstalled:
+            pass
 
         for thread in self._threads:
             thread.join()
