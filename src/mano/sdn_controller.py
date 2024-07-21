@@ -83,11 +83,11 @@ class SDNController():
             )
 
             if response.status_code != 200:
-                raise RuntimeError(
-                    f"Failed to install flow in switch {switch.name}.")
-        except Exception:
-            raise RuntimeError(
-                    f"Failed to install flow in switch {switch.name}.\n{response.content}")
+                TUI.appendToLog(
+                    f"      Failed to install flow in switch {switch.name} to {destination} via port {gateway}.\n{str(response.content)}", True)
+        except Exception as e:
+            TUI.appendToLog(
+                    f"      Failed to install flow in switch {switch.name} to {destination} via port {gateway}.\n{str(e)}", True)
 
         TUI.appendToLog(f"      Installed flow from {switch.name} to {destination} via port {gateway}.")
 
@@ -146,11 +146,11 @@ class SDNController():
                 timeout=config["general"]["requestTimeout"]
             )
             if response.status_code != 200:
-                raise RuntimeError(
-                    f"Failed to delete flow in switch {switch.name}.")
-        except Exception:
-            raise RuntimeError(
-                    f"Failed to delete flow in switch {switch.name}.")
+                TUI.appendToLog(
+                    f"      Failed to delete flow in switch {switch.name} to {destination} via port {gateway}.\{str(response.content)}", True)
+        except Exception as e:
+            TUI.appendToLog(
+                    f"      Failed to delete flow in switch {switch.name} to {destination} via port {gateway}.\n{str(e)}", True)
 
         TUI.appendToLog(f"      Deleted flow from {switch.name} to {destination} via port {gateway}.")
 
