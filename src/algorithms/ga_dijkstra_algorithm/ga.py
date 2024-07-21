@@ -12,7 +12,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from deap import base, creator, tools
 
-from algorithms.ga_dijkstra_algorithm.utils import algorithm, crossover, evaluation, generateRandomIndividual, mutate
+from algorithms.ga_dijkstra_algorithm.utils import algorithm, crossover, evaluation, generateRandomIndividual, getVNFsfromFGRs, mutate
 from models.calibrate import ResourceDemand
 
 import numpy as np
@@ -51,12 +51,12 @@ def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, Resource
     toolbox.register("individual", generateRandomIndividual, creator.Individual, topology, fgrs)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("mate", crossover)
-    toolbox.register("mutate", mutate, indpb=0.8)
+    toolbox.register("mutate", mutate, indpb=0.25*len(getVNFsfromFGRs(fgrs)))
     toolbox.register("select", tools.selNSGA2)
 
     pop = toolbox.population(n=NO_OF_INDIVIDUALS)
     gen: int = 1
-    CXPB, MUTPB, NGEN = 1.0, 0.9, 10
+    CXPB, MUTPB, NGEN = 1.0, 0.3, 10
     for ind in pop:
         ind.fitness.values = evaluation(ind, fgrs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, resourceDemands)
 
