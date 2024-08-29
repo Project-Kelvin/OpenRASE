@@ -313,7 +313,7 @@ def mutate(individual: "list[list[int]]", indpb: float) -> "list[list[int]]":
 
     return mutatedIndividual
 
-def algorithm(pop: "list[list[list[int]]]", toolbox: base.Toolbox, CXPB: float, MUTPB: float, topo: Topology, resourceDemands: "dict[str, ResourceDemand]", fgrs: "list[EmbeddingGraph]") -> "list[list[list[int]]]":
+def algorithm(pop: "list[list[list[int]]]", toolbox: base.Toolbox, CXPB: float, MUTPB: float) -> "list[list[list[int]]]":
     """
     Run the algorithm.
 
