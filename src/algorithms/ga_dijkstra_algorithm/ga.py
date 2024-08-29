@@ -4,9 +4,8 @@ GA is sued for VNf Embedding and Dijkstra isu sed for link embedding.
 """
 
 from typing import Callable
-from mano.vnf_manager import VNFManager
-from packages.python.shared.models.traffic_design import TrafficDesign
-from packages.python.shared.utils.config import getConfig
+from shared.models.traffic_design import TrafficDesign
+from shared.utils.config import getConfig
 from sfc.traffic_generator import TrafficGenerator
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
