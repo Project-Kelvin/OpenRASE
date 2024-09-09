@@ -2,14 +2,18 @@
 This defines the Neural Network used for genetic encoding.
 """
 
+import copy
 import pandas as pd
+from constants.topology import SERVER, SFCC
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.topology import Topology
 from shared.utils.config import getConfig
+from dijkstar import Graph, find_path
 
 from utils.embedding_graph import traverseVNF
 import tensorflow as tf
 import numpy as np
+from utils.tui import TUI
 
 def convertFGstoDF(fgs: "list[EmbeddingGraph]", topology: Topology) -> pd.DataFrame:
     """
@@ -66,7 +70,11 @@ def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
     endIndex: "list[int]" = [noHosts]
 
     egs: "list[EmbeddingGraph]" = []
-    for _index, fg in enumerate(fgs):
+    nodes: "dict[str, list[str]]" = {}
+
+    for index, fg in enumerate(fgs):
+        fg["sfcID"] = fg["sfcrID"] if "sfcrID" in fg else f"sfc{index}"
+        nodes[fg["sfcID"]] = [SFCC]
         embeddingNotFound: "list[bool]" = [False]
 
         def parseVNF(vnf: VNF, _pos: int, embeddingNotFound, startIndex, endIndex) -> None:
@@ -83,6 +91,12 @@ def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
             if embeddingNotFound[0]:
                 return
 
+            if "host" in vnf and vnf["host"]["id"] == SERVER:
+                # pylint: disable=cell-var-from-loop
+                nodes[fg["sfcID"]].append(SERVER)
+
+                return
+
             cls: "list[float]" = data[startIndex[0]:endIndex[0]]["ConfidenceLevel"].tolist()
             startIndex[0] = startIndex[0] + noHosts
             endIndex[0] = endIndex[0] + noHosts
@@ -97,11 +111,49 @@ def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
                 vnf["host"] = {
                     "id": topology["hosts"][cls.index(maxCL)]["id"]
                 }
+                # pylint: disable=cell-var-from-loop
+                if nodes[fg["sfcID"]][-1] != vnf["host"]["id"]:
+                    # pylint: disable=cell-var-from-loop
+                    nodes[fg["sfcID"]].append(vnf["host"]["id"])
 
         traverseVNF(fg["vnfs"], parseVNF, embeddingNotFound, startIndex, endIndex, shouldParseTerminal=False)
 
         if not embeddingNotFound[0]:
-            egs.append(fg)
+            if "sfcrID" in fg:
+                del fg["sfcrID"]
+
+            graph = Graph()
+            nodePair: "list[str]" = []
+            eg: EmbeddingGraph = copy.deepcopy(fg)
+
+            if "links" not in eg:
+                eg["links"] = []
+
+            for link in topology["links"]:
+                graph.add_edge(
+                    link["source"], link["destination"], link["bandwidth"])
+                graph.add_edge(
+                    link["destination"], link["source"], link["bandwidth"])
+
+            for i in range(len(nodes[eg["sfcID"]]) - 1):
+                srcDst: str = f"{nodes[eg['sfcID']][i]}-{nodes[eg['sfcID']][i + 1]}"
+                dstSrc: str = f"{nodes[eg['sfcID']][i + 1]}-{nodes[eg['sfcID']][i]}"
+                if srcDst not in nodePair and dstSrc not in nodePair:
+                    nodePair.append(srcDst)
+                    nodePair.append(dstSrc)
+                    try:
+                        path = find_path(graph, nodes[eg["sfcID"]][i], nodes[eg["sfcID"]][i + 1])
+                    except Exception as e:
+                        TUI.appendToSolverLog(f"Error: {e}")
+                        continue
+
+                    eg["links"].append({
+                        "source": {"id": path.nodes[0]},
+                        "destination": {"id": path.nodes[-1]},
+                        "links": path.nodes[1:-1]
+                    })
+
+            egs.append(eg)
 
     return egs
 

@@ -2,9 +2,14 @@
 This defines the GA that evolves teh weights of the Neural Network.
 """
 
-import json
 import random
+from time import sleep
+from typing import Callable
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
+from models.calibrate import ResourceDemand
+from models.traffic_generator import TrafficData
+from packages.python.shared.models.traffic_design import TrafficDesign
+from sfc.traffic_generator import TrafficGenerator
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.topology import Topology
 import pandas as pd
@@ -13,14 +18,22 @@ from deap import base, creator, tools
 from shared.utils.config import getConfig
 from utils.embedding_graph import traverseVNF
 from utils.topology import generateFatTreeTopology
+from utils.traffic_design import calculateTrafficDuration
+from utils.tui import TUI
 
-def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]", topology: Topology) -> "tuple[float, float]":
+def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology) -> "tuple[float, float]":
     """
     Evaluates the individual.
 
     Parameters:
         individual (list[float]): the individual.
         fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        gen (int): the generation.
+        ngen (int): the number of generations.
+        sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
+        deleteEGs (Callable[[list[EmbeddingGraph]], None]): the function to delete the Embedding Graphs.
+        trafficDesign (TrafficDesign): the traffic design.
+        trafficGenerator (TrafficGenerator): the traffic generator.
         topology (Topology): the topology.
 
     Returns:
@@ -30,41 +43,49 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]", topology: T
     df: pd.DataFrame = convertFGstoDF(fgs, topology)
     newDF: pd.DataFrame = getConfidenceValues(df, individual[0:-1], [individual[-1]])
     egs: "list[EmbeddingGraph]" = convertDFtoFGs(newDF, fgs, topology)
-
-    ar: float = len(egs)/len(fgs)
+    penaltyLatency: float = 50000
+    acceptanceRatio: float = len(egs)/len(fgs)
     latency: int = 0
-    hosts: "dict[str, int]" = {}
-    for eg in egs:
-        def parseVNF(vnf: VNF, _depth: int, hosts: "dict[str, int]") -> None:
-            """
-            Parses a VNF.
 
-            Parameters:
-                vnf (VNF): the VNF.
-                _depth (int): the depth.
-                hosts (dict[str, int]): the hosts.
-            """
+    TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}")
 
-            if vnf["host"]["id"] in hosts:
-                hosts[vnf["host"]["id"]] = hosts[vnf["host"]["id"]] + 1
-            else:
-                hosts[vnf["host"]["id"]] = 1
+    if len(egs) > 0:
+        sendEGs(egs)
 
-        traverseVNF(eg["vnfs"], parseVNF, hosts, shouldParseTerminal=False)
+        duration: int = calculateTrafficDuration(trafficDesign[0])
+        TUI.appendToSolverLog(f"Traffic Duration: {duration}s")
+        TUI.appendToSolverLog(f"Waiting for {duration}s...")
+        sleep(duration)
+        TUI.appendToSolverLog(f"Done waiting for {duration}s.")
 
-    if len(hosts.values()) > 0:
-        latency = max(hosts.values())
+        trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
+                        f"{duration:.0f}s")
+        latency: float = 0
+        for _key, value in trafficData.items():
+            latency += value["averageLatency"]
+
+        latency = latency / len(trafficData) if len(trafficData) > 0 else penaltyLatency
+
+        TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
+        deleteEGs(egs)
     else:
-        latency = 17
+        penalty: float = gen/ngen
+        latency = penaltyLatency * penalty
 
-    return ar, latency
+    TUI.appendToSolverLog(f"Latency: {latency}ms")
 
-def evolveWeights(fgs: "list[EmbeddingGraph]", topology: Topology) -> "list[EmbeddingGraph]":
+    return acceptanceRatio, latency
+
+def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology) -> "list[EmbeddingGraph]":
     """
     Evolves the weights of the Neural Network.
 
     Parameters:
         fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
+        deleteEGs (Callable[[list[EmbeddingGraph]], None]): the function to delete the Embedding Graphs.
+        trafficDesign (TrafficDesign): the traffic design.
+        trafficGenerator (TrafficGenerator): the traffic generator.
         topology (Topology): the topology.
 
     Returns:
@@ -72,8 +93,8 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", topology: Topology) -> "list[Embe
     """
 
     NO_OF_WEIGHTS: int = 5 #4 weights and 1 bias
-    POP_SIZE: int = 100
-    NGEN: int = 5
+    POP_SIZE: int = 10
+    NGEN: int = 10
     CXPB: float = 0.8
     MUTPB: float = 0.2
 
@@ -94,13 +115,21 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", topology: Topology) -> "list[Embe
     gen: int = 1
 
     for ind in pop:
-        ind.fitness.values = evaluate(ind, fgs, topology)
+        ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology)
+
+    ars = [ind.fitness.values[0] for ind in pop]
+    latencies = [ind.fitness.values[1] for ind in pop]
+
+    with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/data.csv", "a", encoding="utf8") as topologyFile:
+        topologyFile.write(f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n")
 
     hof = tools.ParetoFront()
     hof.update(pop)
 
     for ind in hof:
-        print(f"{gen}\t {ind.fitness.values[0]}\t {ind.fitness.values[1]}")
+        TUI.appendToSolverLog(f"{gen}\t {ind.fitness.values[0]}\t {ind.fitness.values[1]}")
+        with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/pfs.csv", "a", encoding="utf8") as pf:
+            pf.write(f"{gen}, {ind.fitness.values[1]}, {ind.fitness.values[0]}\n")
 
     gen = gen + 1
     while gen <= NGEN:
@@ -117,18 +146,11 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", topology: Topology) -> "list[Embe
                 del mutant.fitness.values
 
         for ind in offspring:
-            ind.fitness.values = evaluate(ind, fgs, topology)
+            ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology)
         pop[:] = toolbox.select(pop + offspring, k=POP_SIZE)
 
         hof.update(pop)
 
         for ind in hof:
-            print(f"{gen}\t {ind.fitness.values[0]}\t {ind.fitness.values[1]}")
+            TUI.appendToSolverLog(f"{gen}\t {ind.fitness.values[0]}\t {ind.fitness.values[1]}")
         gen = gen + 1
-
-topo: Topology = generateFatTreeTopology(4, 1000, 2, 1000)
-
-with open(f"{getConfig()['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/configs/forwarding-graphs.json", "r") as file:
-    fgs: "list[EmbeddingGraph]" = json.load(file)
-
-    evolveWeights(fgs, topo)
