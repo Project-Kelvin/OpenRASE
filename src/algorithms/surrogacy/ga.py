@@ -6,7 +6,6 @@ import random
 from time import sleep
 from typing import Callable
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
-from models.calibrate import ResourceDemand
 from models.traffic_generator import TrafficData
 from packages.python.shared.models.traffic_design import TrafficDesign
 from sfc.traffic_generator import TrafficGenerator
@@ -16,10 +15,13 @@ import pandas as pd
 import numpy as np
 from deap import base, creator, tools
 from shared.utils.config import getConfig
-from utils.embedding_graph import traverseVNF
-from utils.topology import generateFatTreeTopology
 from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
+import os
+
+directory = f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy"
+if not os.path.exists(directory):
+    os.makedirs(directory)
 
 with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/data.csv", "w", encoding="utf8") as topologyFile:
     topologyFile.write("generation, average_ar, max_ar, min_ar, average_latency, max_latency, min_latency\n")
