@@ -26,18 +26,17 @@ from utils.tui import TUI
 
 
 config: Config = getConfig()
-configPath: str = f"{config['repoAbsolutePath']}/src/runs/ga_dijkstra_algorithm/configs"
+configPath: str = f"{config['repoAbsolutePath']}/src/runs/surrogacy/configs"
 
-
-directory = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm"
+directory = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy"
 
 if not os.path.exists(directory):
     os.makedirs(directory)
 
 topology: Topology = generateFatTreeTopology(4, 1000, 2, None)
 trafficDesign: "list[TrafficDesign]" = []
-logFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/experiments.csv"
-latencyDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/latency_data.csv"
+logFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy/experiments.csv"
+latencyDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency_data.csv"
 
 def appendToLog(message: str) -> None:
     """
@@ -90,7 +89,6 @@ class SFCSolver(Solver):
 
     def __init__(self, orchestrator: Orchestrator, trafficGenerator: TrafficGenerator) -> None:
         super().__init__(orchestrator, trafficGenerator)
-        self._topology: Topology = self._orchestrator.getTopology()
 
     def generateEmbeddingGraphs(self) -> None:
         try:
@@ -100,6 +98,8 @@ class SFCSolver(Solver):
             while not self._requests.empty():
                 requests.append(self._requests.get())
                 sleep(0.1)
+
+            self._topology: Topology = self._orchestrator.getTopology()
 
             evolveWeights(requests, self._orchestrator.sendEmbeddingGraphs, self._orchestrator.deleteEmbeddingGraphs, trafficDesign, self._trafficGenerator, self._topology)
             TUI.appendToSolverLog(f"Finished experiment.")

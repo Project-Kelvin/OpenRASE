@@ -21,6 +21,12 @@ from utils.topology import generateFatTreeTopology
 from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
 
+with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/data.csv", "w", encoding="utf8") as topologyFile:
+    topologyFile.write("generation, average_ar, max_ar, min_ar, average_latency, max_latency, min_latency\n")
+
+with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/pfs.csv", "w", encoding="utf8") as pf:
+    pf.write("generation, latency, ar\n")
+
 def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology) -> "tuple[float, float]":
     """
     Evaluates the individual.
@@ -91,7 +97,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
     Returns:
         list[EmbeddingGraph]: the evolved Embedding Graphs.
     """
-
+    TUI.appendToSolverLog(f"Reached here 0")
     NO_OF_WEIGHTS: int = 5 #4 weights and 1 bias
     POP_SIZE: int = 10
     NGEN: int = 10
@@ -113,7 +119,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
     pop: "list[creator.Individual]" = toolbox.population(n=POP_SIZE)
 
     gen: int = 1
-
+    TUI.appendToSolverLog(f"Reached here 1")
     for ind in pop:
         ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology)
 
