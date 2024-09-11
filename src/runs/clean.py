@@ -66,7 +66,7 @@ def clean(logs: bool, docker: bool, prune: bool) -> None:
         # Code to clean the docker containers
         removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/registry")
 
-    def prune() -> None:
+    def pruneDocker() -> None:
         """
         This function prunes the docker containers.
         """
@@ -87,9 +87,9 @@ def clean(logs: bool, docker: bool, prune: bool) -> None:
         cleanDocker()
 
     if prune:
-        prune()
+        pruneDocker()
 
-    if not logs and not docker:
+    if not logs and not docker and not prune:
         cleanLogs()
         cleanDocker()
-        prune()
+        pruneDocker()
