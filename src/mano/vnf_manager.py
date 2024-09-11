@@ -17,7 +17,7 @@ from docker import DockerClient, from_env
 from utils.container import connectToDind, getContainerIP
 from utils.embedding_graph import traverseVNF
 from utils.tui import TUI
-
+from uuid import uuid5
 
 class VNFManager():
     """
@@ -71,7 +71,7 @@ class VNFManager():
             vnf: VNFEntity = vnfs["vnf"]
 
             vnfList.append(vnf["id"])
-            vnfName: str = f"{sfcId}-{vnf['id']}-{len(vnfList)}"
+            vnfName: str = f"{sfcId}-{vnf['id']}-{len(vnfList)}-{uuid5()}"
             vnf["name"] = vnfName
 
             if host["id"] != SERVER:
