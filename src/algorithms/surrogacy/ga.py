@@ -159,6 +159,11 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
 
         hof.update(pop)
 
+        with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/data.csv", "a", encoding="utf8") as topologyFile:
+            topologyFile.write(f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n")
+        
         for ind in hof:
             TUI.appendToSolverLog(f"{gen}\t {ind.fitness.values[0]}\t {ind.fitness.values[1]}")
+            with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/pfs.csv", "a", encoding="utf8") as pf:
+                pf.write(f"{gen}, {ind.fitness.values[1]}, {ind.fitness.values[0]}\n")
         gen = gen + 1
