@@ -33,6 +33,7 @@ click = "^8.1.7"
 setuptools = "<60" # To suppress 'distutils Version classes are deprecated. Use packaging.version instead.'
 textual = "^0.57.1"
 deap = "^1.4.1"
+networkx = {version = "3.2.1", extras = ["default"]}
 
 [build-system]
 requires = ["poetry-core"]
