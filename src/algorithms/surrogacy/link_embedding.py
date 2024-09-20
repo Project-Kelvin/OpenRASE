@@ -37,24 +37,25 @@ class Node:
 
     def __init__(self, name: str):
         self.name = name
-        self._cost = 0
+        self._hCost = 0
+        self._totalCost = 0
         self._parent = None
 
     @property
-    def cost(self):
+    def hCost(self):
         """
-        The cost of the node.
-        """
-
-        return self._cost
-
-    @cost.setter
-    def cost(self, value):
-        """
-        Sets the cost of the node.
+        The heuristic cost of the node.
         """
 
-        self._cost = value
+        return self._hCost
+
+    @hCost.setter
+    def hCost(self, value):
+        """
+        Sets the heuristic cost of the node.
+        """
+
+        self._hCost = value
 
     @property
     def parent(self):
@@ -72,11 +73,27 @@ class Node:
 
         self._parent = value
 
-    def __lt__(self, other):
-        return self.cost < other.cost
+    @property
+    def totalCost(self):
+        """
+        The total cost of the node.
+        """
 
-    def __eq__(self, other):
-        return self.name == other.name
+        return self._totalCost
+
+    @totalCost.setter
+    def totalCost(self, value):
+        """
+        Sets the total cost of the node.
+        """
+
+        self._totalCost = value
+
+    def __lt__(self, other):
+        return self._totalCost + self.hCost < other.totalCost + other.hCost
+
+    def __eq__(self, name):
+        return self.name == name
 
 def findPath(graph: nx.Graph, source: str, destination: str) -> "list[str]":
     """
@@ -94,38 +111,65 @@ def findPath(graph: nx.Graph, source: str, destination: str) -> "list[str]":
     openSet: "list[Node]" = [Node(source)]
     closedSet: "list[Node]" = []
 
+    hCost = {
+        "src": 10,
+        "s1": 5,
+        "s2": 4,
+        "s3": 3,
+        "s4": 2,
+        "s5": 3,
+        "s6": 6,
+        "s7": 8,
+        "s8": 9,
+        "h1": 4,
+        "dst": 0
+    }
+
+    cost ={
+        "src-s1": 2,
+        "src-s2": 1,
+        "s1-s6": 3,
+        "s1-s3": 1,
+        "s2-s3": 2,
+        "s2-s5": 4,
+        "s3-s7": 4,
+        "s3-s4": 3,
+        "s6-s7": 1,
+        "s7-s8": 2,
+        "s4-dst": 1,
+        "s4-s5": 2,
+        "s5-h1": 1
+    }
+
     while len(openSet) > 0:
         currentNode: Node = heapq.heappop(openSet)
+        print("Current Node: ", currentNode.name, currentNode.totalCost)
+        if currentNode.name == destination:
+            path = []
+            while currentNode is not None:
+                path.append(currentNode.name)
+                currentNode = currentNode.parent
+
+            path.reverse()
+
+            return path
 
         for neighbor in graph.adj[currentNode.name]:
-            if neighbor == destination:
-                path = [destination]
-                while currentNode is not None:
-                    path.append(currentNode.name)
-                    currentNode = currentNode.parent
-
-                path.reverse()
-
-                return path
-
-            if neighbor in [openSetNode.name for openSetNode in openSet]:
-                continue
-
-            if neighbor == currentNode.name:
-                continue
-
             if "h" in neighbor:
                 continue
 
-            if neighbor in [closedSetNode.name for closedSetNode in closedSet]:
-                continue
-
             node: Node = Node(neighbor)
-            node.cost = 1
+            node.hCost = hCost[neighbor]
             node.parent = currentNode
-            heapq.heappush(openSet, node)
+            node.totalCost = currentNode.totalCost + (cost[f"{currentNode.name}-{neighbor}"] if f"{currentNode.name}-{neighbor}" in cost else cost[f"{neighbor}-{currentNode.name}"])
+            print("Neighbor: ", neighbor, node.totalCost)
+            print(currentNode.totalCost, cost[f"{currentNode.name}-{neighbor}"] if f"{currentNode.name}-{neighbor}" in cost else cost[f"{neighbor}-{currentNode.name}"])
+            if len([closedSetNode for closedSetNode in closedSet if closedSetNode.name == neighbor and node.totalCost >= closedSetNode.totalCost]) == 0:
+                heapq.heappush(openSet, node)
+                print("Open List: ", [(node.name, node.hCost + node.totalCost, node.hCost, node.totalCost) for node in openSet])
 
         closedSet.append(currentNode)
+        print("Closed List: ", [(node.name, node.hCost + node.totalCost) for node in closedSet])
 
 sg: nx.Graph = nx.Graph()
 sg.add_edge("src", "s1")
