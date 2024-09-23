@@ -8,14 +8,16 @@ from typing import Callable
 from algorithms.surrogacy.link_embedding import EmbedLinks
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
 from models.traffic_generator import TrafficData
+from packages.python.shared.models.embedding_graph import VNF
 from packages.python.shared.models.traffic_design import TrafficDesign
 from sfc.traffic_generator import TrafficGenerator
-from shared.models.embedding_graph import VNF, EmbeddingGraph
+from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 import pandas as pd
 import numpy as np
 from deap import base, creator, tools
 from shared.utils.config import getConfig
+from utils.embedding_graph import traverseVNF
 from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
 import os
@@ -61,9 +63,26 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     acceptanceRatio: float = len(egs)/len(fgs)
     latency: int = 0
 
-    TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}")
+    #TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}")
 
-    if len(egs) > 0:
+    hosts = {}
+    def parseVNF(vnf: VNF, _pos: int, hosts) -> None:
+        """
+        Traverses a VNF.
+
+        Parameters:
+            vnf (VNF): the VNF.
+            pos (int): the position.
+        """
+
+        if vnf["host"]["id"] not in hosts:
+            hosts[vnf["host"]["id"]] = 1
+        else:
+            hosts[vnf["host"]["id"]] += 1
+
+    traverseVNF(egs[0]["vnfs"], parseVNF, hosts)
+    latency = max(hosts.values())
+    """ if len(egs) > 0:
         sendEGs(egs)
 
         duration: int = calculateTrafficDuration(trafficDesign[0])
@@ -84,7 +103,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         deleteEGs(egs)
     else:
         penalty: float = gen/ngen
-        latency = penaltyLatency * penalty
+        latency = penaltyLatency * penalty """
 
     TUI.appendToSolverLog(f"Latency: {latency}ms")
 
