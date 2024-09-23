@@ -56,8 +56,10 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     df: pd.DataFrame = convertFGstoDF(fgs, topology)
     newDF: pd.DataFrame = getConfidenceValues(df, individual[0:4], [individual[4]])
     egs, nodes = convertDFtoFGs(newDF, fgs, topology)
-    embedLinks: EmbedLinks = EmbedLinks(topology, egs, individual[5:8], individual[8])
-    egs = embedLinks.embedLinks(nodes)
+
+    if len(egs) > 0:
+        embedLinks: EmbedLinks = EmbedLinks(topology, egs, individual[5:8], individual[8])
+        egs = embedLinks.embedLinks(nodes)
 
     penaltyLatency: float = 50000
     acceptanceRatio: float = len(egs)/len(fgs)

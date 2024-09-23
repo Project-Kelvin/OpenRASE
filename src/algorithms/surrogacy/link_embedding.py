@@ -21,7 +21,7 @@ class HotCode:
         """
 
         self.nodes = {}
-        self.sfcs = {}
+        self.egs = {}
 
     def addNode(self, name: str):
         """
@@ -41,7 +41,7 @@ class HotCode:
             name (str): the name.
         """
 
-        self.sfcs[name] = len(self.sfcs)
+        self.egs[name] = len(self.egs)
 
     def getNodeCode(self, name: str) -> int:
         """
@@ -67,7 +67,7 @@ class HotCode:
             int: the code.
         """
 
-        return self.sfcs[name]
+        return self.egs[name]
 
 
 class Node:
@@ -192,8 +192,14 @@ class EmbedLinks:
             None
         """
 
-        map(self._hotCode.addNode, [node["id"] for node in (self._topology["hosts"] + self._topology["switches"])])
-        map(self._hotCode.addSFC, [eg["sfcID"] for eg in self._egs])
+        for hosts in self._topology["hosts"]:
+            self._hotCode.addNode(hosts["id"])
+
+        for switch in self._topology["switches"]:
+            self._hotCode.addNode(switch["id"])
+
+        for eg in self._egs:
+            self._hotCode.addSFC(eg["sfcID"])
 
     def _getHeuristicCost(self, sfc: str, src: str, dst: str) -> float:
         """
@@ -294,27 +300,20 @@ class EmbedLinks:
         """
 
         for eg in self._egs:
-            nodePair: "list[str]" = []
-
             if "links" not in eg:
                 eg["links"] = []
 
             for i in range(len(nodes[eg["sfcID"]]) - 1):
-                srcDst: str = f"{nodes[eg['sfcID']][i]}-{nodes[eg['sfcID']][i + 1]}"
-                dstSrc: str = f"{nodes[eg['sfcID']][i + 1]}-{nodes[eg['sfcID']][i]}"
-                if srcDst not in nodePair and dstSrc not in nodePair:
-                    nodePair.append(srcDst)
-                    nodePair.append(dstSrc)
-                    try:
-                        path = self._findPath(eg["sfcID"], nodes[eg["sfcID"]][i], nodes[eg["sfcID"]][i + 1])
-                    except Exception as e:
-                        TUI.appendToSolverLog(f"Error: {e}")
-                        continue
+                try:
+                    path = self._findPath(eg["sfcID"], nodes[eg["sfcID"]][i], nodes[eg["sfcID"]][i + 1])
+                except Exception as e:
+                    TUI.appendToSolverLog(f"Error: {e}")
+                    continue
 
-                    eg["links"].append({
-                        "source": {"id": path[0]},
-                        "destination": {"id": path[-1]},
-                        "links": path[1:-1]
-                    })
+                eg["links"].append({
+                    "source": {"id": path[0]},
+                    "destination": {"id": path[-1]},
+                    "links": path[1:-1]
+                })
 
         return self._egs
