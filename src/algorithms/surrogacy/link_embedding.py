@@ -2,10 +2,15 @@
 This defines the functions used for VNF link embedding.
 """
 
+from typing import Union
 import networkx as nx
 import heapq
 from shared.models.topology import Topology
+from shared.models.embedding_graph import EmbeddingGraph
+from runs.test import SFCR
 from utils.topology import generateFatTreeTopology
+import tensorflow as tf
+import numpy as np
 
 def constructGraph(topology: Topology) -> nx.Graph:
     """
@@ -29,6 +34,66 @@ def constructGraph(topology: Topology) -> nx.Graph:
     return graph
 
 topo = generateFatTreeTopology(4, 100, 100, 100)
+
+class HotCode:
+    """
+    This defines the hot code.
+    """
+
+    def __init__(self):
+        """
+        Initializes the hot code.
+        """
+
+        self.nodes = {}
+        self.sfcs = {}
+
+    def addNode(self, name: str):
+        """
+        Adds a node.
+
+        Parameters:
+            name (str): the name.
+        """
+
+        self.nodes[name] = len(self.nodes)
+
+    def addSFC(self, name: str):
+        """
+        Adds an SFC.
+
+        Parameters:
+            name (str): the name.
+        """
+
+        self.sfcs[name] = len(self.sfcs)
+
+    def getNodeCode(self, name: str) -> int:
+        """
+        Gets the node code.
+
+        Parameters:
+            name (str): the name.
+
+        Returns:
+            int: the code.
+        """
+
+        return self.nodes[name]
+
+    def getSFCCode(self, name: str) -> int:
+        """
+        Gets the SFC code.
+
+        Parameters:
+            name (str): the name.
+
+        Returns:
+            int: the code.
+        """
+
+        return self.sfcs[name]
+
 
 class Node:
     """
@@ -95,7 +160,7 @@ class Node:
     def __eq__(self, name):
         return self.name == name
 
-def findPath(graph: nx.Graph, source: str, destination: str) -> "list[str]":
+def findPath(graph: nx.Graph, source: str, destination: str, sfcID: str, hotCode: HotCode, weights: "list[float]") -> "list[str]":
     """
     Finds the path using A*.
 
@@ -103,6 +168,8 @@ def findPath(graph: nx.Graph, source: str, destination: str) -> "list[str]":
         graph (nx.Graph): the graph.
         source (str): the source.
         destination (str): the destination.
+        sfcID (str): the SFC ID.
+        hotCode (HotCode): the hot code.
 
     Returns:
         list[str]: the path.
@@ -111,39 +178,8 @@ def findPath(graph: nx.Graph, source: str, destination: str) -> "list[str]":
     openSet: "list[Node]" = [Node(source)]
     closedSet: "list[Node]" = []
 
-    hCost = {
-        "src": 10,
-        "s1": 5,
-        "s2": 4,
-        "s3": 3,
-        "s4": 2,
-        "s5": 3,
-        "s6": 6,
-        "s7": 8,
-        "s8": 9,
-        "h1": 4,
-        "dst": 0
-    }
-
-    cost ={
-        "src-s1": 2,
-        "src-s2": 1,
-        "s1-s6": 3,
-        "s1-s3": 1,
-        "s2-s3": 2,
-        "s2-s5": 4,
-        "s3-s7": 4,
-        "s3-s4": 3,
-        "s6-s7": 1,
-        "s7-s8": 2,
-        "s4-dst": 1,
-        "s4-s5": 2,
-        "s5-h1": 1
-    }
-
     while len(openSet) > 0:
         currentNode: Node = heapq.heappop(openSet)
-        print("Current Node: ", currentNode.name, currentNode.totalCost)
         if currentNode.name == destination:
             path = []
             while currentNode is not None:
@@ -159,31 +195,91 @@ def findPath(graph: nx.Graph, source: str, destination: str) -> "list[str]":
                 continue
 
             node: Node = Node(neighbor)
-            node.hCost = hCost[neighbor]
+            node.hCost = getHeuristicCost(hotCode.getSFCCode(sfcID), hotCode.getNodeCode(neighbor), hotCode.getNodeCode(destination))
             node.parent = currentNode
-            node.totalCost = currentNode.totalCost + (cost[f"{currentNode.name}-{neighbor}"] if f"{currentNode.name}-{neighbor}" in cost else cost[f"{neighbor}-{currentNode.name}"])
-            print("Neighbor: ", neighbor, node.totalCost)
-            print(currentNode.totalCost, cost[f"{currentNode.name}-{neighbor}"] if f"{currentNode.name}-{neighbor}" in cost else cost[f"{neighbor}-{currentNode.name}"])
+            node.totalCost = currentNode.totalCost + getHeuristicCost(
+                hotCode.getSFCCode(sfcID),
+                hotCode.getNodeCode(currentNode.name),
+                hotCode.getNodeCode(neighbor)
+            )
+
             if len([closedSetNode for closedSetNode in closedSet if closedSetNode.name == neighbor and node.totalCost >= closedSetNode.totalCost]) == 0:
                 heapq.heappush(openSet, node)
-                print("Open List: ", [(node.name, node.hCost + node.totalCost, node.hCost, node.totalCost) for node in openSet])
 
         closedSet.append(currentNode)
-        print("Closed List: ", [(node.name, node.hCost + node.totalCost) for node in closedSet])
+
+def getHeuristicCost(sfc: str, src: str, dst: str, weights: "list[float]", bias: "list[float]") -> float:
+    """
+    Gets the heuristic cost.
+
+    Parameters:
+        sfc (str): the SFC.
+        src (str): the source.
+        dst (str): the destination.
+        weights (list[float]): the weights.
+        bias (list[float]): the bias.
+
+    Returns:
+        float: the heuristic cost.
+    """
+
+    layers: "list[int]" = [3, 1]
+
+    model = tf.keras.Sequential([
+        tf.keras.Input(shape=(layers[0], )),
+        tf.keras.layers.Dense(layers[1], activation='relu')
+    ])
+
+    index: int = 0
+    startIndex: int = 0
+    endIndex: int = layers[index]
+    for layer in model.layers:
+        if isinstance(layer, tf.keras.layers.Dense):
+            layer.set_weights([
+                np.array(weights[startIndex:endIndex]).reshape(layers[index], layers[index + 1]),
+                np.array([bias[index]])
+            ])
+            index += 1
+            if index < len(layers) - 1:
+                startIndex = endIndex
+                endIndex = startIndex + layers[index]
+
+    prediction = model.predict(np.array([sfc, src, dst]).reshape(1, 3))
+
+    return prediction
+
+
+def convertToHotCodes(hotCode: HotCode, sfcrs: "list[Union[SFCR, EmbeddingGraph]]", topology: Topology) -> None:
+    """
+    Converts the SFCRs to hot codes.
+
+    Parameters:
+        hotCode (HotCode): the hot code.
+        sfcrs (list[Union[SFCR, EmbeddingGraph]]): the SFCRs.
+        topology (Topology): the topology.
+
+    Returns:
+        None
+    """
+
+    map(hotCode.addNode, [node["id"] for node in (topology["hosts"] + topology["switches"])])
+    map(hotCode.addSFC, [sfcr["sfcID"] for sfcr in sfcrs])
 
 sg: nx.Graph = nx.Graph()
-sg.add_edge("src", "s1")
-sg.add_edge("src", "s2")
-sg.add_edge("s1", "s6")
-sg.add_edge("s1", "s3")
-sg.add_edge("s2", "s3")
-sg.add_edge("s2", "s5")
-sg.add_edge("s3", "s7")
-sg.add_edge("s3", "s4")
-sg.add_edge("s6", "s7")
-sg.add_edge("s7", "s8")
-sg.add_edge("s4", "dst")
-sg.add_edge("s4", "s5")
-sg.add_edge("s5", "h1")
+sg.add_edge("a", "b")
+sg.add_edge("a", "c")
+sg.add_edge("c", "d")
+sg.add_edge("d", "e")
+sg.add_edge("e", "z")
+sg.add_edge("b", "f")
+sg.add_edge("f", "z")
+sg.add_edge("b", "e")
+sg.add_edge("c", "e")
 
-print(findPath(sg, "src", "dst"))
+
+#print(findPath(sg, "a", "z"))
+hCode = HotCode()
+hCode.addNode("a")
+hCode.addNode("z")
+hCode.addSFC("sfc1")
+print(getHeuristicCost(hCode.getSFCCode("sfc1"), hCode.getNodeCode("a"),hCode.getNodeCode("z"), [1, 1, 1], [1]))
