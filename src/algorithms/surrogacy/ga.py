@@ -5,6 +5,7 @@ This defines the GA that evolves teh weights of the Neural Network.
 import random
 from time import sleep
 from typing import Callable
+from algorithms.surrogacy.link_embedding import EmbedLinks
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
 from models.traffic_generator import TrafficData
 from packages.python.shared.models.traffic_design import TrafficDesign
@@ -18,6 +19,8 @@ from shared.utils.config import getConfig
 from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
 import os
+
+NO_OF_WEIGHTS: int = 9 #4 weights + 1 bias for VNF embedding & 3 wights + 1 bias for link embedding.
 
 directory = f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy"
 if not os.path.exists(directory):
@@ -49,8 +52,11 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     """
 
     df: pd.DataFrame = convertFGstoDF(fgs, topology)
-    newDF: pd.DataFrame = getConfidenceValues(df, individual[0:-1], [individual[-1]])
-    egs: "list[EmbeddingGraph]" = convertDFtoFGs(newDF, fgs, topology)
+    newDF: pd.DataFrame = getConfidenceValues(df, individual[0:4], [individual[4]])
+    egs, nodes = convertDFtoFGs(newDF, fgs, topology)
+    embedLinks: EmbedLinks = EmbedLinks(topology, egs, individual[5:8], individual[8])
+    egs = embedLinks.embedLinks(nodes)
+
     penaltyLatency: float = 50000
     acceptanceRatio: float = len(egs)/len(fgs)
     latency: int = 0
@@ -99,8 +105,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
     Returns:
         list[EmbeddingGraph]: the evolved Embedding Graphs.
     """
-    TUI.appendToSolverLog(f"Reached here 0")
-    NO_OF_WEIGHTS: int = 5 #4 weights and 1 bias
+
     POP_SIZE: int = 10
     NGEN: int = 10
     CXPB: float = 1.0
@@ -121,7 +126,6 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
     pop: "list[creator.Individual]" = toolbox.population(n=POP_SIZE)
 
     gen: int = 1
-    TUI.appendToSolverLog(f"Reached here 1")
     for ind in pop:
         ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology)
 
@@ -164,7 +168,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
 
         with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/data.csv", "a", encoding="utf8") as topologyFile:
             topologyFile.write(f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n")
-        
+
         for ind in hof:
             TUI.appendToSolverLog(f"{gen}\t {ind.fitness.values[0]}\t {ind.fitness.values[1]}")
             with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/pfs.csv", "a", encoding="utf8") as pf:

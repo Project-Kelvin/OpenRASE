@@ -3,17 +3,16 @@ This defines the Neural Network used for genetic encoding.
 """
 
 import copy
+from typing import Tuple
 import pandas as pd
 from constants.topology import SERVER, SFCC
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.topology import Topology
 from shared.utils.config import getConfig
-from dijkstar import Graph, find_path
 
 from utils.embedding_graph import traverseVNF
 import tensorflow as tf
 import numpy as np
-from utils.tui import TUI
 
 def convertFGstoDF(fgs: "list[EmbeddingGraph]", topology: Topology) -> pd.DataFrame:
     """
@@ -52,7 +51,7 @@ def convertFGstoDF(fgs: "list[EmbeddingGraph]", topology: Topology) -> pd.DataFr
     return pd.DataFrame(data, columns=["SFC", "VNF", "Position", "Host"])
 
 
-def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: Topology) -> "list[EmbeddingGraph]":
+def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: Topology) -> "Tuple[list[EmbeddingGraph], dict[str, list[str]]]":
     """
     Generates the Embedding Graphs.
 
@@ -62,7 +61,7 @@ def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
         topology (Topology): the topology.
 
     Returns:
-        list[EmbeddingGraph]: the Embedding Graphs.
+        Tuple[list[EmbeddingGraph], dict[str, list[str]]]: (the Embedding Graphs, hosts in the order they should be linked).
     """
 
     noHosts: int = len(topology["hosts"])
@@ -122,40 +121,11 @@ def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
             if "sfcrID" in fg:
                 del fg["sfcrID"]
 
-            graph = Graph()
-            nodePair: "list[str]" = []
             eg: EmbeddingGraph = copy.deepcopy(fg)
-
-            if "links" not in eg:
-                eg["links"] = []
-
-            for link in topology["links"]:
-                graph.add_edge(
-                    link["source"], link["destination"], link["bandwidth"])
-                graph.add_edge(
-                    link["destination"], link["source"], link["bandwidth"])
-
-            for i in range(len(nodes[eg["sfcID"]]) - 1):
-                srcDst: str = f"{nodes[eg['sfcID']][i]}-{nodes[eg['sfcID']][i + 1]}"
-                dstSrc: str = f"{nodes[eg['sfcID']][i + 1]}-{nodes[eg['sfcID']][i]}"
-                if srcDst not in nodePair and dstSrc not in nodePair:
-                    nodePair.append(srcDst)
-                    nodePair.append(dstSrc)
-                    try:
-                        path = find_path(graph, nodes[eg["sfcID"]][i], nodes[eg["sfcID"]][i + 1])
-                    except Exception as e:
-                        TUI.appendToSolverLog(f"Error: {e}")
-                        continue
-
-                    eg["links"].append({
-                        "source": {"id": path.nodes[0]},
-                        "destination": {"id": path.nodes[-1]},
-                        "links": path.nodes[1:-1]
-                    })
 
             egs.append(eg)
 
-    return egs
+    return (egs, nodes)
 
 
 def getConfidenceValues(data: pd.DataFrame, weights: "list[float]", bias: "list[float]") -> pd.DataFrame:
