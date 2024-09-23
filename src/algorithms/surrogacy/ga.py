@@ -58,7 +58,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     egs, nodes = convertDFtoFGs(newDF, fgs, topology)
 
     if len(egs) > 0:
-        embedLinks: EmbedLinks = EmbedLinks(topology, egs, individual[5:8], individual[8])
+        embedLinks: EmbedLinks = EmbedLinks(topology, egs, individual[5:8], [individual[8]])
         egs = embedLinks.embedLinks(nodes)
 
     penaltyLatency: float = 50000

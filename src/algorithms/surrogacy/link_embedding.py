@@ -4,6 +4,7 @@ This defines the functions used for VNF link embedding.
 
 import networkx as nx
 import heapq
+from constants.topology import SERVER, SFCC
 from shared.models.topology import Topology
 from shared.models.embedding_graph import EmbeddingGraph
 import tensorflow as tf
@@ -192,6 +193,9 @@ class EmbedLinks:
             None
         """
 
+        self._hotCode.addNode(SFCC)
+        self._hotCode.addNode(SERVER)
+
         for hosts in self._topology["hosts"]:
             self._hotCode.addNode(hosts["id"])
 
@@ -235,7 +239,7 @@ class EmbedLinks:
                     startIndex = endIndex
                     endIndex = startIndex + layers[index]
 
-        prediction = model.predict(np.array([sfc, src, dst]).reshape(1, 3))
+        prediction = model.predict(np.array([sfc, src, dst]).reshape(1, 3))[0][0]
 
         return prediction
 
@@ -307,7 +311,7 @@ class EmbedLinks:
                 try:
                     path = self._findPath(eg["sfcID"], nodes[eg["sfcID"]][i], nodes[eg["sfcID"]][i + 1])
                 except Exception as e:
-                    TUI.appendToSolverLog(f"Error: {e}")
+                    TUI.appendToSolverLog(f"Error: {e}", True)
                     continue
 
                 eg["links"].append({
