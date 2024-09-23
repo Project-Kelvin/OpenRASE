@@ -103,8 +103,8 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
     NO_OF_WEIGHTS: int = 5 #4 weights and 1 bias
     POP_SIZE: int = 10
     NGEN: int = 10
-    CXPB: float = 0.8
-    MUTPB: float = 0.2
+    CXPB: float = 1.0
+    MUTPB: float = 0.3
 
     creator.create("MaxARMinLatency", base.Fitness, weights=(1.0, -1.0))
     creator.create("Individual", list, fitness=creator.MaxARMinLatency)
@@ -158,6 +158,9 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
         pop[:] = toolbox.select(pop + offspring, k=POP_SIZE)
 
         hof.update(pop)
+
+        ars = [ind.fitness.values[0] for ind in pop]
+        latencies = [ind.fitness.values[1] for ind in pop]
 
         with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/data.csv", "a", encoding="utf8") as topologyFile:
             topologyFile.write(f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n")
