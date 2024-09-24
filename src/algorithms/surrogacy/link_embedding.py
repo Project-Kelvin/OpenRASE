@@ -164,6 +164,7 @@ class EmbedLinks:
         self._hotCode: HotCode = HotCode()
         self._convertToHotCodes()
         self._model: tf.keras.Sequential = self._buildModel()
+        self._hCost: "dict[str, dict[str, dict[str, float]]]" = {}
 
     def _constructGraph(self) -> nx.Graph:
         """
@@ -250,7 +251,32 @@ class EmbedLinks:
             float: the heuristic cost.
         """
 
-        prediction: float = self._model.predict(np.array([sfc, src, dst]).reshape(1, 3))[0][0]
+        prediction: float = 0.0
+        if sfc in self._hCost and src in self._hCost[sfc] and dst in self._hCost[sfc][src]:
+
+            start: float = default_timer()
+            prediction = self._hCost[sfc][src][dst]
+            end: float = default_timer()
+
+            TUI.appendToSolverLog(f"CACHE: Predicted cost for SFC {sfc}, source {src}, destination {dst}: {prediction}. Time: {end - start}s")
+        else:
+            start: float = default_timer()
+
+            prediction = self._model.predict(np.array([
+                self._hotCode.getSFCCode(sfc),
+                self._hotCode.getNodeCode(src),
+                self._hotCode.getNodeCode(dst)]).reshape(1, 3))[0][0]
+
+            if sfc not in self._hCost:
+                self._hCost[sfc] = {}
+            if src not in self._hCost[sfc]:
+                self._hCost[sfc] = {
+                    src: {}
+                }
+            self._hCost[sfc][src][dst] = prediction
+
+            end: float = default_timer()
+            TUI.appendToSolverLog(f"Predicted cost for SFC {sfc}, source {src}, destination {dst}: {prediction}. Time: {end - start}s")
 
         return prediction
 
@@ -289,14 +315,14 @@ class EmbedLinks:
                 for neighbor in self._graph.adj[currentNode.name]:
                     node: Node = Node(neighbor)
                     node.hCost = self._getHeuristicCost(
-                        self._hotCode.getSFCCode(sfcID),
-                        self._hotCode.getNodeCode(neighbor),
-                        self._hotCode.getNodeCode(destination))
+                        sfcID,
+                        neighbor,
+                        destination)
                     node.parent = currentNode
                     node.totalCost = currentNode.totalCost + self._getHeuristicCost(
-                        self._hotCode.getSFCCode(sfcID),
-                        self._hotCode.getNodeCode(currentNode.name),
-                        self._hotCode.getNodeCode(neighbor)
+                        sfcID,
+                        currentNode.name,
+                        neighbor
                     )
 
                     if len([closedSetNode for closedSetNode in closedSet if closedSetNode.name == neighbor and node.totalCost >= closedSetNode.totalCost]) == 0:
