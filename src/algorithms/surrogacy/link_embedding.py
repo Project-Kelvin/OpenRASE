@@ -2,6 +2,7 @@
 This defines the functions used for VNF link embedding.
 """
 
+from timeit import default_timer
 import networkx as nx
 import heapq
 from constants.topology import SERVER, SFCC
@@ -250,7 +251,11 @@ class EmbedLinks:
             float: the heuristic cost.
         """
 
+        start: float = default_timer()
         prediction = self._model.predict(np.array([sfc, src, dst]).reshape(1, 3))[0][0]
+        end: float = default_timer()
+
+        TUI.appendToSolverLog(f"Prediction time: {end - start}s")
 
         return prediction
 

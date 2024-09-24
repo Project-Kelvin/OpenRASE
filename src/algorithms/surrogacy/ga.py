@@ -65,7 +65,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     acceptanceRatio: float = len(egs)/len(fgs)
     latency: int = 0
 
-    #TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}")
+    TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}")
 
     hosts = {}
     def parseVNF(vnf: VNF, _pos: int, hosts) -> None:
