@@ -269,6 +269,7 @@ class EmbedLinks:
 
         openSet: "list[Node]" = [Node(source)]
         closedSet: "list[Node]" = []
+        index: int = 0
 
         while len(openSet) > 0:
             currentNode: Node = heapq.heappop(openSet)
@@ -282,7 +283,7 @@ class EmbedLinks:
 
                 return path
 
-            if "h" not in currentNode.name and currentNode.name != SFCC and currentNode.name != SERVER:
+            if index == 0 or ("h" not in currentNode.name and currentNode.name != SFCC and currentNode.name != SERVER):
                 for neighbor in self._graph.adj[currentNode.name]:
                     node: Node = Node(neighbor)
                     node.hCost = self._getHeuristicCost(
@@ -298,7 +299,7 @@ class EmbedLinks:
 
                     if len([closedSetNode for closedSetNode in closedSet if closedSetNode.name == neighbor and node.totalCost >= closedSetNode.totalCost]) == 0:
                         heapq.heappush(openSet, node)
-
+            index += 1
             closedSet.append(currentNode)
 
     def embedLinks(self, nodes: "dict[str, list[str]]") -> None:
