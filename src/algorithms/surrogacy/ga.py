@@ -4,6 +4,7 @@ This defines the GA that evolves teh weights of the Neural Network.
 
 import random
 from time import sleep
+from timeit import default_timer
 from typing import Callable
 from algorithms.surrogacy.link_embedding import EmbedLinks
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
@@ -59,7 +60,10 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
 
     if len(egs) > 0:
         embedLinks: EmbedLinks = EmbedLinks(topology, egs, individual[5:8], [individual[8]])
+        start: float = default_timer()
         egs = embedLinks.embedLinks(nodes)
+        end: float = default_timer()
+        TUI.appendToSolverLog(f"Link Embedding Time for all EGs: {end - start}s")
 
     penaltyLatency: float = 50000
     acceptanceRatio: float = len(egs)/len(fgs)

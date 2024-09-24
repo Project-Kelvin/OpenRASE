@@ -250,11 +250,7 @@ class EmbedLinks:
             float: the heuristic cost.
         """
 
-        start: float = default_timer()
         prediction: float = self._model.predict(np.array([sfc, src, dst]).reshape(1, 3))[0][0]
-        end: float = default_timer()
-
-        TUI.appendToSolverLog(f"Prediction time: {end - start}s")
 
         return prediction
 
@@ -323,6 +319,7 @@ class EmbedLinks:
             if "links" not in eg:
                 eg["links"] = []
 
+            start: float = default_timer()
             for i in range(len(nodes[eg["sfcID"]]) - 1):
                 try:
                     path = self._findPath(eg["sfcID"], nodes[eg["sfcID"]][i], nodes[eg["sfcID"]][i + 1])
@@ -335,5 +332,8 @@ class EmbedLinks:
                     "destination": {"id": path[-1]},
                     "links": path[1:-1]
                 })
+            end: float = default_timer()
+
+            TUI.appendToSolverLog(f"Link Embedding Time for EG {eg['sfcID']}: {end - start}s")
 
         return self._egs
