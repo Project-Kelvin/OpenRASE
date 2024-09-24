@@ -162,6 +162,7 @@ class EmbedLinks:
         self._bias = bias
         self._hotCode = HotCode()
         self._convertToHotCodes()
+        self._model = self._buildModel()
 
 
     def _constructGraph(self) -> nx.Graph:
@@ -205,17 +206,12 @@ class EmbedLinks:
         for eg in self._egs:
             self._hotCode.addSFC(eg["sfcID"])
 
-    def _getHeuristicCost(self, sfc: str, src: str, dst: str) -> float:
+    def _buildModel(self) -> tf.keras.Sequential:
         """
-        Gets the heuristic cost.
-
-        Parameters:
-            sfc (str): the SFC.
-            src (str): the source.
-            dst (str): the destination.
+        Builds the model.
 
         Returns:
-            float: the heuristic cost.
+            tf.keras.Sequential: the model.
         """
 
         layers: "list[int]" = [3, 1]
@@ -239,7 +235,22 @@ class EmbedLinks:
                     startIndex = endIndex
                     endIndex = startIndex + layers[index]
 
-        prediction = model.predict(np.array([sfc, src, dst]).reshape(1, 3))[0][0]
+        return model
+
+    def _getHeuristicCost(self, sfc: str, src: str, dst: str) -> float:
+        """
+        Gets the heuristic cost.
+
+        Parameters:
+            sfc (str): the SFC.
+            src (str): the source.
+            dst (str): the destination.
+
+        Returns:
+            float: the heuristic cost.
+        """
+
+        prediction = self._model.predict(np.array([sfc, src, dst]).reshape(1, 3))[0][0]
 
         return prediction
 
@@ -271,24 +282,22 @@ class EmbedLinks:
 
                 return path
 
-            for neighbor in self._graph.adj[currentNode.name]:
-                if "h" in neighbor:
-                    continue
+            if "h" not in currentNode.name and currentNode.name != SFCC and currentNode.name != SERVER:
+                for neighbor in self._graph.adj[currentNode.name]:
+                    node: Node = Node(neighbor)
+                    node.hCost = self._getHeuristicCost(
+                        self._hotCode.getSFCCode(sfcID),
+                        self._hotCode.getNodeCode(neighbor),
+                        self._hotCode.getNodeCode(destination))
+                    node.parent = currentNode
+                    node.totalCost = currentNode.totalCost + self._getHeuristicCost(
+                        self._hotCode.getSFCCode(sfcID),
+                        self._hotCode.getNodeCode(currentNode.name),
+                        self._hotCode.getNodeCode(neighbor)
+                    )
 
-                node: Node = Node(neighbor)
-                node.hCost = self._getHeuristicCost(
-                    self._hotCode.getSFCCode(sfcID),
-                    self._hotCode.getNodeCode(neighbor),
-                    self._hotCode.getNodeCode(destination))
-                node.parent = currentNode
-                node.totalCost = currentNode.totalCost + self._getHeuristicCost(
-                    self._hotCode.getSFCCode(sfcID),
-                    self._hotCode.getNodeCode(currentNode.name),
-                    self._hotCode.getNodeCode(neighbor)
-                )
-
-                if len([closedSetNode for closedSetNode in closedSet if closedSetNode.name == neighbor and node.totalCost >= closedSetNode.totalCost]) == 0:
-                    heapq.heappush(openSet, node)
+                    if len([closedSetNode for closedSetNode in closedSet if closedSetNode.name == neighbor and node.totalCost >= closedSetNode.totalCost]) == 0:
+                        heapq.heappush(openSet, node)
 
             closedSet.append(currentNode)
 
