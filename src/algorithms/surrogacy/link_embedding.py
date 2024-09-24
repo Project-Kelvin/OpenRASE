@@ -164,7 +164,7 @@ class EmbedLinks:
         self._hotCode: HotCode = HotCode()
         self._convertToHotCodes()
         self._model: tf.keras.Sequential = self._buildModel()
-        self._hCost: "dict[str, float]" = {}
+        self._hCost: "dict[str, dict[str, dict[str, float]]]" = {}
 
 
     def _constructGraph(self) -> nx.Graph:
@@ -255,10 +255,11 @@ class EmbedLinks:
         start: float = default_timer()
         prediction: float = 0
         if f"{sfc}-{src}-{dst}" in self._hCost:
-            prediction = self._hCost[f"{sfc}-{src}-{dst}"]
+            TUI.appendToSolverLog(f"Using cached prediction for {sfc} from {src} to {dst}.")
+            prediction = self._hCost[sfc][src][dst]
         else:
             prediction = self._model.predict(np.array([sfc, src, dst]).reshape(1, 3))[0][0]
-            self._hCost[f"{sfc}-{src}-{dst}"] = prediction
+            self._hCost[sfc][src][dst] = prediction
         end: float = default_timer()
 
         TUI.appendToSolverLog(f"Prediction time: {end - start}s")
