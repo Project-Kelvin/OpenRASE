@@ -252,6 +252,7 @@ class EmbedLinks:
         """
 
         prediction: float = 0.0
+        TUI.appendToSolverLog(str(self._hCost))
         if sfc in self._hCost and src in self._hCost[sfc] and dst in self._hCost[sfc][src]:
 
             start: float = default_timer()
