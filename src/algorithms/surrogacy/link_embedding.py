@@ -2,7 +2,6 @@
 This defines the functions used for VNF link embedding.
 """
 
-import copy
 from timeit import default_timer
 import networkx as nx
 import heapq
@@ -12,7 +11,6 @@ from shared.models.embedding_graph import EmbeddingGraph
 import tensorflow as tf
 import numpy as np
 from utils.tui import TUI
-from dijkstar import Graph, find_path
 
 class HotCode:
     """
@@ -322,46 +320,7 @@ class EmbedLinks:
         """
 
         for eg in self._egs:
-            graph = Graph()
-            nodePair: "list[str]" = []
-            eg: EmbeddingGraph = copy.deepcopy(eg)
-
             if "links" not in eg:
-                eg["links"] = []
-
-            for link in self._topology["links"]:
-                graph.add_edge(
-                    link["source"], link["destination"], self._getHeuristicCost(
-                        self._hotCode.getSFCCode(eg["sfcID"]),
-                        self._hotCode.getNodeCode(link["source"]),
-                        self._hotCode.getNodeCode(link["destination"])))
-                graph.add_edge(
-                    link["destination"], link["source"], self._getHeuristicCost(
-                        self._hotCode.getSFCCode(eg["sfcID"]),
-                        self._hotCode.getNodeCode(link["destination"]),
-                        self._hotCode.getNodeCode(link["source"])))
-
-            for i in range(len(nodes[eg["sfcID"]]) - 1):
-                srcDst: str = f"{nodes[eg['sfcID']][i]}-{nodes[eg['sfcID']][i + 1]}"
-                dstSrc: str = f"{nodes[eg['sfcID']][i + 1]}-{nodes[eg['sfcID']][i]}"
-                if srcDst not in nodePair and dstSrc not in nodePair:
-                    nodePair.append(srcDst)
-                    nodePair.append(dstSrc)
-                    try:
-                        path = find_path(graph, nodes[eg["sfcID"]][i], nodes[eg["sfcID"]][i + 1])
-                        TUI.appendToSolverLog(f"Path found: {str(path.nodes)}")
-                    except Exception as e:
-                        TUI.appendToSolverLog(f"Error: {e}")
-                        continue
-
-                    eg["links"].append({
-                        "source": {"id": path.nodes[0]},
-                        "destination": {"id": path.nodes[-1]},
-                        "links": path.nodes[1:-1]
-                    })
-
-
-            """ if "links" not in eg:
                 eg["links"] = []
 
             for i in range(len(nodes[eg["sfcID"]]) - 1):
@@ -375,6 +334,6 @@ class EmbedLinks:
                     "source": {"id": path[0]},
                     "destination": {"id": path[-1]},
                     "links": path[1:-1]
-                }) """
+                })
 
         return self._egs
