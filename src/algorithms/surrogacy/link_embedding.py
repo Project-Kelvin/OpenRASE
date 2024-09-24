@@ -219,7 +219,7 @@ class EmbedLinks:
 
         model = tf.keras.Sequential([
             tf.keras.Input(shape=(layers[0], )),
-            tf.keras.layers.Dense(layers[1], activation='relu')
+            tf.keras.layers.Dense(layers[1])
         ])
 
         index: int = 0
