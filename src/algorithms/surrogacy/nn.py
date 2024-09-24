@@ -115,7 +115,7 @@ def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
                     # pylint: disable=cell-var-from-loop
                     nodes[fg["sfcID"]].append(vnf["host"]["id"])
 
-        traverseVNF(fg["vnfs"], parseVNF, embeddingNotFound, startIndex, endIndex, shouldParseTerminal=False)
+        traverseVNF(fg["vnfs"], parseVNF, embeddingNotFound, startIndex, endIndex)
 
         if not embeddingNotFound[0]:
             if "sfcrID" in fg:
