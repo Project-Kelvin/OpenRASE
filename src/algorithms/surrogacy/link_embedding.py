@@ -156,14 +156,15 @@ class EmbedLinks:
             None
         """
 
-        self._egs = egs
-        self._topology = topology
-        self._graph = self._constructGraph()
-        self._weights = weights
-        self._bias = bias
-        self._hotCode = HotCode()
+        self._egs: "list[EmbeddingGraph]" = egs
+        self._topology: Topology = topology
+        self._graph: nx.Graph = self._constructGraph()
+        self._weights: "list[float]" = weights
+        self._bias: "list[float]" = bias
+        self._hotCode: HotCode = HotCode()
         self._convertToHotCodes()
-        self._model = self._buildModel()
+        self._model: tf.keras.Sequential = self._buildModel()
+        self._hCost: "dict[str, float]" = {}
 
 
     def _constructGraph(self) -> nx.Graph:
@@ -252,7 +253,12 @@ class EmbedLinks:
         """
 
         start: float = default_timer()
-        prediction = self._model.predict(np.array([sfc, src, dst]).reshape(1, 3))[0][0]
+        prediction: float = 0
+        if f"{sfc}-{src}-{dst}" in self._hCost:
+            prediction = self._hCost[f"{sfc}-{src}-{dst}"]
+        else:
+            prediction = self._model.predict(np.array([sfc, src, dst]).reshape(1, 3))[0][0]
+            self._hCost[f"{sfc}-{src}-{dst}"] = prediction
         end: float = default_timer()
 
         TUI.appendToSolverLog(f"Prediction time: {end - start}s")
