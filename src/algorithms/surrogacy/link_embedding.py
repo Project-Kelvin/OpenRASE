@@ -331,9 +331,15 @@ class EmbedLinks:
 
             for link in self._topology["links"]:
                 graph.add_edge(
-                    link["source"], link["destination"], self._getHeuristicCost(eg["sfcID"], link["source"], link["destination"]))
+                    link["source"], link["destination"], self._getHeuristicCost(
+                        self._hotCode.getSFCCode(eg["sfcID"]),
+                        self._hotCode.getNodeCode(link["source"]),
+                        self._hotCode.getNodeCode(link["destination"])))
                 graph.add_edge(
-                    link["destination"], link["source"], self._getHeuristicCost(eg["sfcID"], link["destination"], link["source"]))
+                    link["destination"], link["source"], self._getHeuristicCost(
+                        self._hotCode.getSFCCode(eg["sfcID"]),
+                        self._hotCode.getNodeCode(link["destination"]),
+                        self._hotCode.getNodeCode(link["source"])))
 
             for i in range(len(nodes[eg["sfcID"]]) - 1):
                 srcDst: str = f"{nodes[eg['sfcID']][i]}-{nodes[eg['sfcID']][i + 1]}"
