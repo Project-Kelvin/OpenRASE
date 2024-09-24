@@ -253,15 +253,8 @@ class EmbedLinks:
 
         prediction: float = 0.0
         if sfc in self._hCost and src in self._hCost[sfc] and dst in self._hCost[sfc][src]:
-
-            start: float = default_timer()
             prediction = self._hCost[sfc][src][dst]
-            end: float = default_timer()
-
-            TUI.appendToSolverLog(f"CACHE: Predicted cost for SFC {sfc}, source {src}, destination {dst}: {prediction}. Time: {end - start}s")
         else:
-            start: float = default_timer()
-
             prediction = self._model.predict(np.array([
                 self._hotCode.getSFCCode(sfc),
                 self._hotCode.getNodeCode(src),
@@ -272,9 +265,6 @@ class EmbedLinks:
             if src not in self._hCost[sfc]:
                 self._hCost[sfc][src] = {}
             self._hCost[sfc][src][dst] = prediction
-
-            end: float = default_timer()
-            TUI.appendToSolverLog(f"Predicted cost for SFC {sfc}, source {src}, destination {dst}: {prediction}. Time: {end - start}s")
 
         return prediction
 
