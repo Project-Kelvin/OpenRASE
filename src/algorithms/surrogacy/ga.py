@@ -83,8 +83,9 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
             hosts[vnf["host"]["id"]] += 1
 
     if len(egs) > 0:
-        traverseVNF(egs["vnfs"], parseVNF, hosts)
-        latency = max(hosts.values())
+        for eg in egs:
+            traverseVNF(eg["vnfs"], parseVNF, hosts)
+            latency = max(hosts.values())
     """ if len(egs) > 0:
         sendEGs(egs)
 
