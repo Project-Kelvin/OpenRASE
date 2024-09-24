@@ -270,7 +270,7 @@ class EmbedLinks:
         openSet: "list[Node]" = [Node(source)]
         closedSet: "list[Node]" = []
         index: int = 0
-
+        TUI.appendToSolverLog(f"Finding path from {source} to {destination} for SFC {sfcID}.")
         while len(openSet) > 0:
             currentNode: Node = heapq.heappop(openSet)
             if currentNode.name == destination:
@@ -280,6 +280,8 @@ class EmbedLinks:
                     currentNode = currentNode.parent
 
                 path.reverse()
+
+                TUI.appendToSolverLog(f"Path found: {str(path)}")
 
                 return path
 
