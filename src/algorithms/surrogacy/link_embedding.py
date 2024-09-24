@@ -271,9 +271,7 @@ class EmbedLinks:
             if sfc not in self._hCost:
                 self._hCost[sfc] = {}
             if src not in self._hCost[sfc]:
-                self._hCost[sfc] = {
-                    src: {}
-                }
+                self._hCost[sfc][src] = {}
             self._hCost[sfc][src][dst] = prediction
 
             end: float = default_timer()
