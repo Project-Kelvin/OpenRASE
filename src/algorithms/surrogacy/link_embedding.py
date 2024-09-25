@@ -432,14 +432,20 @@ class EmbedLinks:
         for eg in self._egs:
             if "links" not in eg:
                 eg["links"] = []
-            sfcNodes: "list[list[str]]" = self.parseNodes(nodes[eg["sfcID"]])
 
+            paths: "list[str]" = []
+            sfcNodes: "list[list[str]]" = self.parseNodes(nodes[eg["sfcID"]])
             start: float = default_timer()
 
             for nodeList in sfcNodes:
                 for i in range(len(nodeList) - 1):
                     try:
+                        if f"{nodeList[i]}-{nodeList[i + 1]}" in paths:
+                            continue
+                        if nodeList[i] == nodeList[i + 1]:
+                            continue
                         path = self._findPath(eg["sfcID"], nodeList[i], nodeList[i + 1])
+                        paths.append(f"{nodeList[i]}-{nodeList[i + 1]}")
                     except Exception as e:
                         TUI.appendToSolverLog(f"Error: {e}", True)
                         continue
