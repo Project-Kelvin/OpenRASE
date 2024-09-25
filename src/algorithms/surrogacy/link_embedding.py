@@ -11,7 +11,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 import tensorflow as tf
 import numpy as np
 from utils.tui import TUI
-import pd
+import pandas as pd
 
 class HotCode:
     """
