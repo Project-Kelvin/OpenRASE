@@ -11,6 +11,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 import tensorflow as tf
 import numpy as np
 from utils.tui import TUI
+import pd
 
 class HotCode:
     """
@@ -163,8 +164,57 @@ class EmbedLinks:
         self._bias: "list[float]" = bias
         self._hotCode: HotCode = HotCode()
         self._convertToHotCodes()
-        self._model: tf.keras.Sequential = self._buildModel()
         self._hCost: "dict[str, dict[str, dict[str, float]]]" = {}
+        self._data: pd.DataFrame = self._predictCost()
+
+    def _isHost(self, node: str) -> bool:
+        """
+        Checks if the node is a host.
+
+        Parameters:
+            node (str): the node.
+
+        Returns:
+            bool: True if the node is a host, False otherwise.
+        """
+
+        return node in [host["id"] for host in self._topology["hosts"]] or node == SFCC or node == SERVER
+
+    def _constructDF(self) -> pd.DataFrame:
+        """
+        Constructs the DataFrame.
+        """
+
+        links: "list[list[int]]" = []
+        for link in self._topology["links"]:
+            row: "list[int]" = []
+            row.append(self._hotCode.getNodeCode(link["source"]))
+            row.append(self._hotCode.getNodeCode(link["destination"]))
+
+            links.append(row)
+
+        hosts: "list[int]" = [self._hotCode.getNodeCode(host["id"]) for host in self._topology["hosts"]]
+        hosts.append(self._hotCode.getNodeCode(SFCC))
+        hosts.append(self._hotCode.getNodeCode(SERVER))
+
+        switches: "list[int]" = [self._hotCode.getNodeCode(switch["id"]) for switch in self._topology["switches"]]
+
+        for switch in switches:
+            for host in hosts:
+                links.append([switch, host])
+
+        rows: "list[list[int]]" = []
+        for eg in self._egs:
+            sfcLinks: "list[list[int]]" = []
+            for link in links:
+                row: "list[int]" = []
+                row.append(self._hotCode.getSFCCode(eg["sfcID"]))
+                row.extend(link)
+                sfcLinks.append(row)
+            rows.extend(sfcLinks)
+
+        return pd.DataFrame(rows, columns=["SFC", "Source", "Destination"])
+
 
     def _constructGraph(self) -> nx.Graph:
         """
@@ -207,18 +257,22 @@ class EmbedLinks:
         for eg in self._egs:
             self._hotCode.addSFC(eg["sfcID"])
 
-    def _buildModel(self) -> tf.keras.Sequential:
+    def _predictCost(self) -> pd.DataFrame:
         """
         Builds the model.
 
         Returns:
-            tf.keras.Sequential: the model.
+            The dataframe: pd.Dataframe.
         """
 
+        data: pd.DataFrame = self._constructDF()
+        normalizer = tf.keras.layers.Normalization(axis=1)
+        normalizer.adapt(np.array(data))
         layers: "list[int]" = [3, 1]
 
         model = tf.keras.Sequential([
             tf.keras.Input(shape=(layers[0], )),
+            normalizer,
             tf.keras.layers.Dense(layers[1])
         ])
 
@@ -236,7 +290,9 @@ class EmbedLinks:
                     startIndex = endIndex
                     endIndex = startIndex + layers[index]
 
-        return model
+        prediction = model.predict(np.array(data))
+
+        return data.assign(Cost=prediction)
 
     def _getHeuristicCost(self, sfc: str, src: str, dst: str) -> float:
         """
@@ -251,22 +307,22 @@ class EmbedLinks:
             float: the heuristic cost.
         """
 
-        prediction: float = 0.0
-        if sfc in self._hCost and src in self._hCost[sfc] and dst in self._hCost[sfc][src]:
-            prediction = self._hCost[sfc][src][dst]
-        else:
-            prediction = self._model.predict(np.array([
-                self._hotCode.getSFCCode(sfc),
-                self._hotCode.getNodeCode(src),
-                self._hotCode.getNodeCode(dst)]).reshape(1, 3))[0][0]
+        sfcCode: int = self._hotCode.getSFCCode(sfc)
+        srcCode: int = self._hotCode.getNodeCode(src)
+        dstCode: int = self._hotCode.getNodeCode(dst)
 
-            if sfc not in self._hCost:
-                self._hCost[sfc] = {}
-            if src not in self._hCost[sfc]:
-                self._hCost[sfc][src] = {}
-            self._hCost[sfc][src][dst] = prediction
+        row: "list[int]" = self._data.loc[
+            (self._data["SFC"] == sfcCode) &
+            (self._data["Source"] == srcCode) &
+            (self._data["Destination"] == dstCode)]
 
-        return prediction
+        if row.empty:
+            row = self._data.loc[
+                (self._data["SFC"] == sfcCode) &
+                (self._data["Source"] == dstCode) &
+                (self._data["Destination"] == srcCode)]
+
+        return row["Cost"].values[0]
 
     def _findPath(self, sfcID: str, source: str, destination: str) -> "list[str]":
         """
@@ -299,13 +355,17 @@ class EmbedLinks:
 
                 return path
 
-            if index == 0 or ("h" not in currentNode.name and currentNode.name != SFCC and currentNode.name != SERVER):
+            if index == 0 or self._isHost(currentNode.name):
                 for neighbor in self._graph.adj[currentNode.name]:
                     node: Node = Node(neighbor)
-                    node.hCost = self._getHeuristicCost(
-                        sfcID,
-                        neighbor,
-                        destination)
+
+                    if self._isHost(neighbor):
+                        node.hCost = 0
+                    else:
+                        node.hCost = self._getHeuristicCost(
+                            sfcID,
+                            neighbor,
+                            destination)
                     node.parent = currentNode
                     node.totalCost = currentNode.totalCost + self._getHeuristicCost(
                         sfcID,
@@ -315,6 +375,7 @@ class EmbedLinks:
 
                     if len([closedSetNode for closedSetNode in closedSet if closedSetNode.name == neighbor and node.totalCost >= closedSetNode.totalCost]) == 0:
                         heapq.heappush(openSet, node)
+
             index += 1
             closedSet.append(currentNode)
 
