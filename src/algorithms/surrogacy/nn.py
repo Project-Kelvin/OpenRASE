@@ -5,6 +5,7 @@ This defines the Neural Network used for genetic encoding.
 import copy
 from typing import Tuple
 import pandas as pd
+from algorithms.surrogacy.constants import BRANCH
 from constants.topology import SERVER, SFCC
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.topology import Topology
@@ -28,25 +29,32 @@ def convertFGstoDF(fgs: "list[EmbeddingGraph]", topology: Topology) -> pd.DataFr
 
     vnfs: "list[str]" = getConfig()["vnfs"]["names"]
     data: "list[list[int]]" = []
+    instances: "dict[str, int]" = {}
     for index, fg in enumerate(fgs):
         fgID: int = index + 1
 
-        def parseVNF(vnf: VNF, pos: int) -> None:
+        def parseVNF(vnf: VNF, _pos: int, instances: "dict[str, int]") -> None:
             """
             Parses a VNF.
 
             Parameters:
                 vnf (VNF): the VNF.
-                pos (int): the position.
+                _pos (int): the position.
+                instances (dict[str, int]): the instances.
             """
 
             vnfID: int = vnfs.index(vnf["vnf"]["id"]) + 1
 
+            if vnf["vnf"]["id"] not in instances:
+                instances[vnf["vnf"]["id"]] = 1
+            else:
+                instances[vnf["vnf"]["id"]] += 1
+
             for hIndex, _host in enumerate(topology["hosts"]):
                 #pylint: disable=cell-var-from-loop
-                data.append([fgID, vnfID, pos, hIndex + 1])
+                data.append([fgID, vnfID, instances[vnf["vnf"]["id"]], hIndex + 1])
 
-        traverseVNF(fg["vnfs"], parseVNF, shouldParseTerminal=False)
+        traverseVNF(fg["vnfs"], parseVNF, instances, shouldParseTerminal=False)
 
     return pd.DataFrame(data, columns=["SFC", "VNF", "Position", "Host"])
 
@@ -75,17 +83,24 @@ def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
         fg["sfcID"] = fg["sfcrID"] if "sfcrID" in fg else f"sfc{index}"
         nodes[fg["sfcID"]] = [SFCC]
         embeddingNotFound: "list[bool]" = [False]
-
-        def parseVNF(vnf: VNF, _pos: int, embeddingNotFound, startIndex, endIndex) -> None:
+        oldDepth: int = 1
+        def parseVNF(vnf: VNF, depth: int, embeddingNotFound, startIndex, endIndex) -> None:
             """
             Parses a VNF.
 
             Parameters:
                 vnf (VNF): the VNF.
-                _pos (int): the position.
+                depth (int): the depth.
                 startIndex (list[int]): the start index.
                 endIndex (list[int]): the end index.
             """
+
+            nonlocal oldDepth
+
+            if depth > oldDepth:
+                oldDepth = depth
+                # pylint: disable=cell-var-from-loop
+                nodes[fg["sfcID"]].append(BRANCH)
 
             if embeddingNotFound[0]:
                 return

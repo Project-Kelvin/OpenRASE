@@ -5,6 +5,7 @@ This defines the functions used for VNF link embedding.
 from timeit import default_timer
 import networkx as nx
 import heapq
+from algorithms.surrogacy.constants import BRANCH
 from constants.topology import SERVER, SFCC
 from shared.models.topology import Topology
 from shared.models.embedding_graph import EmbeddingGraph
@@ -355,7 +356,7 @@ class EmbedLinks:
 
                 return path
 
-            if index == 0 or self._isHost(currentNode.name):
+            if index == 0 or not self._isHost(currentNode.name):
                 for neighbor in self._graph.adj[currentNode.name]:
                     node: Node = Node(neighbor)
 
@@ -378,6 +379,44 @@ class EmbedLinks:
 
             index += 1
             closedSet.append(currentNode)
+
+    def parseNodes(self, nodes: "list[str]") -> "list[list[str]]":
+        """
+        Parses the nodes.
+
+        Parameters:
+            nodes (list[str]): the nodes.
+
+        Returns:
+            list[list[str]]: the parsed nodes.
+        """
+
+        parsedNodes: "list[list[str]]" = []
+        roots: "list[list[str]]" = []
+        branch: "list[str]" = []
+        connectingNode: str = None
+
+        for node in nodes:
+            if node == BRANCH:
+                roots.append(branch[:])
+                parsedNodes.append(branch[:])
+                connectingNode = branch[-1]
+                branch = []
+            elif node == SERVER:
+                branch.append(node)
+                parsedNodes.append(branch[:])
+                branch = []
+                if len(roots) > 0:
+                    lastRoot: "list[str]" = roots.pop()
+                    connectingNode = lastRoot[-1]
+            else:
+                if connectingNode:
+                    parsedNodes.append([connectingNode, node])
+                    connectingNode = None
+                branch.append(node)
+
+        return parsedNodes
+
 
     def embedLinks(self, nodes: "dict[str, list[str]]") -> None:
         """
