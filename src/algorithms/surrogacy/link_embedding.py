@@ -432,20 +432,23 @@ class EmbedLinks:
         for eg in self._egs:
             if "links" not in eg:
                 eg["links"] = []
+            sfcNodes: "list[list[str]]" = self.parseNodes(nodes[eg["sfcID"]])
 
             start: float = default_timer()
-            for i in range(len(nodes[eg["sfcID"]]) - 1):
-                try:
-                    path = self._findPath(eg["sfcID"], nodes[eg["sfcID"]][i], nodes[eg["sfcID"]][i + 1])
-                except Exception as e:
-                    TUI.appendToSolverLog(f"Error: {e}", True)
-                    continue
 
-                eg["links"].append({
-                    "source": {"id": path[0]},
-                    "destination": {"id": path[-1]},
-                    "links": path[1:-1]
-                })
+            for nodeList in sfcNodes:
+                for i in range(len(nodeList) - 1):
+                    try:
+                        path = self._findPath(eg["sfcID"], nodeList[i], nodeList[i + 1])
+                    except Exception as e:
+                        TUI.appendToSolverLog(f"Error: {e}", True)
+                        continue
+
+                    eg["links"].append({
+                        "source": {"id": path[0]},
+                        "destination": {"id": path[-1]},
+                        "links": path[1:-1]
+                    })
             end: float = default_timer()
 
             TUI.appendToSolverLog(f"Link Embedding Time for EG {eg['sfcID']}: {end - start}s")
