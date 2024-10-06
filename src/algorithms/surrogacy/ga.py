@@ -35,6 +35,9 @@ with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/da
 with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/pfs.csv", "w", encoding="utf8") as pf:
     pf.write("generation, latency, ar\n")
 
+with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/weights.csv", "w", encoding="utf8") as weights:
+    weights.write("generation, w1, w2, w3, w4, w5, w6, w7, w8, w9, latency\n")
+
 def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology) -> "tuple[float, float]":
     """
     Evaluates the individual.
@@ -95,6 +98,16 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         latency = penaltyLatency * penalty
 
     TUI.appendToSolverLog(f"Latency: {latency}ms")
+
+    weighTRow: str = f"{gen}, "
+
+    for weight in individual:
+        weighTRow += f"{weight}, "
+
+    weighTRow += f"{latency}\n"
+
+    with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/weights.csv", "a", encoding="utf8") as weights:
+        weights.write(weighTRow)
 
     return acceptanceRatio, latency
 
