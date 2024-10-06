@@ -71,26 +71,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
 
     TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}")
 
-    hosts = {}
-    def parseVNF(vnf: VNF, _pos: int, hosts) -> None:
-        """
-        Traverses a VNF.
-
-        Parameters:
-            vnf (VNF): the VNF.
-            pos (int): the position.
-        """
-
-        if vnf["host"]["id"] not in hosts:
-            hosts[vnf["host"]["id"]] = 1
-        else:
-            hosts[vnf["host"]["id"]] += 1
-
     if len(egs) > 0:
-        for eg in egs:
-            traverseVNF(eg["vnfs"], parseVNF, hosts)
-            latency = max(hosts.values())
-    """ if len(egs) > 0:
         sendEGs(egs)
 
         duration: int = calculateTrafficDuration(trafficDesign[0])
@@ -111,7 +92,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         deleteEGs(egs)
     else:
         penalty: float = gen/ngen
-        latency = penaltyLatency * penalty """
+        latency = penaltyLatency * penalty
 
     TUI.appendToSolverLog(f"Latency: {latency}ms")
 
