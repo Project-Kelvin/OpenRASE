@@ -137,7 +137,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
 
     toolbox:base.Toolbox = base.Toolbox()
 
-    toolbox.register("gene", random.uniform, 0.0, 1000.0)
+    toolbox.register("gene", random.gauss, 0.0, 1)
     toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.gene, n=NO_OF_WEIGHTS)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("crossover", tools.cxBlend, alpha=0.5)
