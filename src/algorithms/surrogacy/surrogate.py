@@ -73,8 +73,7 @@ def priorTrainable(kernelSize: int, biasSize: int=0, dtype=None) -> tf_keras.Seq
     ])
 
 model: tf_keras.Sequential = tf_keras.Sequential([
-    tfp.layers.DenseVariational(8, posteriorMeanField, priorTrainable, activation="relu", kl_weight=1/xTrain.shape[0]),
-    tfp.layers.DenseVariational(8, posteriorMeanField, priorTrainable, activation="relu", kl_weight=1/xTrain.shape[0]),
+    tfp.layers.DenseVariational(1, make_posterior_fn=posteriorMeanField, make_prior_fn=priorTrainable, activation="relu", kl_weight=1/xTrain.shape[0]),
     tfp.layers.DenseVariational(2, make_posterior_fn=posteriorMeanField, make_prior_fn=priorTrainable, kl_weight=1/xTrain.shape[0]),
     tfp.layers.DistributionLambda(
         lambda t: tfp.distributions.Normal(loc=t[..., :1],
@@ -83,7 +82,7 @@ model: tf_keras.Sequential = tf_keras.Sequential([
 ])
 
 model.compile(optimizer=tf_keras.optimizers.Adam(learning_rate=0.05), loss=negLogLikelihood)
-history: Any = model.fit(xTrain, yTrain, epochs=1000, validation_split=0.2)
+history: Any = model.fit(xTrain, yTrain, epochs=2000, validation_split=0.2)
 
 plt.plot(history.history['loss'], label='loss')
 plt.plot(history.history['val_loss'], label='val_loss')
@@ -112,7 +111,7 @@ def predict(w: "list[float]") -> "Tuple[float, float]":
     for _i in range(num):
         predictions.append(model.predict(np.array([w]))[0][0])
 
-    return np.mean(predictions), np.std(predictions)
+    return np.median(predictions), np.quantile(predictions, 0.75) - np.quantile(predictions, 0.25)
 
 for index, row in testData.iterrows():
     w: "list[float]" = row[["w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8", "w9"]].values
