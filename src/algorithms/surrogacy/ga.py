@@ -90,7 +90,17 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
             latency += value["averageLatency"]
 
         latency = latency / len(trafficData) if len(trafficData) > 0 else penaltyLatency
+        
+        weightRow: str = f"{gen}, "
 
+        for weight in individual:
+            weightRow += f"{weight}, "
+
+        weightRow += f"{latency}\n"
+        
+        with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/weights.csv", "a", encoding="utf8") as weights:
+            weights.write(weightRow)
+            
         TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
         deleteEGs(egs)
     else:
@@ -98,16 +108,6 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         latency = penaltyLatency * penalty
 
     TUI.appendToSolverLog(f"Latency: {latency}ms")
-
-    weighTRow: str = f"{gen}, "
-
-    for weight in individual:
-        weighTRow += f"{weight}, "
-
-    weighTRow += f"{latency}\n"
-
-    with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/weights.csv", "a", encoding="utf8") as weights:
-        weights.write(weighTRow)
 
     return acceptanceRatio, latency
 
