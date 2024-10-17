@@ -5,7 +5,8 @@ This defines the function to clean the log files.
 import shutil
 
 import click
-from docker import DockerClient, from_env
+from docker import DockerClient, from_env, errors
+from shared.constants.sfc import SFC_REGISTRY
 from shared.models.config import Config
 from shared.utils.config import getConfig
 import os
@@ -27,7 +28,8 @@ def removeFiles(log_dir: str) -> None:
 @click.option("--logs", default=False, type=bool, is_flag=True, help="Delete the log files.")
 @click.option("--docker", default=False, type=bool, is_flag=True, help="Delete the docker containers.")
 @click.option("--prune", default=False, type=bool, is_flag=True, help="Prune Docker.")
-def clean(logs: bool, docker: bool, prune: bool) -> None:
+@click.option("--stop", default=False, type=bool, is_flag=True, help="Stop & remove the SFC registry.")
+def clean(logs: bool, docker: bool, prune: bool, stop: bool) -> None:
     """
     This function cleans the log files and docker containers.
 
@@ -35,7 +37,21 @@ def clean(logs: bool, docker: bool, prune: bool) -> None:
         logs (bool): A boolean flag to delete the log files.
         docker (bool): A boolean flag to delete the docker containers.
         prune (bool): A boolean flag to prune the docker containers.
+        stop(bool): A boolean flag to stop and remove the SFC registry.
     """
+
+    def stopRegistry() -> None:
+        """
+        Thsi function stops and removes the SFC Docker registry. 
+        """
+
+        print("Stopping and removing the SFC Registry.")
+        client: DockerClient = from_env()
+        try:
+            client.containers.get(SFC_REGISTRY).stop()
+        except errors.NotFound as e:
+            print(f"SFC registry is not running.\n\t{str(e)}")
+
 
     def cleanLogs() -> None:
         """
@@ -89,7 +105,11 @@ def clean(logs: bool, docker: bool, prune: bool) -> None:
     if prune:
         pruneDocker()
 
-    if not logs and not docker and not prune:
+    if stop:
+        stopRegistry()
+
+    if not logs and not docker and not prune and not stop:
         cleanLogs()
         cleanDocker()
         pruneDocker()
+        stopRegistry()

@@ -100,16 +100,6 @@ def startRegistryContainer() -> None:
         auto_remove=True
     ).start()
 
-
-def stopRegistryContainer() -> None:
-    """
-    Stop the registry container.
-    """
-
-    client.containers.get(SFC_REGISTRY).stop()
-    client.containers.get(SFC_REGISTRY).remove()
-
-
 def addRegistryToInsecureRegistries() -> None:
     """
     Add the registry to the list of insecure registries
