@@ -93,7 +93,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
                 latency: float = data["averageLatency"]
                 reqps: float = requests / interval
                 linkData: "dict[str, float]" = embedLinks.getLinkData()
-                row: "list[Union[str, float]]" = getSFCScore(reqps, egs[sfc], topology, embedData, linkData, latency)
+                row: "list[Union[str, float]]" = getSFCScore(reqps, topology, egs[sfc], embedData, linkData)
                 row.append(latency)
             stopTime: int = default_timer()
             interval = stopTime - startTime
