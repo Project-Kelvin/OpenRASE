@@ -289,7 +289,7 @@ def getCPUScore(cpuDemand: float, totalCPUDemand: float, hostCPU: float) -> floa
         float: the CPU score.
     """
 
-    return ((cpuDemand / totalCPUDemand) * hostCPU) ** -1
+    return ((cpuDemand / totalCPUDemand) * hostCPU) ** -1 if cpuDemand > 0 else 0
 
 def getMemoryScore(memoryDemand: float, totalMemoryDemand: float, hostMemory: float) -> float:
     """
@@ -304,7 +304,7 @@ def getMemoryScore(memoryDemand: float, totalMemoryDemand: float, hostMemory: fl
         float: the memory score.
     """
 
-    return ((memoryDemand / totalMemoryDemand) * hostMemory) ** -1
+    return ((memoryDemand / totalMemoryDemand) * hostMemory) ** -1 if memoryDemand > 0 else 0
 
 def getLinkScore(requests: int, totalRequests: int, bandwidth: float) -> float:
     """
@@ -319,4 +319,4 @@ def getLinkScore(requests: int, totalRequests: int, bandwidth: float) -> float:
         float: the link score.
     """
 
-    return ((requests / totalRequests) * bandwidth) ** -1
+    return ((requests / totalRequests) * bandwidth) ** -1 if requests > 0 else 0

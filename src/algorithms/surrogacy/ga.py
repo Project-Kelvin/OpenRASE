@@ -92,7 +92,6 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         threads: "list[threading.Thread]" = []
         while step < duration:
             try:
-                startTime: int = default_timer()
                 def writeSFCScore():
                     trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
                                 f"{interval:.0f}s")
@@ -119,10 +118,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
                 thread: threading.Thread = threading.Thread(target=writeSFCScore)
                 thread.start()
                 threads.append(thread)
-                stopTime: int = default_timer()
-                interval = stopTime - startTime
-                if interval < 2:
-                    interval = 2
+                sleep(interval)
                 step += interval
 
             except Exception as e:
