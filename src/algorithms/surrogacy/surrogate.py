@@ -133,7 +133,7 @@ def predict(w: "list[float]", model) -> "Tuple[float, float]":
     return np.median(predictions), np.quantile(predictions, 0.75) - np.quantile(predictions, 0.25)
 
 
-def getSFCScoresForEGs(trafficModel: "list[int]", topology: Topology, egs: "list[EmbeddingGraph]", embeddingData: "dict[str, list[str]]", linkData: "dict[str, float]") -> "list[Union[str, float]]":
+def getSFCScoresForEGs(trafficModel: "list[int]", topology: Topology, egs: "list[EmbeddingGraph]", embeddingData: "dict[str, list[str]]", linkData: "dict[str, float]") -> "list[list[Union[str, float]]]":
     """
     Gets the SFC scores.
 
@@ -145,12 +145,15 @@ def getSFCScoresForEGs(trafficModel: "list[int]", topology: Topology, egs: "list
         linkData (dict[str, float]): the link data.
 
     Returns:
-        list[Union[str, float]]: the SFC scores.
+        list[list[Union[str, float]]]: the SFC scores.
     """
 
-    return [getSFCScoresForTrafficModel(trafficModel, topology, eg, embeddingData, linkData) for eg in egs]
+    rows: "list[list[Union[str, float]]]" =[]
 
-def getSFCScoresForTrafficModel(trafficModel: "list[int]", topology: Topology, eg: EmbeddingGraph, embeddingData: "dict[str, list[str]]", linkData: "dict[str, float]") -> "list[Union[str, float]]":
+    for eg in egs:
+        rows.extend(getSFCScoresForTrafficModel(trafficModel, topology, eg, embeddingData, linkData))
+
+def getSFCScoresForTrafficModel(trafficModel: "list[int]", topology: Topology, eg: EmbeddingGraph, embeddingData: "dict[str, list[str]]", linkData: "dict[str, float]") -> "list[list[Union[str, float]]]":
     """
     Gets the SFC scores.
 
@@ -162,12 +165,12 @@ def getSFCScoresForTrafficModel(trafficModel: "list[int]", topology: Topology, e
         linkData (dict[str, float]): the link data.
 
     Returns:
-        list[Union[str, float]]: the SFC scores.
+        list[list[Union[str, float]]]: the SFC scores.
     """
 
     return [getSFCScore(reqps, topology, eg, embeddingData, linkData) for reqps in trafficModel]
 
-def getSFCScore(reqps: int, topology: Topology, eg: EmbeddingGraph, embeddingData: "dict[str, list[Tuple[str, int]]]", linkData: "dict[str, float]" ) -> "list[list[Union[str, float]]]":
+def getSFCScore(reqps: int, topology: Topology, eg: EmbeddingGraph, embeddingData: "dict[str, list[Tuple[str, int]]]", linkData: "dict[str, float]" ) -> "list[Union[str, float]]":
     """
     Gets the SFC scores.
 
@@ -179,7 +182,7 @@ def getSFCScore(reqps: int, topology: Topology, eg: EmbeddingGraph, embeddingDat
         linkData (dict[str, float]): the link data.
 
     Returns:
-        list[list[Union[str, float]]]: the SFC scores.
+        list[Union[str, float]]: the SFC scores.
     """
 
     calibrate = Calibrate()

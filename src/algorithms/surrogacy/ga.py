@@ -39,6 +39,9 @@ with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/pf
 with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/weights.csv", "w", encoding="utf8") as weights:
     weights.write("generation, w1, w2, w3, w4, w5, w6, w7, w8, w9, latency\n")
 
+with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "w", encoding="utf8") as latency:
+    latency.write("sfc, reqps, cpu, memory, link, latency\n")
+
 def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology) -> "tuple[float, float]":
     """
     Evaluates the individual.
@@ -83,18 +86,22 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         TUI.appendToSolverLog(f"Waiting for {duration}s...")
 
         step: int = 0
-        interval: int = 1
+        interval: int = 5
+        sleep(interval)
         while step < duration:
             startTime: int = default_timer()
             trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
                         f"{interval:.0f}s")
             for sfc, data in trafficData.items():
-                requests: float = data["httpReqs"]
+                requests: int = data["httpReqs"]
                 latency: float = data["averageLatency"]
                 reqps: float = requests / interval
                 linkData: "dict[str, float]" = embedLinks.getLinkData()
-                row: "list[Union[str, float]]" = getSFCScore(reqps, topology, egs[sfc], embedData, linkData)
+                eg: EmbeddingGraph = [graph for graph in egs if graph["sfcID"] == sfc][0]
+                row: "list[Union[str, float]]" = getSFCScore(reqps, topology, eg, embedData, linkData)
                 row.append(latency)
+                with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as latency:
+                    latency.write(",".join([str(el) for el in row]) + "\n")
             stopTime: int = default_timer()
             interval = stopTime - startTime
             step += interval

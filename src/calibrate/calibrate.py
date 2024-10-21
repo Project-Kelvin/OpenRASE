@@ -31,7 +31,7 @@ from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
 from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
-from kconstants.topology import SERVER, SFCC
+from constants.topology import SERVER, SFCC
 
 EPOCHS: int = 6000
 
