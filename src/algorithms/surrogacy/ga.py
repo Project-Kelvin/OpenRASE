@@ -5,9 +5,10 @@ This defines the GA that evolves teh weights of the Neural Network.
 import random
 from time import sleep
 from timeit import default_timer
-from typing import Callable
+from typing import Callable, Union
 from algorithms.surrogacy.link_embedding import EmbedLinks
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
+from algorithms.surrogacy.surrogate import getSFCScore
 from models.traffic_generator import TrafficData
 from packages.python.shared.models.embedding_graph import VNF
 from packages.python.shared.models.traffic_design import TrafficDesign
@@ -59,7 +60,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
 
     df: pd.DataFrame = convertFGstoDF(fgs, topology)
     newDF: pd.DataFrame = getConfidenceValues(df, individual[0:4], [individual[4]])
-    egs, nodes = convertDFtoFGs(newDF, fgs, topology)
+    egs, nodes, embedData = convertDFtoFGs(newDF, fgs, topology)
 
     if len(egs) > 0:
         embedLinks: EmbedLinks = EmbedLinks(topology, egs, individual[5:8], [individual[8]])
@@ -80,7 +81,24 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         duration: int = calculateTrafficDuration(trafficDesign[0])
         TUI.appendToSolverLog(f"Traffic Duration: {duration}s")
         TUI.appendToSolverLog(f"Waiting for {duration}s...")
-        sleep(duration)
+
+        step: int = 0
+        interval: int = 1
+        while step < duration:
+            startTime: int = default_timer()
+            trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
+                        f"{interval:.0f}s")
+            for sfc, data in trafficData.items():
+                requests: float = data["httpReqs"]
+                latency: float = data["averageLatency"]
+                reqps: float = requests / interval
+                linkData: "dict[str, float]" = embedLinks.getLinkData()
+                row: "list[Union[str, float]]" = getSFCScore(reqps, egs[sfc], topology, embedData, linkData, latency)
+                row.append(latency)
+            stopTime: int = default_timer()
+            interval = stopTime - startTime
+            step += interval
+
         TUI.appendToSolverLog(f"Done waiting for {duration}s.")
 
         trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
@@ -90,17 +108,17 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
             latency += value["averageLatency"]
 
         latency = latency / len(trafficData) if len(trafficData) > 0 else penaltyLatency
-        
+
         weightRow: str = f"{gen}, "
 
         for weight in individual:
             weightRow += f"{weight}, "
 
         weightRow += f"{latency}\n"
-        
+
         with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/weights.csv", "a", encoding="utf8") as weights:
             weights.write(weightRow)
-            
+
         TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
         deleteEGs(egs)
     else:
