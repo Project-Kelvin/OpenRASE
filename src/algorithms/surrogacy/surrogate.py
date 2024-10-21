@@ -2,7 +2,7 @@
 This defines the surrogate model as a Bayesian Neural Network.
 """
 
-from typing import Any, Callable, Tuple
+from typing import Any, Callable, Tuple, Union
 
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.topology import Host, Topology
@@ -133,40 +133,55 @@ def predict(w: "list[float]", model) -> "Tuple[float, float]":
     return np.median(predictions), np.quantile(predictions, 0.75) - np.quantile(predictions, 0.25)
 
 
-def getSFCScores(trafficModel: "list[int]", topology: Topology, egs: "list[EmbeddingGraph]", embeddingData: "dict[str, list[str]]", linkData: "dict[str, float]") -> pd.DataFrame:
+def getSFCScoresForEGs(trafficModel: "list[int]", egs: "list[EmbeddingGraph]", topology: Topology, embeddingData: "dict[str, list[str]]", linkData: "dict[str, float]") -> "list[Union[str, float]]":
+    """
+    Gets the SFC scores.
+
+    Parameters:
+        trafficModel (list[int]): the traffic model.
+        egs (list[EmbeddingGraph]): the Embedding Graphs.
+        topology (Topology): the topology.
+        embeddingData (dict[str, list[str]]): the embedding data.
+        linkData (dict[str, float]): the link data.
+
+    Returns:
+        list[Union[str, float]]: the SFC scores.
+    """
+
+    return [getSFCScoresForTrafficModel(trafficModel, eg, topology, embeddingData, linkData) for eg in egs]
+
+def getSFCScoresForTrafficModel(trafficModel: "list[int]", topology: Topology, eg: EmbeddingGraph, embeddingData: "dict[str, list[str]]", linkData: "dict[str, float]") -> "list[Union[str, float]]":
     """
     Gets the SFC scores.
 
     Parameters:
         trafficModel (list[int]): the traffic model.
         topology (Topology): the topology.
-        egs (list[EmbeddingGraph]): the Embedding Graphs.
+        egs (EmbeddingGraph): the Embedding Graph.
         embeddingData (dict[str, list[str]]): the embedding data.
         linkData (dict[str, float]): the link data.
 
     Returns:
-        pd.DataFrame: the SFC scores.
+        list[Union[str, float]]: the SFC scores.
     """
 
-    return pd.concat([getSFCScore(reqps, topology, egs, embeddingData, linkData) for reqps in trafficModel])
+    return [getSFCScore(reqps, topology, egs, embeddingData, linkData) for reqps in trafficModel]
 
-def getSFCScore(reqps: int, topology: Topology, egs: "list[EmbeddingGraph]", embeddingData: "dict[str, list[Tuple[str, int]]]", linkData: "dict[str, float]" ) -> pd.DataFrame:
+def getSFCScore(reqps: int, topology: Topology, eg: EmbeddingGraph, embeddingData: "dict[str, list[Tuple[str, int]]]", linkData: "dict[str, float]" ) -> "list[list[Union[str, float]]]":
     """
     Gets the SFC scores.
 
     Parameters:
         request (int): the number of requests per second.
         topology (Topology): the topology.
-        egs (list[EmbeddingGraph]): the Embedding Graphs.
+        egs (EmbeddingGraph): the Embedding Graph.
         embeddingData (dict[str, list[Tuple[str, int]]]): the embedding data.
         linkData (dict[str, float]): the link data.
 
     Returns:
-        pd.DataFrame: the SFC scores.
+        list[list[Union[str, float]]]: the SFC scores.
     """
 
-    rows: "list[list[float]]" = []
-    headers: "list[str]" = ["SFC", "Requests", "CPUScore", "MemoryScore", "LinkScore"]
     calibrate = Calibrate()
     hostResourceData: "dict[str, ResourceDemand]" = {}
 
@@ -185,74 +200,71 @@ def getSFCScore(reqps: int, topology: Topology, egs: "list[EmbeddingGraph]", emb
 
         hostResourceData[host] = ResourceDemand(cpu=otherCPU, memory=otherMemory)
 
-    for eg in egs:
-        row: "list[float]" = []
-        totalCPUScore: float = 0
-        totalMemoryScore: float = 0
-        totalLinkScore: float = 0
+    row: "list[float]" = []
+    totalCPUScore: float = 0
+    totalMemoryScore: float = 0
+    totalLinkScore: float = 0
 
-        def parseVNF(vnf: VNF, depth: int) -> None:
-            """
-            Parses a VNF.
+    def parseVNF(vnf: VNF, depth: int) -> None:
+        """
+        Parses a VNF.
 
-            Parameters:
-                vnf (VNF): the VNF.
-                depth (int): the depth.
-            """
+        Parameters:
+            vnf (VNF): the VNF.
+            depth (int): the depth.
+        """
 
-            nonlocal totalCPUScore
-            nonlocal totalMemoryScore
+        nonlocal totalCPUScore
+        nonlocal totalMemoryScore
 
-            divisor: int = 2**(depth-1)
-            demands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(reqps/divisor)
+        divisor: int = 2**(depth-1)
+        demands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(reqps/divisor)
 
-            vnfCPU: float = demands[vnf["vnf"]["id"]]["cpu"]
-            vnfMemory: float = demands[vnf["vnf"]["id"]]["memory"]
+        vnfCPU: float = demands[vnf["vnf"]["id"]]["cpu"]
+        vnfMemory: float = demands[vnf["vnf"]["id"]]["memory"]
 
-            host: Host = [host for host in topology["hosts"] if host["id"] == vnf["host"]["id"]][0]
-            hostCPU: float = host["cpu"]
-            hostMemory: float = host["memory"]
+        host: Host = [host for host in topology["hosts"] if host["id"] == vnf["host"]["id"]][0]
+        hostCPU: float = host["cpu"]
+        hostMemory: float = host["memory"]
 
-            cpuScore: float = getCPUScore(vnfCPU, hostResourceData[vnf["host"]["id"]]["cpu"], hostCPU)
-            memoryScore: float = getMemoryScore(vnfMemory, hostResourceData[vnf["host"]["id"]]["memory"], hostMemory)
+        cpuScore: float = getCPUScore(vnfCPU, hostResourceData[vnf["host"]["id"]]["cpu"], hostCPU)
+        memoryScore: float = getMemoryScore(vnfMemory, hostResourceData[vnf["host"]["id"]]["memory"], hostMemory)
 
-            totalCPUScore += cpuScore
-            totalMemoryScore += memoryScore
+        totalCPUScore += cpuScore
+        totalMemoryScore += memoryScore
 
-        traverseVNF(eg["vnfs"], parseVNF, shouldParseTerminal=False)
+    traverseVNF(eg["vnfs"], parseVNF, shouldParseTerminal=False)
 
-        for egLink in eg["links"]:
-            links: "list[str]" = [egLink["source"]["id"]]
-            links.extend(egLink["links"])
-            links.append(egLink["destination"]["id"])
-            divisor: int = egLink["divisor"]
+    for egLink in eg["links"]:
+        links: "list[str]" = [egLink["source"]["id"]]
+        links.extend(egLink["links"])
+        links.append(egLink["destination"]["id"])
+        divisor: int = egLink["divisor"]
 
-            for linkIndex in range(len(links) - 1):
-                source: str = links[linkIndex]
-                destination: str = links[linkIndex + 1]
+        for linkIndex in range(len(links) - 1):
+            source: str = links[linkIndex]
+            destination: str = links[linkIndex + 1]
 
-                totalRequests: int = 0
+            totalRequests: int = 0
 
-                if f"{source}-{destination}" in linkData:
-                    totalRequests = linkData[f"{source}-{destination}"]
-                elif f"{destination}-{source}" in linkData:
-                    totalRequests = linkData[f"{destination}-{source}"]
+            if f"{source}-{destination}" in linkData:
+                totalRequests = linkData[f"{source}-{destination}"]
+            elif f"{destination}-{source}" in linkData:
+                totalRequests = linkData[f"{destination}-{source}"]
 
-                bandwidth: float = [link["bandwidth"] for link in topology["links"] if (link["source"] == source and link["destination"] == destination) or (link["source"] == destination and link["destination"] == source)][0]
+            bandwidth: float = [link["bandwidth"] for link in topology["links"] if (link["source"] == source and link["destination"] == destination) or (link["source"] == destination and link["destination"] == source)][0]
 
-                linkScore: float = getLinkScore(reqps/divisor, totalRequests * reqps, bandwidth)
+            linkScore: float = getLinkScore(reqps/divisor, totalRequests * reqps, bandwidth)
 
-                totalLinkScore += linkScore
+            totalLinkScore += linkScore
 
-        row.append(eg["sfcID"])
-        row.append(reqps)
-        row.append(totalCPUScore)
-        row.append(totalMemoryScore)
-        row.append(totalLinkScore)
+    row.append(eg["sfcID"])
+    row.append(reqps)
+    row.append(totalCPUScore)
+    row.append(totalMemoryScore)
+    row.append(totalLinkScore)
 
-        rows.append(row)
-
-    return pd.DataFrame(rows, columns=headers)
+    return row
 
 def getCPUScore(cpuDemand: float, totalCPUDemand: float, hostCPU: float) -> float:
     """
