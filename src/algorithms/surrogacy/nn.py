@@ -59,7 +59,7 @@ def convertFGstoDF(fgs: "list[EmbeddingGraph]", topology: Topology) -> pd.DataFr
     return pd.DataFrame(data, columns=["SFC", "VNF", "Position", "Host"])
 
 
-def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: Topology) -> "Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, list[Tuple[str, int]]]]":
+def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: Topology) -> "Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]":
     """
     Generates the Embedding Graphs.
 
@@ -69,7 +69,7 @@ def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
         topology (Topology): the topology.
 
     Returns:
-        Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, list[Tuple[str, int]]]]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
+        Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
     """
 
     noHosts: int = len(topology["hosts"])
@@ -78,7 +78,7 @@ def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
 
     egs: "list[EmbeddingGraph]" = []
     nodes: "dict[str, list[str]]" = {}
-    embeddingData: "dict[str, list[Tuple[str, int]]]" = {}
+    embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" = {}
 
     for index, fg in enumerate(fgs):
         fg["sfcID"] = fg["sfcrID"] if "sfcrID" in fg else f"sfc{index}"
@@ -133,9 +133,14 @@ def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
                     nodes[fg["sfcID"]].append(vnf["host"]["id"])
 
                 if vnf["host"]["id"] in embeddingData:
-                    embeddingData[vnf["host"]["id"]].append([vnf["vnf"]["id"], depth])
+                    if fg["sfcID"] in embeddingData[vnf["host"]["id"]]:
+                        embeddingData[vnf["host"]["id"]][fg["sfcID"]].append([vnf["vnf"]["id"], depth])
+                    else:
+                        embeddingData[vnf["host"]["id"]][fg["sfcID"]] = [[vnf["vnf"]["id"], depth]]
                 else:
-                    embeddingData[vnf["host"]["id"]] = [[vnf["vnf"]["id"], depth]]
+                    embeddingData[vnf["host"]["id"]] = {
+                        fg["sfcID"]: [[vnf["vnf"]["id"], depth]]
+                    }
 
         traverseVNF(fg["vnfs"], parseVNF, embeddingNotFound, startIndex, endIndex)
 

@@ -15,6 +15,7 @@ import tensorflow_probability as tfp
 import pandas as pd
 import matplotlib.pyplot as plt
 import tf_keras
+from utils.tui import TUI
 
 from utils.embedding_graph import traverseVNF
 
@@ -133,16 +134,16 @@ def predict(w: "list[float]", model) -> "Tuple[float, float]":
     return np.median(predictions), np.quantile(predictions, 0.75) - np.quantile(predictions, 0.25)
 
 
-def getSFCScoresForEGs(trafficModel: "list[int]", topology: Topology, egs: "list[EmbeddingGraph]", embeddingData: "dict[str, list[str]]", linkData: "dict[str, float]") -> "list[list[Union[str, float]]]":
+def getSFCScoresForEGs(trafficModel: "list[dict[str, int]]", topology: Topology, egs: "list[EmbeddingGraph]", embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]", linkData: "dict[str, dict[str, float]]") -> "list[list[Union[str, float]]]":
     """
     Gets the SFC scores.
 
     Parameters:
-        trafficModel (list[int]): the traffic model.
+        trafficModel (list[dict[str, int]]): the traffic model.
         egs (list[EmbeddingGraph]): the Embedding Graphs.
         topology (Topology): the topology.
-        embeddingData (dict[str, list[str]]): the embedding data.
-        linkData (dict[str, float]): the link data.
+        embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): the embedding data.
+        linkData (dict[str, dict[str, float]]): the link data.
 
     Returns:
         list[list[Union[str, float]]]: the SFC scores.
@@ -153,16 +154,16 @@ def getSFCScoresForEGs(trafficModel: "list[int]", topology: Topology, egs: "list
     for eg in egs:
         rows.extend(getSFCScoresForTrafficModel(trafficModel, topology, eg, embeddingData, linkData))
 
-def getSFCScoresForTrafficModel(trafficModel: "list[int]", topology: Topology, eg: EmbeddingGraph, embeddingData: "dict[str, list[str]]", linkData: "dict[str, float]") -> "list[list[Union[str, float]]]":
+def getSFCScoresForTrafficModel(trafficModel: "list[dict[str, int]]", topology: Topology, eg: EmbeddingGraph, embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]", linkData: "dict[str, dict[str, float]]") -> "list[list[Union[str, float]]]":
     """
     Gets the SFC scores.
 
     Parameters:
-        trafficModel (list[int]): the traffic model.
+        trafficModel (list[dict[str, int]]): the traffic model.
         topology (Topology): the topology.
         eg (EmbeddingGraph): the Embedding Graph.
-        embeddingData (dict[str, list[str]]): the embedding data.
-        linkData (dict[str, float]): the link data.
+        embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): the embedding data.
+        linkData (dict[str, dict[str, float]]): the link data.
 
     Returns:
         list[list[Union[str, float]]]: the SFC scores.
@@ -170,16 +171,16 @@ def getSFCScoresForTrafficModel(trafficModel: "list[int]", topology: Topology, e
 
     return [getSFCScore(reqps, topology, eg, embeddingData, linkData) for reqps in trafficModel]
 
-def getSFCScore(reqps: int, topology: Topology, eg: EmbeddingGraph, embeddingData: "dict[str, list[Tuple[str, int]]]", linkData: "dict[str, float]" ) -> "list[Union[str, float]]":
+def getSFCScore(reqps: "dict[str, int]", topology: Topology, eg: EmbeddingGraph, embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]", linkData: "dict[str, dict[str, float]]" ) -> "list[Union[str, float]]":
     """
     Gets the SFC scores.
 
     Parameters:
-        request (int): the number of requests per second.
+        reqps (dict[str, int]) : the requests per second by SFC.
         topology (Topology): the topology.
         eg (EmbeddingGraph): the Embedding Graph.
-        embeddingData (dict[str, list[Tuple[str, int]]]): the embedding data.
-        linkData (dict[str, float]): the link data.
+        embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): the embedding data.
+        linkData (dict[str, dict[str, float]]): the link data.
 
     Returns:
         list[Union[str, float]]: the SFC scores.
@@ -188,21 +189,23 @@ def getSFCScore(reqps: int, topology: Topology, eg: EmbeddingGraph, embeddingDat
     calibrate = Calibrate()
     hostResourceData: "dict[str, ResourceDemand]" = {}
 
-    for host, vnfs  in embeddingData.items():
+    for host, sfcs  in embeddingData.items():
         otherCPU: float = 0
         otherMemory: float = 0
 
-        for vnf, depth in vnfs:
-            divisor: int = 2**(depth-1)
-            demands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(reqps/divisor)
+        for sfc, vnfs in sfcs.items():
+            for vnf, depth in vnfs:
+                divisor: int = 2**(depth-1)
+                demands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(reqps[sfc] if sfc in reqps else 0 /divisor)
 
-            vnfCPU: float = demands[vnf]["cpu"]
-            vnfMemory: float = demands[vnf]["memory"]
-            otherCPU += vnfCPU
-            otherMemory += vnfMemory
+                vnfCPU: float = demands[vnf]["cpu"]
+                vnfMemory: float = demands[vnf]["memory"]
+                otherCPU += vnfCPU
+                otherMemory += vnfMemory
 
         hostResourceData[host] = ResourceDemand(cpu=otherCPU, memory=otherMemory)
 
+    TUI.appendToSolverLog(f"Resource consumption of hosts calculated.")
     row: "list[float]" = []
     totalCPUScore: float = 0
     totalMemoryScore: float = 0
@@ -221,7 +224,7 @@ def getSFCScore(reqps: int, topology: Topology, eg: EmbeddingGraph, embeddingDat
         nonlocal totalMemoryScore
 
         divisor: int = 2**(depth-1)
-        demands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(reqps/divisor)
+        demands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(reqps[eg["sfcID"]] if eg["sfcID"] in reqps else 0 /divisor)
 
         vnfCPU: float = demands[vnf["vnf"]["id"]]["cpu"]
         vnfMemory: float = demands[vnf["vnf"]["id"]]["memory"]
@@ -238,6 +241,7 @@ def getSFCScore(reqps: int, topology: Topology, eg: EmbeddingGraph, embeddingDat
 
     traverseVNF(eg["vnfs"], parseVNF, shouldParseTerminal=False)
 
+    TUI.appendToSolverLog(f"CPU Score: {totalCPUScore}. Memory Score: {totalMemoryScore}.")
     for egLink in eg["links"]:
         links: "list[str]" = [egLink["source"]["id"]]
         links.extend(egLink["links"])
@@ -251,18 +255,21 @@ def getSFCScore(reqps: int, topology: Topology, eg: EmbeddingGraph, embeddingDat
             totalRequests: int = 0
 
             if f"{source}-{destination}" in linkData:
-                totalRequests = linkData[f"{source}-{destination}"]
+                for sfc, requests in reqps.items():
+                    totalRequests += linkData[f"{source}-{destination}"][sfc]
             elif f"{destination}-{source}" in linkData:
-                totalRequests = linkData[f"{destination}-{source}"]
+                for sfc, requests in reqps.items():
+                    totalRequests += linkData[f"{destination}-{source}"][sfc]
 
             bandwidth: float = [link["bandwidth"] for link in topology["links"] if (link["source"] == source and link["destination"] == destination) or (link["source"] == destination and link["destination"] == source)][0]
 
-            linkScore: float = getLinkScore(reqps/divisor, totalRequests * reqps, bandwidth)
+            linkScore: float = getLinkScore(reqps[eg["sfcID"]] if eg["sfcID"] in reqps else 0 /divisor, totalRequests, bandwidth)
 
             totalLinkScore += linkScore
 
+    TUI.appendToSolverLog(f"Link Score: {totalLinkScore}.")
     row.append(eg["sfcID"])
-    row.append(reqps)
+    row.append(reqps[eg["sfcID"]])
     row.append(totalCPUScore)
     row.append(totalMemoryScore)
     row.append(totalLinkScore)

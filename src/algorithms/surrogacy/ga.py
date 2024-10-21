@@ -89,22 +89,32 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         interval: int = 5
         sleep(interval)
         while step < duration:
-            startTime: int = default_timer()
-            trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
-                        f"{interval:.0f}s")
-            for sfc, data in trafficData.items():
-                requests: int = data["httpReqs"]
-                latency: float = data["averageLatency"]
-                reqps: float = requests / interval
-                linkData: "dict[str, float]" = embedLinks.getLinkData()
-                eg: EmbeddingGraph = [graph for graph in egs if graph["sfcID"] == sfc][0]
-                row: "list[Union[str, float]]" = getSFCScore(reqps, topology, eg, embedData, linkData)
-                row.append(latency)
-                with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as latency:
-                    latency.write(",".join([str(el) for el in row]) + "\n")
-            stopTime: int = default_timer()
-            interval = stopTime - startTime
-            step += interval
+            try:
+                startTime: int = default_timer()
+                trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
+                            f"{interval:.0f}s")
+                reqps: "dict[str, int]" = {}
+
+                for sfc, data in trafficData.items():
+                    requests: int = data["httpReqs"]
+                    req: float = requests / interval
+
+                    reqps[sfc] = req
+
+                for sfc, data in trafficData.items():
+                    latency: float = data["averageLatency"]
+                    linkData: "dict[str, float]" = embedLinks.getLinkData()
+                    eg: EmbeddingGraph = [graph for graph in egs if graph["sfcID"] == sfc][0]
+
+                    row: "list[Union[str, float]]" = getSFCScore(reqps, topology, eg, embedData, linkData)
+                    row.append(latency)
+                    with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as latency:
+                        latency.write(",".join([str(el) for el in row]) + "\n")
+                stopTime: int = default_timer()
+                interval = stopTime - startTime
+                step += interval
+            except Exception as e:
+                TUI.appendToSolverLog(str(e), True)
 
         TUI.appendToSolverLog(f"Done waiting for {duration}s.")
 

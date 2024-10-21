@@ -168,7 +168,7 @@ class EmbedLinks:
         self._convertToHotCodes()
         self._hCost: "dict[str, dict[str, dict[str, float]]]" = {}
         self._data: pd.DataFrame = self._predictCost()
-        self._linkData: "dict[str, float]" = {}
+        self._linkData: "dict[str, dict[str, float]]" = {}
 
     def _isHost(self, node: str) -> bool:
         """
@@ -428,7 +428,7 @@ class EmbedLinks:
 
         return parsedNodes, parsedDivisors
 
-    def getLinkData(self) -> "dict[str, float]":
+    def getLinkData(self) -> "dict[str, dict[str, float]]":
         """
         Gets the link data.
 
@@ -467,11 +467,20 @@ class EmbedLinks:
 
                         for p in range(len(path) - 1):
                             if f"{path[p]}-{path[p + 1]}" in self._linkData:
-                                self._linkData[f"{path[p]}-{path[p + 1]}"] += 1/divisor
+                                if eg["sfcID"] in self._linkData[f"{path[p]}-{path[p + 1]}"]:
+                                    self._linkData[f"{path[p]}-{path[p + 1]}"][eg["sfcID"]] += 1/divisor
+                                else:
+                                    self._linkData[f"{path[p]}-{path[p + 1]}"][eg["sfcID"]] = 1/divisor
                             elif f"{path[p + 1]}-{path[p]}" in self._linkData:
-                                self._linkData[f"{path[p + 1]}-{path[p]}"] += 1/divisor
+                                if eg["sfcID"] in self._linkData[f"{path[p + 1]}-{path[p]}"]:
+                                    self._linkData[f"{path[p + 1]}-{path[p]}"][eg["sfcID"]] += 1/divisor
+                                else:
+                                    self._linkData[f"{path[p + 1]}-{path[p]}"][eg["sfcID"]] = 1/divisor
+                                self._linkData[f"{path[p + 1]}-{path[p]}"][eg["sfcID"]] += 1/divisor
                             else:
-                                self._linkData[f"{path[p]}-{path[p + 1]}"] = 1/divisor
+                                self._linkData[f"{path[p]}-{path[p + 1]}"] = {
+                                    eg["sfcID"]: 1/divisor
+                                }
 
 
                         if f"{nodeList[i]}-{nodeList[i + 1]}" in paths:
