@@ -205,7 +205,7 @@ def getSFCScore(reqps: "dict[str, int]", topology: Topology, eg: EmbeddingGraph,
 
         hostResourceData[host] = ResourceDemand(cpu=otherCPU, memory=otherMemory)
 
-    TUI.appendToSolverLog(f"Resource consumption of hosts calculated.")
+    TUI.appendToSolverLog("Resource consumption of hosts calculated.")
     row: "list[float]" = []
     totalCPUScore: float = 0
     totalMemoryScore: float = 0
@@ -255,10 +255,10 @@ def getSFCScore(reqps: "dict[str, int]", topology: Topology, eg: EmbeddingGraph,
             totalRequests: int = 0
 
             if f"{source}-{destination}" in linkData:
-                for sfc, requests in reqps.items():
+                for sfc in reqps.keys():
                     totalRequests += linkData[f"{source}-{destination}"][sfc]
             elif f"{destination}-{source}" in linkData:
-                for sfc, requests in reqps.items():
+                for sfc in reqps.keys():
                     totalRequests += linkData[f"{destination}-{source}"][sfc]
 
             bandwidth: float = [link["bandwidth"] for link in topology["links"] if (link["source"] == source and link["destination"] == destination) or (link["source"] == destination and link["destination"] == source)][0]

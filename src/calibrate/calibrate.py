@@ -4,6 +4,7 @@ This code is used to calibrate the CPU, memory, and bandwidth demands of VNFs.
 
 from copy import deepcopy
 import os
+import threading
 from time import sleep
 from timeit import default_timer
 import csv
@@ -387,7 +388,7 @@ class Calibrate:
         memory: float = memoryModel.predict(np.array([reqps]))[0][0]
         ior: float = iorModel.predict(np.array([reqps]))[0][0]
 
-        return ResourceDemand(cpu=cpu, memory=memory, ior=ior)
+        return ResourceDemand(cpu=cpu if cpu > 0 else 0, memory=memory if memory > 0 else 0, ior=ior)
 
     def calibrateVNFs(self, trafficDesignFile: str = "", vnf: str = "", metric: str = "", train: bool = False, epochs: int = EPOCHS) -> None:
         """
@@ -427,5 +428,8 @@ class Calibrate:
         for vnf in self._config["vnfs"]["names"]:
             demands[vnf] = self._getVNFResourceDemands(vnf, reqps)
 
-        self._cache[str(reqps)] = demands
+        lock: threading.Lock = threading.Lock()
+        with lock:
+            self._cache[str(reqps)] = demands
+
         return demands

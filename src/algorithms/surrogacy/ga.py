@@ -3,6 +3,7 @@ This defines the GA that evolves teh weights of the Neural Network.
 """
 
 import random
+import threading
 from time import sleep
 from timeit import default_timer
 from typing import Callable, Union
@@ -88,33 +89,46 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         step: int = 0
         interval: int = 5
         sleep(interval)
+        threads: "list[threading.Thread]" = []
         while step < duration:
             try:
                 startTime: int = default_timer()
-                trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
-                            f"{interval:.0f}s")
-                reqps: "dict[str, int]" = {}
+                def writeSFCScore():
+                    trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
+                                f"{interval:.0f}s")
+                    reqps: "dict[str, int]" = {}
 
-                for sfc, data in trafficData.items():
-                    requests: int = data["httpReqs"]
-                    req: float = requests / interval
+                    for sfc, data in trafficData.items():
+                        requests: int = data["httpReqs"]
+                        req: float = requests / interval
 
-                    reqps[sfc] = req
+                        reqps[sfc] = req
 
-                for sfc, data in trafficData.items():
-                    latency: float = data["averageLatency"]
-                    linkData: "dict[str, float]" = embedLinks.getLinkData()
-                    eg: EmbeddingGraph = [graph for graph in egs if graph["sfcID"] == sfc][0]
+                    for sfc, data in trafficData.items():
+                        avgLatency: float = data["averageLatency"]
+                        linkData: "dict[str, float]" = embedLinks.getLinkData()
+                        eg: EmbeddingGraph = [graph for graph in egs if graph["sfcID"] == sfc][0]
 
-                    row: "list[Union[str, float]]" = getSFCScore(reqps, topology, eg, embedData, linkData)
-                    row.append(latency)
-                    with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as latency:
-                        latency.write(",".join([str(el) for el in row]) + "\n")
+                        row: "list[Union[str, float]]" = getSFCScore(reqps, topology, eg, embedData, linkData)
+                        row.append(avgLatency)
+
+                        lock: threading.Lock = threading.Lock()
+                        with lock:
+                            with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
+                                avgLatency.write(",".join([str(el) for el in row]) + "\n")
+                thread: threading.Thread = threading.Thread(target=writeSFCScore)
+                thread.start()
+                threads.append(thread)
                 stopTime: int = default_timer()
                 interval = stopTime - startTime
+                if interval < 2:
+                    interval = 2
                 step += interval
+
             except Exception as e:
                 TUI.appendToSolverLog(str(e), True)
+        for thread in threads:
+            thread.join()
 
         TUI.appendToSolverLog(f"Done waiting for {duration}s.")
 
