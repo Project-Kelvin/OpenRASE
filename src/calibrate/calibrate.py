@@ -22,7 +22,6 @@ import pandas as pd
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from pandas import DataFrame, Series
-from constants.topology import SERVER, SFCC
 from mano.telemetry import Telemetry
 from models.calibrate import ResourceDemand
 from models.telemetry import HostData
@@ -32,7 +31,7 @@ from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
 from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
-
+from kconstants.topology import SERVER, SFCC
 
 EPOCHS: int = 6000
 
@@ -55,6 +54,7 @@ class Calibrate:
         self._modelName: str = "model.keras"
         self._headers: "list[str]" = ["cpu", "memory", "networkIn",
                 "networkOut", "ior", "http_reqs", "latency", "duration"]
+        self._cache: "dict[str, dict[str, ResourceDemand]]" = {}
 
         if not os.path.exists(f"{self._config['repoAbsolutePath']}/artifacts/calibrations"):
             os.makedirs(f"{self._config['repoAbsolutePath']}/artifacts/calibrations")
@@ -420,8 +420,12 @@ class Calibrate:
             dict[str, ResourceDemand]: The resource demands of each vnf.
         """
 
+        if str(reqps) in self._cache:
+            return self._cache[str(reqps)]
+
         demands: "dict[str, ResourceDemand]" = {}
         for vnf in self._config["vnfs"]["names"]:
             demands[vnf] = self._getVNFResourceDemands(vnf, reqps)
 
+        self._cache[str(reqps)] = demands
         return demands

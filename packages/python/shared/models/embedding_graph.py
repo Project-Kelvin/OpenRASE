@@ -28,6 +28,7 @@ class ForwardingLink:
     source: ChainEntity
     destination: ChainEntity
     links: "list[str]"
+    divisor: int
 
 
 class VNF(dict):

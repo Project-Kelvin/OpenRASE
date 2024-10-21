@@ -3,6 +3,7 @@ This defines the functions used for VNF link embedding.
 """
 
 from timeit import default_timer
+from typing import Tuple
 import networkx as nx
 import heapq
 from algorithms.surrogacy.constants import BRANCH
@@ -167,6 +168,7 @@ class EmbedLinks:
         self._convertToHotCodes()
         self._hCost: "dict[str, dict[str, dict[str, float]]]" = {}
         self._data: pd.DataFrame = self._predictCost()
+        self._linkData: "dict[str, float]" = {}
 
     def _isHost(self, node: str) -> bool:
         """
@@ -380,7 +382,7 @@ class EmbedLinks:
             index += 1
             closedSet.append(currentNode)
 
-    def parseNodes(self, nodes: "list[str]") -> "list[list[str]]":
+    def parseNodes(self, nodes: "list[str]") -> "Tuple[list[list[str]], list[int]]":
         """
         Parses the nodes.
 
@@ -388,37 +390,55 @@ class EmbedLinks:
             nodes (list[str]): the nodes.
 
         Returns:
-            list[list[str]]: the parsed nodes.
+            Tuple[list[list[str]], list[int]]: the parsed nodes, the parsed divisors.
         """
 
         parsedNodes: "list[list[str]]" = []
         roots: "list[list[str]]" = []
         branch: "list[str]" = []
         connectingNode: str = None
+        currentDivisor: int = 1
+        divisors: "list[int]" = []
+        parsedDivisors: "list[int]" = []
 
         for node in nodes:
             if node == BRANCH:
                 roots.append(branch[:])
                 parsedNodes.append(branch[:])
+                parsedDivisors.append(currentDivisor)
+                currentDivisor *= 2
+                divisors.append(currentDivisor)
                 connectingNode = branch[-1]
                 branch = []
             elif node == SERVER:
                 branch.append(node)
                 parsedNodes.append(branch[:])
+                parsedDivisors.append(currentDivisor)
                 branch = []
                 if len(roots) > 0:
                     lastRoot: "list[str]" = roots.pop()
+                    currentDivisor = divisors.pop()
                     connectingNode = lastRoot[-1]
             else:
                 if connectingNode:
                     parsedNodes.append([connectingNode, node])
+                    parsedDivisors.append(currentDivisor)
                     connectingNode = None
                 branch.append(node)
 
-        return parsedNodes
+        return parsedNodes, parsedDivisors
 
+    def getLinkData(self) -> "dict[str, float]":
+        """
+        Gets the link data.
 
-    def embedLinks(self, nodes: "dict[str, list[str]]") -> None:
+        Returns:
+            dict[str, float]: the link data.
+        """
+
+        return self._linkData
+
+    def embedLinks(self, nodes: "dict[str, list[str]]") -> "list[EmbeddingGraph]":
         """
         Embeds the links.
 
@@ -426,7 +446,7 @@ class EmbedLinks:
             nodes (dict[str, list[str]]): the nodes to be linked.
 
         Returns:
-            None
+            list[EmbeddingGraph]: the EGs.
         """
 
         for eg in self._egs:
@@ -434,18 +454,31 @@ class EmbedLinks:
                 eg["links"] = []
 
             paths: "list[str]" = []
-            sfcNodes: "list[list[str]]" = self.parseNodes(nodes[eg["sfcID"]])
+            sfcNodes, sfcDivisors = self.parseNodes(nodes[eg["sfcID"]])
             start: float = default_timer()
 
-            for nodeList in sfcNodes:
+            for nodeList, divisor in zip(sfcNodes, sfcDivisors):
                 for i in range(len(nodeList) - 1):
                     try:
-                        if f"{nodeList[i]}-{nodeList[i + 1]}" in paths:
-                            continue
                         if nodeList[i] == nodeList[i + 1]:
                             continue
+
                         path = self._findPath(eg["sfcID"], nodeList[i], nodeList[i + 1])
+
+                        for p in range(len(path) - 1):
+                            if f"{path[p]}-{path[p + 1]}" in self._linkData:
+                                self._linkData[f"{path[p]}-{path[p + 1]}"] += 1/divisor
+                            elif f"{path[p + 1]}-{path[p]}" in self._linkData:
+                                self._linkData[f"{path[p + 1]}-{path[p]}"] += 1/divisor
+                            else:
+                                self._linkData[f"{path[p]}-{path[p + 1]}"] = 1/divisor
+
+
+                        if f"{nodeList[i]}-{nodeList[i + 1]}" in paths:
+                            continue
+
                         paths.append(f"{nodeList[i]}-{nodeList[i + 1]}")
+
                     except Exception as e:
                         TUI.appendToSolverLog(f"Error: {e}", True)
                         continue
@@ -453,7 +486,8 @@ class EmbedLinks:
                     eg["links"].append({
                         "source": {"id": path[0]},
                         "destination": {"id": path[-1]},
-                        "links": path[1:-1]
+                        "links": path[1:-1],
+                        "divisor": divisor
                     })
             end: float = default_timer()
 
