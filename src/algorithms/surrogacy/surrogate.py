@@ -255,11 +255,11 @@ def getSFCScore(reqps: "dict[str, int]", topology: Topology, eg: EmbeddingGraph,
             totalRequests: int = 0
 
             if f"{source}-{destination}" in linkData:
-                for sfc in reqps.keys():
-                    totalRequests += linkData[f"{source}-{destination}"][sfc]
+                for data in linkData[f"{source}-{destination}"].values():
+                    totalRequests += data
             elif f"{destination}-{source}" in linkData:
-                for sfc in reqps.keys():
-                    totalRequests += linkData[f"{destination}-{source}"][sfc]
+                for data in linkData[f"{destination}-{source}"].values():
+                    totalRequests += data
 
             bandwidth: float = [link["bandwidth"] for link in topology["links"] if (link["source"] == source and link["destination"] == destination) or (link["source"] == destination and link["destination"] == source)][0]
 
