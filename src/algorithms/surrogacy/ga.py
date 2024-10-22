@@ -115,7 +115,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
 
         TUI.appendToSolverLog(f"Done waiting for {duration}s.")
 
-        rows: "list[list[Union[str, float]]]" = getSFCScores(trafficData, topology, egs, embedData, embedLinks.getLinkData())
+        rows: "list[list[Union[str, float]]]" = getSFCScores(data, topology, egs, embedData, embedLinks.getLinkData())
 
         for row in rows:
             with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
