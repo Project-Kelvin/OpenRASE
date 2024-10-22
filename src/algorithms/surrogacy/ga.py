@@ -9,7 +9,7 @@ from timeit import default_timer
 from typing import Callable, Union
 from algorithms.surrogacy.link_embedding import EmbedLinks
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
-from algorithms.surrogacy.surrogate import getSFCScore
+from algorithms.surrogacy.surrogate import getSFCScores
 from models.traffic_generator import TrafficData
 from packages.python.shared.models.embedding_graph import VNF
 from packages.python.shared.models.traffic_design import TrafficDesign
@@ -89,47 +89,37 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         step: int = 0
         interval: int = 5
         sleep(interval)
-        threads: "list[threading.Thread]" = []
+        data: "list[dict[str, dict[str, Union[int, float]]]]" = []
         while step < duration:
             try:
-                def writeSFCScore():
-                    try:
-                        trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
-                                    f"{interval:.0f}s")
-                        reqps: "dict[str, int]" = {}
-
-                        for sfc, data in trafficData.items():
-                            requests: int = data["httpReqs"]
-                            req: float = requests / interval
-
-                            reqps[sfc] = 5 * round(req/5)
-
-                        for sfc, data in trafficData.items():
-                            avgLatency: float = data["averageLatency"]
-                            linkData: "dict[str, float]" = embedLinks.getLinkData()
-                            eg: EmbeddingGraph = [graph for graph in egs if graph["sfcID"] == sfc][0]
-
-                            row: "list[Union[str, float]]" = getSFCScore(reqps, topology, eg, embedData, linkData)
-                            row.append(avgLatency)
-
-                            lock: threading.Lock = threading.Lock()
-                            with lock:
-                                with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
-                                    avgLatency.write(",".join([str(el) for el in row]) + "\n")
-                    except Exception as e:
-                        TUI.appendToSolverLog(str(e), True)
-                thread: threading.Thread = threading.Thread(target=writeSFCScore)
-                thread.start()
-                threads.append(thread)
                 sleep(interval)
+                trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
+                            f"{interval:.0f}s")
+
+                for sfc, data in trafficData.items():
+                    requests: int = data["httpReqs"]
+                    req: float = round(requests / interval)
+                    avgLatency: float = data["averageLatency"]
+
+                    data.append({
+                        sfc: {
+                            "reqps": req,
+                            "latency": avgLatency
+                        }
+                    })
+
                 step += interval
 
             except Exception as e:
                 TUI.appendToSolverLog(str(e), True)
-        for thread in threads:
-            thread.join()
 
         TUI.appendToSolverLog(f"Done waiting for {duration}s.")
+
+        rows: "list[list[Union[str, float]]]" = getSFCScores(data, topology, egs, embedData, embedLinks.getLinkData())
+
+        for row in rows:
+            with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
+                avgLatency.write(",".join([str(el) for el in row]) + "\n")
 
         trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
                         f"{duration:.0f}s")

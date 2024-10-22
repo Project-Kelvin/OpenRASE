@@ -9,7 +9,7 @@ from time import sleep
 from timeit import default_timer
 import csv
 import json
-from typing import Any
+from typing import Any, Tuple
 from shared.models.embedding_graph import VNF
 from shared.constants.embedding_graph import TERMINAL
 from shared.models.config import Config
@@ -390,6 +390,36 @@ class Calibrate:
 
         return ResourceDemand(cpu=cpu if cpu > 0 else 0, memory=memory if memory > 0 else 0, ior=ior)
 
+    def _getVNFResourceDemandsForRequests(self, vnf: str, reqps: "list[float]") -> ResourceDemand:
+        """
+        Get the resource demands of the VNF.
+
+        Parameters:
+            vnf (str): The VNF to get the resource demands for.
+            reqps (list[float]): The requests per second.
+
+        Returns:
+            ResourceDemand: The resource demands.
+        """
+
+        cpuModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[0])
+        memoryModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[1])
+        iorModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[4])
+
+        cpu: float = cpuModel.predict(np.array(reqps))[0]
+        memory: float = memoryModel.predict(np.array(reqps))[0]
+        ior: float = iorModel.predict(np.array(reqps))[0]
+
+        demands: "list[ResourceDemand]" = []
+        for cpuPred, memoryPred, iorPred in zip(cpu, memory, ior):
+            cpu = cpuPred
+            memory = memoryPred
+            ior = iorPred
+
+            demands.append(ResourceDemand(cpu=cpu if cpu > 0 else 0, memory=memory if memory > 0 else 0, ior=ior))
+
+        return demands
+
     def calibrateVNFs(self, trafficDesignFile: str = "", vnf: str = "", metric: str = "", train: bool = False, epochs: int = EPOCHS) -> None:
         """
         Calibrate all the VNFs.
@@ -421,15 +451,52 @@ class Calibrate:
             dict[str, ResourceDemand]: The resource demands of each vnf.
         """
 
-        if str(reqps) in self._cache:
-            return self._cache[str(reqps)]
-
         demands: "dict[str, ResourceDemand]" = {}
         for vnf in self._config["vnfs"]["names"]:
             demands[vnf] = self._getVNFResourceDemands(vnf, reqps)
 
-        lock: threading.Lock = threading.Lock()
-        with lock:
-            self._cache[str(reqps)] = demands
 
         return demands
+
+    def predictAndCache(self, data: "dict[str, list[float]]") -> None:
+        """
+        Predict on the data and cache the results.
+
+        Parameters:
+            data (dict[str, list[float]]): The data to predict on and cache.
+        """
+
+        uncached: "dict[str, list[float]]" = {}
+
+        for vnf, reqps in data.items():
+            if vnf in self._cache:
+                for req in reqps:
+                    if str(req) not in self._cache[vnf]:
+                        if vnf in uncached:
+                            uncached[vnf].append(req)
+                        else:
+                            uncached[vnf] = [req]
+            else:
+                uncached[vnf] = reqps
+
+        for vnf, reqps in uncached.items():
+            demands: "list[ResourceDemand]" = self._getVNFResourceDemandsForRequests(vnf, reqps)
+            for req, demand in zip(reqps, demands):
+                if vnf in self._cache:
+                    self._cache[vnf][str(req)] = demand
+                else:
+                    self._cache[vnf] = {str(req): demand}
+
+    def getVNFResourceDemandForReqps(self, vnf, reqps: float) -> ResourceDemand:
+        """
+        Get the resource demands of the VNF for the given requests per second.
+
+        Parameters:
+            vnf (str): The VNF to get the resource demands for.
+            reqps (float): The requests per second.
+
+        Returns:
+            ResourceDemand: The resource demands.
+        """
+
+        return self._cache[vnf][str(reqps)]
