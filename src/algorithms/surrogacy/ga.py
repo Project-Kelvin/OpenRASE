@@ -102,7 +102,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
                             requests: int = data["httpReqs"]
                             req: float = requests / interval
 
-                            reqps[sfc] = req
+                            reqps[sfc] = 5 * round(req/5)
 
                         for sfc, data in trafficData.items():
                             avgLatency: float = data["averageLatency"]
