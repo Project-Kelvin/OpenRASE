@@ -257,11 +257,11 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
                     totalRequests: int = 0
 
                     if f"{source}-{destination}" in linkData:
-                        for data in linkData[f"{source}-{destination}"].values():
-                            totalRequests += data
+                        for key, data in linkData[f"{source}-{destination}"].items():
+                            totalRequests += data * step[key]["reqps"]
                     elif f"{destination}-{source}" in linkData:
                         for data in linkData[f"{destination}-{source}"].values():
-                            totalRequests += data
+                            totalRequests += data * step[key]["reqps"]
 
                     bandwidth: float = [link["bandwidth"] for link in topology["links"] if (link["source"] == source and link["destination"] == destination) or (link["source"] == destination and link["destination"] == source)][0]
 
