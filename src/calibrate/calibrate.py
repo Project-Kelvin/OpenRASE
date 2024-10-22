@@ -74,7 +74,6 @@ class Calibrate:
             float: The test loss.
         """
 
-        print(f"Training model for {metric} on {vnf}.")
         directory: str = f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"
         file = f"{directory}/calibration_data.csv"
 
@@ -406,9 +405,9 @@ class Calibrate:
         memoryModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[1])
         iorModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[4])
 
-        cpu: float = cpuModel.predict(np.array(reqps))[0]
-        memory: float = memoryModel.predict(np.array(reqps))[0]
-        ior: float = iorModel.predict(np.array(reqps))[0]
+        cpu: float = np.array(cpuModel.predict(np.array(reqps))).flatten()
+        memory: float = memoryModel.predict(np.array(reqps)).flatten()
+        ior: float = iorModel.predict(np.array(reqps)).flatten()
 
         demands: "list[ResourceDemand]" = []
         for cpuPred, memoryPred, iorPred in zip(cpu, memory, ior):
@@ -458,27 +457,35 @@ class Calibrate:
 
         return demands
 
-    def predictAndCache(self, data: "dict[str, list[float]]") -> None:
+    def predictAndCache(self, data: "dict[str, list[float]]", maxDepth = 3) -> None:
         """
         Predict on the data and cache the results.
 
         Parameters:
             data (dict[str, list[float]]): The data to predict on and cache.
+            maxDepth (int): The maximum depth of the VNFs.
         """
 
         uncached: "dict[str, list[float]]" = {}
 
         for vnf, reqps in data.items():
-            if vnf in self._cache:
-                for req in reqps:
-                    if str(req) not in self._cache[vnf]:
-                        if vnf in uncached:
-                            uncached[vnf].append(req)
-                        else:
-                            uncached[vnf] = [req]
-            else:
-                uncached[vnf] = reqps
+            requests  = []
+            requests.extend(reqps)
 
+            for req in reqps:
+                for i in range(2, maxDepth + 1):
+                    requests.append(int(req / (2 ** (i - 1))))
+            requests.append(0)
+            if vnf in self._cache:
+                for req in requests:
+                    intReq: int = int(req)
+                    if str(intReq) not in self._cache[vnf]:
+                        if vnf in uncached:
+                            uncached[vnf].append(intReq)
+                        else:
+                            uncached[vnf] = [intReq]
+            else:
+                uncached[vnf] = requests
         for vnf, reqps in uncached.items():
             demands: "list[ResourceDemand]" = self._getVNFResourceDemandsForRequests(vnf, reqps)
             for req, demand in zip(reqps, demands):
@@ -499,4 +506,12 @@ class Calibrate:
             ResourceDemand: The resource demands.
         """
 
-        return self._cache[vnf][str(reqps)]
+        if vnf not in self._cache or str(int(reqps)) not in self._cache[vnf]:
+            demand: ResourceDemand = self._getVNFResourceDemands(vnf, reqps)
+            if vnf in self._cache:
+                self._cache[vnf][str(int(reqps))] = demand
+            else:
+                self._cache[vnf] = {str(int(reqps)): demand}
+            return demand
+
+        return self._cache[vnf][str(int(reqps))]

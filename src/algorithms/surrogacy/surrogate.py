@@ -150,13 +150,13 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
     """
 
     vnfsInEGs: "dict[str, set[str]]" = {}
-    def parseEG(vnf: VNF, depth: int, egID: str) -> None:
+    def parseEG(vnf: VNF, _depth: int, egID: str) -> None:
         """
         Parses an EG.
 
         Parameters:
             vnf (VNF): the VNF.
-            depth (int): the depth.
+            _depth (int): the depth.
             egID (str): the EG ID.
         """
 
@@ -168,21 +168,20 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
             vnfsInEGs[egID].add(vnf["vnf"]["id"])
 
     for eg in egs:
-        traverseVNF(eg["vnfs"], parseEG, shouldParseTerminal=False)
+        traverseVNF(eg["vnfs"], parseEG, eg["sfcID"], shouldParseTerminal=False)
 
     dataToCache: "dict[str, list[float]]" = {}
 
     for step in data:
-        for sfc, data in step.items():
+        for sfc, sfcData in step.items():
             for vnf in vnfsInEGs[sfc]:
                 if vnf in dataToCache:
-                    dataToCache[vnf].append(data["reqps"])
+                    dataToCache[vnf].append(sfcData["reqps"])
                 else:
-                    dataToCache[vnf] = [data["reqps"]]
+                    dataToCache[vnf] = [sfcData["reqps"]]
 
     calibrate = Calibrate()
     calibrate.predictAndCache(dataToCache)
-
     rows: "list[list[Union[str, float]]]" = []
     for step in data:
         hostResourceData: "dict[str, ResourceDemand]" = {}
@@ -191,14 +190,13 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
             otherMemory: float = 0
 
             for sfc, vnfs in sfcs.items():
-                reqps: float = step[sfc]["reqps"] if sfc in step else 0 / divisor
-
                 for vnf, depth in vnfs:
                     divisor: int = 2**(depth-1)
-                    demands: "dict[str, ResourceDemand]" = calibrate.getVNFResourceDemandForReqps(vnf, reqps)
+                    reqps: float = step[sfc]["reqps"] if sfc in step else 0 / divisor
+                    demands: ResourceDemand = calibrate.getVNFResourceDemandForReqps(vnf, reqps)
 
-                    vnfCPU: float = demands[vnf]["cpu"]
-                    vnfMemory: float = demands[vnf]["memory"]
+                    vnfCPU: float = demands["cpu"]
+                    vnfMemory: float = demands["memory"]
                     otherCPU += vnfCPU
                     otherMemory += vnfMemory
 
@@ -206,7 +204,7 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
 
         TUI.appendToSolverLog("Resource consumption of hosts calculated.")
 
-        for sfc, data in step.items():
+        for sfc, sfcData in step.items():
             totalCPUScore: float = 0
             totalMemoryScore: float = 0
             totalLinkScore: float = 0
@@ -227,11 +225,11 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
                 nonlocal totalMemoryScore
 
                 divisor: int = 2**(depth-1)
-                reqps: float = data["reqps"] if sfc in data else 0 / divisor
-                demands: "dict[str, ResourceDemand]" = calibrate.getVNFResourceDemandForReqps(vnf["vnf"]["id"], reqps)
+                reqps: float = sfcData["reqps"] / divisor
+                demands: ResourceDemand = calibrate.getVNFResourceDemandForReqps(vnf["vnf"]["id"], reqps)
 
-                vnfCPU: float = demands[vnf["vnf"]["id"]]["cpu"]
-                vnfMemory: float = demands[vnf["vnf"]["id"]]["memory"]
+                vnfCPU: float = demands["cpu"]
+                vnfMemory: float = demands["memory"]
 
                 host: Host = [host for host in topology["hosts"] if host["id"] == vnf["host"]["id"]][0]
                 hostCPU: float = host["cpu"]
@@ -251,7 +249,7 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
                 links.extend(egLink["links"])
                 links.append(egLink["destination"]["id"])
                 divisor: int = egLink["divisor"]
-                reqps: float = data["reqps"] if sfc in data else 0 / divisor
+                reqps: float = sfcData["reqps"] / divisor
 
                 for linkIndex in range(len(links) - 1):
                     source: str = links[linkIndex]
@@ -274,11 +272,11 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
 
             TUI.appendToSolverLog(f"Link Score: {totalLinkScore}.")
             row.append(sfc)
-            row.append(data["reqps"])
+            row.append(sfcData["reqps"])
             row.append(totalCPUScore)
             row.append(totalMemoryScore)
             row.append(totalLinkScore)
-            row.append(data["latency"])
+            row.append(sfcData["latency"])
             rows.append(row)
 
     return rows
