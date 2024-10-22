@@ -93,28 +93,31 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         while step < duration:
             try:
                 def writeSFCScore():
-                    trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
-                                f"{interval:.0f}s")
-                    reqps: "dict[str, int]" = {}
+                    try:
+                        trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
+                                    f"{interval:.0f}s")
+                        reqps: "dict[str, int]" = {}
 
-                    for sfc, data in trafficData.items():
-                        requests: int = data["httpReqs"]
-                        req: float = requests / interval
+                        for sfc, data in trafficData.items():
+                            requests: int = data["httpReqs"]
+                            req: float = requests / interval
 
-                        reqps[sfc] = req
+                            reqps[sfc] = req
 
-                    for sfc, data in trafficData.items():
-                        avgLatency: float = data["averageLatency"]
-                        linkData: "dict[str, float]" = embedLinks.getLinkData()
-                        eg: EmbeddingGraph = [graph for graph in egs if graph["sfcID"] == sfc][0]
+                        for sfc, data in trafficData.items():
+                            avgLatency: float = data["averageLatency"]
+                            linkData: "dict[str, float]" = embedLinks.getLinkData()
+                            eg: EmbeddingGraph = [graph for graph in egs if graph["sfcID"] == sfc][0]
 
-                        row: "list[Union[str, float]]" = getSFCScore(reqps, topology, eg, embedData, linkData)
-                        row.append(avgLatency)
+                            row: "list[Union[str, float]]" = getSFCScore(reqps, topology, eg, embedData, linkData)
+                            row.append(avgLatency)
 
-                        lock: threading.Lock = threading.Lock()
-                        with lock:
-                            with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
-                                avgLatency.write(",".join([str(el) for el in row]) + "\n")
+                            lock: threading.Lock = threading.Lock()
+                            with lock:
+                                with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
+                                    avgLatency.write(",".join([str(el) for el in row]) + "\n")
+                    except Exception as e:
+                        TUI.appendToSolverLog(str(e), True)
                 thread: threading.Thread = threading.Thread(target=writeSFCScore)
                 thread.start()
                 threads.append(thread)
