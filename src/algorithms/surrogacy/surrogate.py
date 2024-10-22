@@ -192,7 +192,7 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
             for sfc, vnfs in sfcs.items():
                 for vnf, depth in vnfs:
                     divisor: int = 2**(depth-1)
-                    reqps: float = step[sfc]["reqps"] if sfc in step else 0 / divisor
+                    reqps: float = (step[sfc]["reqps"] if sfc in step else 0) / divisor
                     demands: ResourceDemand = calibrate.getVNFResourceDemandForReqps(vnf, reqps)
 
                     vnfCPU: float = demands["cpu"]
@@ -237,7 +237,6 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
 
                 cpuScore: float = getCPUScore(vnfCPU, hostResourceData[vnf["host"]["id"]]["cpu"], hostCPU)
                 memoryScore: float = getMemoryScore(vnfMemory, hostResourceData[vnf["host"]["id"]]["memory"], hostMemory)
-
                 totalCPUScore += cpuScore
                 totalMemoryScore += memoryScore
 
