@@ -271,27 +271,32 @@ class EmbedLinks:
         data: pd.DataFrame = self._constructDF()
         normalizer = tf.keras.layers.Normalization(axis=1)
         normalizer.adapt(np.array(data))
-        layers: "list[int]" = [3, 1]
+        layers: "list[int]" = [3, 2, 1]
 
         model = tf.keras.Sequential([
             tf.keras.Input(shape=(layers[0], )),
             normalizer,
-            tf.keras.layers.Dense(layers[1], activation="relu")
+            tf.keras.layers.Dense(layers[1], activation="relu"),
+            tf.keras.layers.Dense(layers[2], activation="relu")
         ])
 
         index: int = 0
-        startIndex: int = 0
-        endIndex: int = layers[index]
+        wStartIndex: int = 0
+        wEndIndex: int = layers[index] * layers[index + 1]
+        bStartIndex: int = 0
+        bEndIndex: int = layers[index + 1]
         for layer in model.layers:
             if isinstance(layer, tf.keras.layers.Dense):
                 layer.set_weights([
-                    np.array(self._weights[startIndex:endIndex]).reshape(layers[index], layers[index + 1]),
-                    np.array([self._bias[index]])
+                    np.array(self._weights[wStartIndex:wEndIndex]).reshape(layers[index], layers[index + 1]),
+                    np.array(self._bias[bStartIndex:bEndIndex]).reshape(layers[index + 1])
                 ])
                 index += 1
                 if index < len(layers) - 1:
-                    startIndex = endIndex
-                    endIndex = startIndex + layers[index]
+                    wStartIndex = wEndIndex
+                    wEndIndex = wStartIndex + (layers[index] * layers[index + 1])
+                    bStartIndex = bEndIndex
+                    bEndIndex = bStartIndex + layers[index + 1]
 
         prediction = model.predict(np.array(data))
 

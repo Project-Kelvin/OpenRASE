@@ -25,7 +25,7 @@ from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
 import os
 
-NO_OF_WEIGHTS: int = 9 #4 weights + 1 bias for VNF embedding & 3 wights + 1 bias for link embedding.
+NO_OF_WEIGHTS: int = 169 #136 weights + 22 bias for VNF embedding & 8 weights + 3 bias for link embedding.
 
 directory = f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy"
 if not os.path.exists(directory):
