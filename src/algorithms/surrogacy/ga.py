@@ -63,11 +63,11 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     """
 
     df: pd.DataFrame = convertFGstoDF(fgs, topology)
-    newDF: pd.DataFrame = getConfidenceValues(df, individual[0:4], [individual[4]])
+    newDF: pd.DataFrame = getConfidenceValues(df, individual[0:136], individual[136:158])
     egs, nodes, embedData = convertDFtoFGs(newDF, fgs, topology)
 
     if len(egs) > 0:
-        embedLinks: EmbedLinks = EmbedLinks(topology, egs, individual[5:8], [individual[8]])
+        embedLinks: EmbedLinks = EmbedLinks(topology, egs, individual[158:166], individual[166:169])
         start: float = default_timer()
         egs = embedLinks.embedLinks(nodes)
         end: float = default_timer()
