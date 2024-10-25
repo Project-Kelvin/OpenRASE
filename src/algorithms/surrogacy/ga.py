@@ -92,7 +92,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         #Penalty is applied to the latency and the egs are not deployed.
         maxDemand: int = 1.5
         if maxCPU > maxDemand or maxMemory >= maxDemand:
-            TUI.appendToSolverLog("Penalty for CPU, Memory, or Link Utilization.")
+            TUI.appendToSolverLog(f"Penalty because max CPU demand is {maxCPU} and max Memory demand is {maxMemory}.")
             acceptanceRatio = 0
             latency = penaltyLatency * penalty
 
