@@ -76,10 +76,33 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     penaltyLatency: float = 50000
     acceptanceRatio: float = len(egs)/len(fgs)
     latency: int = 0
+    penalty: float = gen/ngen
 
     TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}")
-
+    maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
     if len(egs) > 0:
+        #Validate EGs
+        validateData: "dict[str, dict[str, Union[int, float]]]" = {}
+        for eg in egs:
+            validateData[eg["sfcID"]] = {
+                "latency": 0,
+                "reqps": maxReqps
+            }
+        scores: "list[list[Union[str, float]]]" = getSFCScores([validateData], topology, egs, embedData, embedLinks.getLinkData())
+        maxCPU: float = max([score[2] for score in scores])
+        maxMemory: float = max([score[3] for score in scores])
+        maxLink: float = max([score[4] for score in scores])
+
+        #The resource demand of deployed VNFs exceed 1.5 times the resource capacity.
+        #This leads to servers crashing.
+        #Penalty is applied to the latency and the egs are not deployed.
+        if maxCPU > 1.5 or maxMemory >= 1.5 or maxLink >= 1.5:
+            TUI.appendToSolverLog("Penalty for CPU, Memory, or Link Utilization.")
+            acceptanceRatio = 0
+            latency = penaltyLatency * penalty
+
+            return acceptanceRatio, latency
+
         sendEGs(egs)
 
         duration: int = calculateTrafficDuration(trafficDesign[0])
@@ -142,7 +165,6 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
         deleteEGs(egs)
     else:
-        penalty: float = gen/ngen
         latency = penaltyLatency * penalty
 
     TUI.appendToSolverLog(f"Latency: {latency}ms")

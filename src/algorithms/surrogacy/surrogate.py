@@ -201,7 +201,6 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
                     otherMemory += vnfMemory
 
             hostResourceData[host] = ResourceDemand(cpu=otherCPU, memory=otherMemory)
-
         TUI.appendToSolverLog("Resource consumption of hosts calculated.")
 
         for sfc, sfcData in step.items():
@@ -235,8 +234,8 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
                 hostCPU: float = host["cpu"]
                 hostMemory: float = host["memory"]
 
-                cpuScore: float = getCPUScore(vnfCPU, hostResourceData[vnf["host"]["id"]]["cpu"], hostCPU)
-                memoryScore: float = getMemoryScore(vnfMemory, hostResourceData[vnf["host"]["id"]]["memory"], hostMemory)
+                cpuScore: float = getScore(vnfCPU, hostResourceData[vnf["host"]["id"]]["cpu"], hostCPU)
+                memoryScore: float = getScore(vnfMemory, hostResourceData[vnf["host"]["id"]]["memory"], hostMemory)
                 totalCPUScore += cpuScore
                 totalMemoryScore += memoryScore
 
@@ -265,7 +264,7 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
 
                     bandwidth: float = [link["bandwidth"] for link in topology["links"] if (link["source"] == source and link["destination"] == destination) or (link["source"] == destination and link["destination"] == source)][0]
 
-                    linkScore: float = getLinkScore(reqps, totalRequests, bandwidth)
+                    linkScore: float = getScore(reqps, totalRequests, bandwidth)
 
                     totalLinkScore += linkScore
 
@@ -280,47 +279,17 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
 
     return rows
 
-def getCPUScore(cpuDemand: float, totalCPUDemand: float, hostCPU: float) -> float:
+def getScore(demand: float, totalDemand: float, resource: float) -> float:
     """
-    Gets the CPU score.
+    Gets the resource score.
 
     Parameters:
-        cpuDemand (float): the CPU demand.
-        totalCPUDemand (float): the total CPU demand.
-        hostCPU (float): the host CPU.
+        demand (float): the demand.
+        totalDemand (float): the total demand.
+        resource (float): the resource.
 
     Returns:
-        float: the CPU score.
+        float: the score.
     """
 
-    return ((cpuDemand / totalCPUDemand) * hostCPU) ** -1 if cpuDemand > 0 else 0
-
-def getMemoryScore(memoryDemand: float, totalMemoryDemand: float, hostMemory: float) -> float:
-    """
-    Gets the memory score.
-
-    Parameters:
-        memoryDemand (float): the memory demand.
-        totalMemoryDemand (float): the total memory demand.
-        hostMemory (float): the host memory.
-
-    Returns:
-        float: the memory score.
-    """
-
-    return ((memoryDemand / totalMemoryDemand) * hostMemory) ** -1 if memoryDemand > 0 else 0
-
-def getLinkScore(requests: int, totalRequests: int, bandwidth: float) -> float:
-    """
-    Gets the link score.
-
-    Parameters:
-        requests (int): the requests.
-        totalRequests (int): the total requests.
-        bandwidth (float): the bandwidth.
-
-    Returns:
-        float: the link score.
-    """
-
-    return ((requests / totalRequests) * bandwidth) ** -1 if requests > 0 and totalRequests > 0 else 0
+    return totalDemand / resource
