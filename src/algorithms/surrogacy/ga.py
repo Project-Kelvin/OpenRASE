@@ -10,6 +10,7 @@ from typing import Callable, Union
 from algorithms.surrogacy.link_embedding import EmbedLinks
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
 from algorithms.surrogacy.surrogate import getSFCScores
+from models.calibrate import ResourceDemand
 from models.traffic_generator import TrafficData
 from packages.python.shared.models.embedding_graph import VNF
 from packages.python.shared.models.traffic_design import TrafficDesign
@@ -82,21 +83,15 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
     if len(egs) > 0:
         #Validate EGs
-        validateData: "dict[str, dict[str, Union[int, float]]]" = {}
-        for eg in egs:
-            validateData[eg["sfcID"]] = {
-                "latency": 0,
-                "reqps": maxReqps
-            }
-        scores: "list[list[Union[str, float]]]" = getSFCScores([validateData], topology, egs, embedData, embedLinks.getLinkData())
-        maxCPU: float = max([score[2] for score in scores])
-        maxMemory: float = max([score[3] for score in scores])
-        maxLink: float = max([score[4] for score in scores])
+        scores: "dict[str, ResourceDemand]" = getSFCScores(maxReqps, topology, egs, embedData)
+        maxCPU: float = max([score["cpu"] for score in scores.values()])
+        maxMemory: float = max([score["memory"] for score in scores.values()])
 
-        #The resource demand of deployed VNFs exceed 1.5 times the resource capacity.
+        #The resource demand of deployed VNFs exceed 2 times the resource capacity of at least 1 host.
         #This leads to servers crashing.
         #Penalty is applied to the latency and the egs are not deployed.
-        if maxCPU > 1.5 or maxMemory >= 1.5 or maxLink >= 1.5:
+        maxDemand: int = 2
+        if maxCPU > maxDemand or maxMemory >= maxDemand:
             TUI.appendToSolverLog("Penalty for CPU, Memory, or Link Utilization.")
             acceptanceRatio = 0
             latency = penaltyLatency * penalty

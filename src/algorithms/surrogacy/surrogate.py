@@ -133,6 +133,54 @@ def predict(w: "list[float]", model) -> "Tuple[float, float]":
 
     return np.median(predictions), np.quantile(predictions, 0.75) - np.quantile(predictions, 0.25)
 
+def getHostScores(reqps: int, egs: "list[EmbeddingGraph]", topology: Topology, embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" ) -> "dict[str, ResourceDemand]":
+    dataToCache: "dict[str, list[float]]" = {}
+    def parseEG(vnf: VNF, _depth: int) -> None:
+        """
+        Parses an EG.
+
+        Parameters:
+            vnf (VNF): the VNF.
+            _depth (int): the depth.
+            egID (str): the EG ID.
+        """
+
+        nonlocal dataToCache
+
+        dataToCache[vnf["vnf"]["id"]] = [reqps]
+
+    for eg in egs:
+        traverseVNF(eg["vnfs"], parseEG, shouldParseTerminal=False)
+
+    calibrate = Calibrate()
+    calibrate.predictAndCache(dataToCache)
+
+    hostResourceData: "dict[str, ResourceDemand]" = {}
+    for host, sfcs  in embeddingData.items():
+        otherCPU: float = 0
+        otherMemory: float = 0
+
+        for vnfs in sfcs.values():
+            for vnf, depth in vnfs:
+                divisor: int = 2**(depth-1)
+                effectiveReqps: float = reqps / divisor
+                demands: ResourceDemand = calibrate.getVNFResourceDemandForReqps(vnf, effectiveReqps)
+
+                vnfCPU: float = demands["cpu"]
+                vnfMemory: float = demands["memory"]
+                otherCPU += vnfCPU
+                otherMemory += vnfMemory
+
+        hostResourceData[host] = ResourceDemand(cpu=otherCPU, memory=otherMemory)
+
+    for host, data in hostResourceData.items():
+        topoHost: Host = [h for h in topology["hosts"] if h["id"] == host][0]
+        hostCPU: float = topoHost["cpu"]
+        hostMemory: float = topoHost["memory"]
+        data["cpu"] = data["cpu"] / hostCPU
+        data["memory"] = data["memory"] / hostMemory
+
+    return hostResourceData
 
 def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology: Topology, egs: "list[EmbeddingGraph]", embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]", linkData: "dict[str, dict[str, float]]" ) -> "list[list[Union[str, float]]]":
     """
