@@ -87,10 +87,10 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         maxCPU: float = max([score["cpu"] for score in scores.values()])
         maxMemory: float = max([score["memory"] for score in scores.values()])
 
-        #The resource demand of deployed VNFs exceed 2 times the resource capacity of at least 1 host.
+        #The resource demand of deployed VNFs exceed 1.5 times the resource capacity of at least 1 host.
         #This leads to servers crashing.
         #Penalty is applied to the latency and the egs are not deployed.
-        maxDemand: int = 2
+        maxDemand: int = 1.5
         if maxCPU > maxDemand or maxMemory >= maxDemand:
             TUI.appendToSolverLog("Penalty for CPU, Memory, or Link Utilization.")
             acceptanceRatio = 0

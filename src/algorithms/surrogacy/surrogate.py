@@ -245,7 +245,7 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
     calibrate.predictAndCache(dataToCache)
     rows: "list[list[Union[str, float]]]" = []
     for step in data:
-        hostResourceData: "dict[str, ResourceDemand]" = {}
+        """ hostResourceData: "dict[str, ResourceDemand]" = {}
         for host, sfcs  in embeddingData.items():
             otherCPU: float = 0
             otherMemory: float = 0
@@ -262,7 +262,11 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
                     otherMemory += vnfMemory
 
             hostResourceData[host] = ResourceDemand(cpu=otherCPU, memory=otherMemory)
-        TUI.appendToSolverLog("Resource consumption of hosts calculated.")
+        TUI.appendToSolverLog("Resource consumption of hosts calculated.") """
+
+        hostVNFs: "dict[str, int]" = {}
+        for host, sfcs in embeddingData.items():
+            hostVNFs[host] = sum([len(vnfs) for vnfs in sfcs.values()])
 
         for sfc, sfcData in step.items():
             totalCPUScore: float = 0
@@ -295,8 +299,8 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
                 hostCPU: float = host["cpu"]
                 hostMemory: float = host["memory"]
 
-                cpuScore: float = getScore(vnfCPU, hostResourceData[vnf["host"]["id"]]["cpu"], hostCPU)
-                memoryScore: float = getScore(vnfMemory, hostResourceData[vnf["host"]["id"]]["memory"], hostMemory)
+                cpuScore: float = getScore(vnfCPU, hostVNFs[vnf["host"]["id"]], hostCPU)
+                memoryScore: float = getScore(vnfMemory, hostVNFs[vnf["host"]["id"]], hostMemory)
                 totalCPUScore += cpuScore
                 totalMemoryScore += memoryScore
 
@@ -325,7 +329,7 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
 
                     bandwidth: float = [link["bandwidth"] for link in topology["links"] if (link["source"] == source and link["destination"] == destination) or (link["source"] == destination and link["destination"] == source)][0]
 
-                    linkScore: float = getScore(reqps, totalRequests, bandwidth)
+                    linkScore: float = getLinkScore(reqps, totalRequests, bandwidth)
 
                     totalLinkScore += linkScore
 
@@ -340,13 +344,28 @@ def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology
 
     return rows
 
-def getScore(demand: float, totalDemand: float, resource: float) -> float:
+def getScore(demand: float, totalVNFs: int, resource: float) -> float:
     """
     Gets the resource score.
 
     Parameters:
         demand (float): the demand.
-        totalDemand (float): the total demand.
+        totalVNFs (int): the total VNFs.
+        resource (float): the resource.
+
+    Returns:
+        float: the score.
+    """
+
+    return demand / (resource / totalVNFs)
+
+def getLinkScore(demand: float, totalDemand: int, resource: float) -> float:
+    """
+    Gets the resource score.
+
+    Parameters:
+        demand (float): the demand.
+        totalDemand (int): the total demand.
         resource (float): the resource.
 
     Returns:
