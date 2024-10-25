@@ -133,7 +133,20 @@ def predict(w: "list[float]", model) -> "Tuple[float, float]":
 
     return np.median(predictions), np.quantile(predictions, 0.75) - np.quantile(predictions, 0.25)
 
-def getHostScores(reqps: int, egs: "list[EmbeddingGraph]", topology: Topology, embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" ) -> "dict[str, ResourceDemand]":
+def getHostScores(reqps: int, topology: Topology, egs: "list[EmbeddingGraph]", embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" ) -> "dict[str, ResourceDemand]":
+    """
+    Gets the host scores.
+
+    Parameters:
+        reqps (int): the reqps.
+        topology (Topology): the topology.
+        egs (list[EmbeddingGraph]): the Embedding Graphs.
+        embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): the embedding data.
+
+    Returns:
+        dict[str, ResourceDemand]: the host scores.
+    """
+
     dataToCache: "dict[str, list[float]]" = {}
     def parseEG(vnf: VNF, _depth: int) -> None:
         """

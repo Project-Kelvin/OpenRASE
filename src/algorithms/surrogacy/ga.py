@@ -9,7 +9,7 @@ from timeit import default_timer
 from typing import Callable, Union
 from algorithms.surrogacy.link_embedding import EmbedLinks
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
-from algorithms.surrogacy.surrogate import getSFCScores
+from algorithms.surrogacy.surrogate import getHostScores, getSFCScores
 from models.calibrate import ResourceDemand
 from models.traffic_generator import TrafficData
 from packages.python.shared.models.embedding_graph import VNF
@@ -83,7 +83,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
     if len(egs) > 0:
         #Validate EGs
-        scores: "dict[str, ResourceDemand]" = getSFCScores(maxReqps, topology, egs, embedData)
+        scores: "dict[str, ResourceDemand]" = getHostScores(maxReqps, topology, egs, embedData)
         maxCPU: float = max([score["cpu"] for score in scores.values()])
         maxMemory: float = max([score["memory"] for score in scores.values()])
 
