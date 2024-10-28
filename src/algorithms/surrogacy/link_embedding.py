@@ -25,30 +25,34 @@ class HotCode:
         Initializes the hot code.
         """
 
-        self.nodes = {}
-        self.egs = {}
+        self.nodes: "dict[str, list[int]]" = {}
+        self.egs: "dict[str, list[int]]" = {}
 
-    def addNode(self, name: str):
+    def addNode(self, name: str, length: int) -> None:
         """
         Adds a node.
 
         Parameters:
             name (str): the name.
+            length (int): the length.
         """
 
-        self.nodes[name] = len(self.nodes)
+        self.nodes[name] = [0] * length
+        self.nodes[name][len(self.nodes) - 1] = 1
 
-    def addSFC(self, name: str):
+    def addSFC(self, name: str, length: int) -> None:
         """
         Adds an SFC.
 
         Parameters:
             name (str): the name.
+            length (int): the length.
         """
 
-        self.egs[name] = len(self.egs)
+        self.egs[name] = [0] * length
+        self.egs[name][len(self.egs) - 1] = 1
 
-    def getNodeCode(self, name: str) -> int:
+    def getNodeCode(self, name: str) -> "list[int]":
         """
         Gets the node code.
 
@@ -56,12 +60,12 @@ class HotCode:
             name (str): the name.
 
         Returns:
-            int: the code.
+            list[int]: the code.
         """
 
         return self.nodes[name]
 
-    def getSFCCode(self, name: str) -> int:
+    def getSFCCode(self, name: str) -> "list[int]":
         """
         Gets the SFC code.
 
@@ -69,7 +73,7 @@ class HotCode:
             name (str): the name.
 
         Returns:
-            int: the code.
+            list[int]: the code.
         """
 
         return self.egs[name]
@@ -189,34 +193,32 @@ class EmbedLinks:
         """
 
         links: "list[list[int]]" = []
+        linkIndices: "list[str]" = []
         for link in self._topology["links"]:
             row: "list[int]" = []
-            row.append(self._hotCode.getNodeCode(link["source"]))
-            row.append(self._hotCode.getNodeCode(link["destination"]))
+            row.extend(self._hotCode.getNodeCode(link["source"]))
+            row.extend(self._hotCode.getNodeCode(link["destination"]))
+            linkIndices.append(f"{link['source']}_{link['destination']}")
 
             links.append(row)
 
-        hosts: "list[int]" = [self._hotCode.getNodeCode(host["id"]) for host in self._topology["hosts"]]
-        hosts.append(self._hotCode.getNodeCode(SFCC))
-        hosts.append(self._hotCode.getNodeCode(SERVER))
-
-        switches: "list[int]" = [self._hotCode.getNodeCode(switch["id"]) for switch in self._topology["switches"]]
-
-        for switch in switches:
-            for host in hosts:
-                links.append([switch, host])
-
         rows: "list[list[int]]" = []
+        indices: "list[str]" = []
         for eg in self._egs:
-            sfcLinks: "list[list[int]]" = []
-            for link in links:
+            for link, linkIndex in zip(links, linkIndices):
                 row: "list[int]" = []
-                row.append(self._hotCode.getSFCCode(eg["sfcID"]))
+                row.extend(self._hotCode.getSFCCode(eg["sfcID"]))
                 row.extend(link)
-                sfcLinks.append(row)
-            rows.extend(sfcLinks)
+                rows.append(row)
+                indices.append(f"{eg['sfcID']}_{linkIndex}")
 
-        return pd.DataFrame(rows, columns=["SFC", "Source", "Destination"])
+        columns: "list[str]" = []
+        columns.extend([f"SFC{i}" for i in range(len(self._egs))])
+        columns.extend([f"Source{i}" for i in range(len(self._topology["hosts"]) + len(self._topology["switches"]) + 2)])
+        columns.extend([f"Destination{i}" for i in range(len(self._topology["hosts"]) + len(self._topology["switches"]) + 2)])
+
+
+        return pd.DataFrame(rows, columns=columns, index=indices)
 
 
     def _constructGraph(self) -> nx.Graph:
@@ -248,24 +250,27 @@ class EmbedLinks:
             None
         """
 
-        self._hotCode.addNode(SFCC)
-        self._hotCode.addNode(SERVER)
+        nodeLength: int = len(self._topology["hosts"]) + len(self._topology["switches"]) + 2
+        sfcLength: int = len(self._egs)
+
+        self._hotCode.addNode(SFCC, nodeLength)
+        self._hotCode.addNode(SERVER, nodeLength)
 
         for hosts in self._topology["hosts"]:
-            self._hotCode.addNode(hosts["id"])
+            self._hotCode.addNode(hosts["id"], nodeLength)
 
         for switch in self._topology["switches"]:
-            self._hotCode.addNode(switch["id"])
+            self._hotCode.addNode(switch["id"], nodeLength)
 
         for eg in self._egs:
-            self._hotCode.addSFC(eg["sfcID"])
+            self._hotCode.addSFC(eg["sfcID"], sfcLength)
 
     def _predictCost(self) -> pd.DataFrame:
         """
         Builds the model.
 
         Returns:
-            The dataframe: pd.Dataframe.
+            The dataframe: pd.DataFrame.
         """
 
         data: pd.DataFrame = self._constructDF()
@@ -315,20 +320,10 @@ class EmbedLinks:
             float: the heuristic cost.
         """
 
-        sfcCode: int = self._hotCode.getSFCCode(sfc)
-        srcCode: int = self._hotCode.getNodeCode(src)
-        dstCode: int = self._hotCode.getNodeCode(dst)
-
-        row: "list[int]" = self._data.loc[
-            (self._data["SFC"] == sfcCode) &
-            (self._data["Source"] == srcCode) &
-            (self._data["Destination"] == dstCode)]
+        row: "list[int]" = self._data.loc[f"{sfc}_{src}_{dst}"]
 
         if row.empty:
-            row = self._data.loc[
-                (self._data["SFC"] == sfcCode) &
-                (self._data["Source"] == dstCode) &
-                (self._data["Destination"] == srcCode)]
+            row = self._data.loc[f"{sfc}_{dst}_{src}"]
 
         return row["Cost"].values[0]
 
