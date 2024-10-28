@@ -86,12 +86,13 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         scores: "dict[str, ResourceDemand]" = getHostScores(maxReqps, topology, egs, embedData)
         maxCPU: float = max([score["cpu"] for score in scores.values()])
         maxMemory: float = max([score["memory"] for score in scores.values()])
-
+        TUI.appendToSolverLog(f"Max CPU is {maxCPU}. Max memory is {maxMemory}.")
         #The resource demand of deployed VNFs exceed 1.5 times the resource capacity of at least 1 host.
         #This leads to servers crashing.
         #Penalty is applied to the latency and the egs are not deployed.
-        maxDemand: int = 1.5
-        if maxCPU > maxDemand or maxMemory >= maxDemand:
+        maxCPUDemand: int = 2
+        maxMemoryDemand: int = 4
+        if maxCPU > maxCPUDemand or maxMemory > maxMemoryDemand:
             TUI.appendToSolverLog(f"Penalty because max CPU demand is {maxCPU} and max Memory demand is {maxMemory}.")
             acceptanceRatio = 0
             latency = penaltyLatency * penalty
@@ -182,7 +183,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
         list[EmbeddingGraph]: the evolved Embedding Graphs.
     """
 
-    POP_SIZE: int = 10
+    POP_SIZE: int = 15
     NGEN: int = 10
     CXPB: float = 1.0
     MUTPB: float = 0.3
