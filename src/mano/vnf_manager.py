@@ -4,6 +4,7 @@ Defines the VNFManager class that corresponds to the VNF Manager in the NFV arch
 
 from concurrent.futures import Future, ThreadPoolExecutor
 from threading import Thread, Lock
+from time import sleep
 import requests
 from shared.models.embedding_graph import VNF, EmbeddingGraph, VNFEntity
 from shared.models.topology import Host as TopoHost
@@ -167,14 +168,21 @@ class VNFManager():
             vnfName: str = vnf["name"]
 
             if host["id"] != SERVER:
-                dindClient: DockerClient = connectToDind(f"{host['id']}Node")
+                attempt: int = 0
+                isDeleted: bool = False
 
-                TUI.appendToLog(f"    Deleting {vnfName}.")
-                try:
-                    dindClient.containers.get(vnfName).stop()
-                    dindClient.containers.get(vnfName).remove(force=True)
-                except Exception as e:
-                    TUI.appendToLog(f"    Error deleting {vnfName}: {e}", True)
+                while not isDeleted and attempt < 3:
+                    try:
+                        dindClient: DockerClient = connectToDind(f"{host['id']}Node")
+
+                        TUI.appendToLog(f"    Deleting {vnfName}.")
+                        dindClient.containers.get(vnfName).stop()
+                        dindClient.containers.get(vnfName).remove(force=True)
+                        isDeleted = True
+                    except Exception as e:
+                        TUI.appendToLog(f"    Attempt {attempt+1}: Error deleting {vnfName}: {e}.\nRetrying in 5s...", True)
+                        attempt += 1
+                        sleep(5)
 
                 with self._deleteLocks[host["id"]]:
                     dindClient.volumes.prune()
