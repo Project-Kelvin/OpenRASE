@@ -87,11 +87,10 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         #The resource demand of deployed VNFs exceed 1.5 times the resource capacity of at least 1 host.
         #This leads to servers crashing.
         #Penalty is applied to the latency and the egs are not deployed.
-        maxCPUDemand: int = 2
-        maxMemoryDemand: int = 4
+        maxCPUDemand: int = 3
+        maxMemoryDemand: int = 5
         if maxCPU > maxCPUDemand or maxMemory > maxMemoryDemand:
             TUI.appendToSolverLog(f"Penalty because max CPU demand is {maxCPU} and max Memory demand is {maxMemory}.")
-            acceptanceRatio = 0
             latency = penaltyLatency * penalty
 
             return acceptanceRatio, latency
