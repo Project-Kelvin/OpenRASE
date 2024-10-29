@@ -3,17 +3,15 @@ This defines the GA that evolves teh weights of the Neural Network.
 """
 
 import random
-import threading
 from time import sleep
 from timeit import default_timer
-from typing import Callable, Union
+from typing import Callable, Tuple, Union
 from algorithms.surrogacy.link_embedding import EmbedLinks
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
 from algorithms.surrogacy.surrogate import getHostScores, getSFCScores
 from models.calibrate import ResourceDemand
 from models.traffic_generator import TrafficData
-from packages.python.shared.models.embedding_graph import VNF
-from packages.python.shared.models.traffic_design import TrafficDesign
+from shared.models.traffic_design import TrafficDesign
 from sfc.traffic_generator import TrafficGenerator
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
@@ -21,12 +19,10 @@ import pandas as pd
 import numpy as np
 from deap import base, creator, tools
 from shared.utils.config import getConfig
-from utils.embedding_graph import traverseVNF
 from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
 import os
 
-NO_OF_WEIGHTS: int = 169 #136 weights + 22 bias for VNF embedding & 8 weights + 3 bias for link embedding.
 
 directory = f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy"
 if not os.path.exists(directory):
@@ -63,12 +59,13 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         tuple[float, float]: the fitness.
     """
 
+    weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(individual, fgs, topology)
     df: pd.DataFrame = convertFGstoDF(fgs, topology)
-    newDF: pd.DataFrame = getConfidenceValues(df, individual[0:136], individual[136:158])
+    newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
     egs, nodes, embedData = convertDFtoFGs(newDF, fgs, topology)
 
     if len(egs) > 0:
-        embedLinks: EmbedLinks = EmbedLinks(topology, egs, individual[158:166], individual[166:169])
+        embedLinks: EmbedLinks = EmbedLinks(topology, egs,weights[2], weights[3])
         start: float = default_timer()
         egs = embedLinks.embedLinks(nodes)
         end: float = default_timer()
@@ -167,6 +164,94 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
 
     return acceptanceRatio, latency
 
+
+def getLinkWeight(fgs: "list[EmbeddingGraph]", topology: Topology) -> int:
+    """
+    Gets the number of link weights.
+
+    Parameters:
+        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        topology (Topology): the topology.
+
+    Returns:
+        int: the number of link weights.
+    """
+
+    return len(fgs) + 2 * (len(topology["hosts"]) + len(topology["switches"]) + 2)
+
+def getVNFWeight(fgs: "list[EmbeddingGraph]", topology: Topology) -> int:
+    """
+    Gets the number of VNF weights.
+
+    Parameters:
+        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        topology (Topology): the topology.
+
+    Returns:
+        int: the number of VNF weights.
+    """
+
+    return len(fgs) + len(getConfig()["vnfs"]["names"]) + len(topology["hosts"]) + 1
+
+def getLinkBias() -> int:
+    """
+    Gets the number of link biases.
+
+    Returns:
+        int: the number of link biases.
+    """
+
+    return 1
+
+def getVNFBias() -> int:
+    """
+    Gets the number of VNF biases.
+
+    Returns:
+        int: the number of VNF biases.
+    """
+
+    return 1
+
+def getWeightLength(fgs: "list[EmbeddingGraph]", topology: Topology) -> int:
+    """
+    Gets the number of weights.
+
+    Parameters:
+        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        topology (Topology): the topology.
+
+    Returns:
+        int: the number of weights.
+    """
+
+    return getLinkWeight(fgs, topology) + getVNFWeight(fgs, topology) + getLinkBias() + getVNFBias()
+
+def getWeights(individual: "list[float]", fgs: "list[EmbeddingGraph]", topology: Topology) -> "Tuple[list[float], list[float], list[float], list[float]]":
+    """
+    Gets the weights.
+
+    Parameters:
+        individual (list[float]): the individual.
+        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        topology (Topology): the topology.
+
+    Returns:
+        tuple[list[float], list[float], list[float], list[float]]: VNF weights, VNF bias, link weights, link bias.
+    """
+
+    vnfWeights: int = getVNFWeight(fgs, topology)
+    linkWeights: int = getLinkWeight(fgs, topology)
+    vnfBias: int = getVNFBias()
+    linkBias: int = getLinkBias()
+
+    vnfWeightUpper: int = vnfWeights
+    vnfBiasUpper: int = vnfWeights + vnfBias
+    linkWeightUpper: int = vnfWeights + vnfBias + linkWeights
+    linkBiasUpper: int = vnfWeights + vnfBias + linkWeights + linkBias
+
+    return individual[0:vnfWeightUpper], individual[vnfWeightUpper:vnfBiasUpper], individual[vnfBiasUpper:linkWeightUpper], individual[linkWeightUpper:linkBiasUpper]
+
 def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology) -> "list[EmbeddingGraph]":
     """
     Evolves the weights of the Neural Network.
@@ -194,7 +279,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
     toolbox:base.Toolbox = base.Toolbox()
 
     toolbox.register("gene", random.gauss, 0.0, 1)
-    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.gene, n=NO_OF_WEIGHTS)
+    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.gene, n=getWeightLength(fgs, topology))
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("crossover", tools.cxBlend, alpha=0.5)
     toolbox.register("mutate", tools.mutGaussian, mu=0.0, sigma=1.0, indpb=0.1)

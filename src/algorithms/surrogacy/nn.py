@@ -146,6 +146,21 @@ def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
             else:
                 vnf["host"] = {"id": topology["hosts"][cls.index(maxCL)]["id"]}
 
+                # pylint: disable=cell-var-from-loop
+                if nodes[fg["sfcID"]][-1] != vnf["host"]["id"]:
+                    # pylint: disable=cell-var-from-loop
+                    nodes[fg["sfcID"]].append(vnf["host"]["id"])
+
+                if vnf["host"]["id"] in embeddingData:
+                    if fg["sfcID"] in embeddingData[vnf["host"]["id"]]:
+                        embeddingData[vnf["host"]["id"]][fg["sfcID"]].append([vnf["vnf"]["id"], depth])
+                    else:
+                        embeddingData[vnf["host"]["id"]][fg["sfcID"]] = [[vnf["vnf"]["id"], depth]]
+                else:
+                    embeddingData[vnf["host"]["id"]] = {
+                        fg["sfcID"]: [[vnf["vnf"]["id"], depth]]
+                    }
+
         traverseVNF(fg["vnfs"], parseVNF, embeddingNotFound, startIndex, endIndex)
 
         if not embeddingNotFound[0]:

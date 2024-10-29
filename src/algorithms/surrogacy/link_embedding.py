@@ -202,6 +202,18 @@ class EmbedLinks:
 
             links.append(row)
 
+        hosts: "list[str]" = [host["id"] for host in self._topology["hosts"]]
+        hosts.append(SFCC)
+        hosts.append(SERVER)
+
+        switches: "list[int]" = [switch["id"] for switch in self._topology["switches"]]
+
+        for switch in switches:
+            for host in hosts:
+                if f"{switch}_{host}" not in linkIndices:
+                    linkIndices.append(f"{switch}_{host}")
+                    links.append(self._hotCode.getNodeCode(switch) + self._hotCode.getNodeCode(host))
+
         rows: "list[list[int]]" = []
         indices: "list[str]" = []
         for eg in self._egs:
@@ -274,15 +286,11 @@ class EmbedLinks:
         """
 
         data: pd.DataFrame = self._constructDF()
-        normalizer = tf.keras.layers.Normalization(axis=1)
-        normalizer.adapt(np.array(data))
-        layers: "list[int]" = [3, 2, 1]
+        layers: "list[int]" = [len(data.columns), 1]
 
         model = tf.keras.Sequential([
             tf.keras.Input(shape=(layers[0], )),
-            normalizer,
             tf.keras.layers.Dense(layers[1], activation="relu"),
-            tf.keras.layers.Dense(layers[2], activation="relu")
         ])
 
         index: int = 0
@@ -320,12 +328,13 @@ class EmbedLinks:
             float: the heuristic cost.
         """
 
-        row: "list[int]" = self._data.loc[f"{sfc}_{src}_{dst}"]
-
-        if row.empty:
+        row: "list[int]" = []
+        try:
+            row = self._data.loc[f"{sfc}_{src}_{dst}"]
+        except KeyError:
             row = self._data.loc[f"{sfc}_{dst}_{src}"]
 
-        return row["Cost"].values[0]
+        return row["Cost"]
 
     def _findPath(self, sfcID: str, source: str, destination: str) -> "list[str]":
         """
