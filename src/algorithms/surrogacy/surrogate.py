@@ -71,18 +71,18 @@ def train() -> None:
 
     dataPath: str = getConfig()["repoAbsolutePath"] + "/src/algorithms/surrogacy/data/weights.csv"
     data: pd.DataFrame = pd.read_csv(dataPath, sep=r'\s*,\s*')
-    filteredData: pd.DataFrame = data.loc[(data["latency"] != 10000) &
-                                    (data["latency"] != 20000) &
-                                    (data["latency"] != 30000) &
-                                    (data["latency"] != 40000) &
-                                    (data["latency"] != 50000)]
-    trainData: pd.DataFrame = filteredData.sample(frac=0.8, random_state=0)
+    q1 = data["latency"].quantile(0.25)
+    q3 = data["latency"].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+
+    filteredData: pd.DataFrame = data[(data["latency"] > lower_bound) & (data["latency"] < upper_bound)]
+    trainData: pd.DataFrame = filteredData.sample(frac=0.7, random_state=0)
     testData: pd.DataFrame = filteredData.drop(trainData.index)
 
-    xTrain: np.ndarray = trainData[["w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8", "w9"]].values
+    xTrain: np.ndarray = trainData[["cpu", "memory", "link"]].values
     yTrain: np.ndarray = trainData["latency"].values
-    _xTest: np.ndarray = testData[["w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8", "w9"]].values
-    _yTest: np.ndarray = testData["latency"].values
 
     negLogLikelihood: "Callable[[tf.Tensor, tf.Tensor], tf.Tensor]" = lambda y, p_y: -p_y.log_prob(y)
     model: tf_keras.Sequential = tf_keras.Sequential([
@@ -109,7 +109,7 @@ def train() -> None:
     plt.clf()
 
     for _index, row in testData.iterrows():
-        w: "list[float]" = row[["w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8", "w9"]].values
+        w: "list[float]" = row[["cpu", "memory", "link"]].values
         mean, std = predict(w, model)
         print(f"Predicted: {mean}, Actual: {row['latency']}, Standard Deviation: {std}")
 
@@ -373,3 +373,5 @@ def getLinkScore(demand: float, totalDemand: int, resource: float) -> float:
     """
 
     return totalDemand / resource
+
+train()
