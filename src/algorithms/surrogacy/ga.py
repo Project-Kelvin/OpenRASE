@@ -87,7 +87,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         #The resource demand of deployed VNFs exceed 1.5 times the resource capacity of at least 1 host.
         #This leads to servers crashing.
         #Penalty is applied to the latency and the egs are not deployed.
-        maxCPUDemand: int = 3
+        maxCPUDemand: int = 2
         maxMemoryDemand: int = 5
         if maxCPU > maxCPUDemand or maxMemory > maxMemoryDemand:
             TUI.appendToSolverLog(f"Penalty because max CPU demand is {maxCPU} and max Memory demand is {maxMemory}.")
@@ -270,7 +270,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
     POP_SIZE: int = 15
     NGEN: int = 10
     CXPB: float = 1.0
-    MUTPB: float = 0.3
+    MUTPB: float = 0.5
 
     creator.create("MaxARMinLatency", base.Fitness, weights=(1.0, -1.0))
     creator.create("Individual", list, fitness=creator.MaxARMinLatency)
@@ -281,7 +281,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
     toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.gene, n=getWeightLength(fgs, topology))
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("crossover", tools.cxBlend, alpha=0.5)
-    toolbox.register("mutate", tools.mutGaussian, mu=0.0, sigma=1.0, indpb=0.1)
+    toolbox.register("mutate", tools.mutGaussian, mu=0.0, sigma=1.0, indpb=0.3)
     toolbox.register("select", tools.selNSGA2)
 
     pop: "list[creator.Individual]" = toolbox.population(n=POP_SIZE)
