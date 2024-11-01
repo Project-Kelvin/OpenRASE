@@ -2,6 +2,7 @@
 This defines the GA that evolves teh weights of the Neural Network.
 """
 
+from copy import deepcopy
 import random
 from time import sleep
 from timeit import default_timer
@@ -59,10 +60,11 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         tuple[float, float]: the fitness.
     """
 
-    weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(individual, fgs, topology)
-    df: pd.DataFrame = convertFGstoDF(fgs, topology)
+    copiedFGs: "list[EmbeddingGraph]" = [deepcopy(fg) for fg in fgs]
+    weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(individual, copiedFGs, topology)
+    df: pd.DataFrame = convertFGstoDF(copiedFGs, topology)
     newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
-    egs, nodes, embedData = convertDFtoFGs(newDF, fgs, topology)
+    egs, nodes, embedData = convertDFtoFGs(newDF, copiedFGs, topology)
 
     if len(egs) > 0:
         embedLinks: EmbedLinks = EmbedLinks(topology, egs,weights[2], weights[3])
