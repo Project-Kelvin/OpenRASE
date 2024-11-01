@@ -90,13 +90,13 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         TUI.appendToSolverLog(f"Max CPU is {maxCPU}. Max memory is {maxMemory}.")
 
         avgScores: "dict[str, ResourceDemand]" = getHostScores(avgReqps, topology, egs, embedData)
-        avgCPU: float = sum([score["cpu"] for score in avgScores.values()]) / len(avgScores)
-        avgMemory: float = sum([score["memory"] for score in avgScores.values()]) / len(avgScores)
+        avgCPU: float = np.mean([score["cpu"] for score in avgScores.values()])
+        avgMemory: float = np.mean([score["memory"] for score in avgScores.values()])
 
         TUI.appendToSolverLog(f"Average CPU is {avgCPU}. Average memory is {avgMemory}.")
 
         linkScores: "dict[str, ResourceDemand]" = getLinkScores(avgReqps, topology, egs, embedLinks.getLinkData())
-        avgLink: float = sum([score for score in linkScores.values()]) / len(scores)
+        avgLink: float = np.mean([score for score in linkScores.values()])
 
 
         #The resource demand of deployed VNFs exceed 1.5 times the resource capacity of at least 1 host.
