@@ -93,7 +93,9 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         avgCPU: float = sum([score["cpu"] for score in avgScores.values()]) / len(avgScores)
         avgMemory: float = sum([score["memory"] for score in avgScores.values()]) / len(avgScores)
 
-        linkScores: "dict[str, ResourceDemand]" = getLinkScores(avgReqps, topology, egs, embedData)
+        TUI.appendToSolverLog(f"Average CPU is {avgCPU}. Average memory is {avgMemory}.")
+
+        linkScores: "dict[str, ResourceDemand]" = getLinkScores(avgReqps, topology, egs, embedLinks.getLinkData())
         avgLink: float = sum([score for score in linkScores.values()]) / len(scores)
 
 
