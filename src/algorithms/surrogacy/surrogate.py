@@ -78,7 +78,7 @@ def train() -> None:
     upper_bound = q3 + 1.5 * iqr
 
     filteredData: pd.DataFrame = data[(data["latency"] > lower_bound) & (data["latency"] < upper_bound)]
-    trainData: pd.DataFrame = filteredData.sample(frac=0.7, random_state=0)
+    trainData: pd.DataFrame = filteredData.sample(frac=0.9, random_state=0)
     testData: pd.DataFrame = filteredData.drop(trainData.index)
 
     xTrain: np.ndarray = trainData[["cpu", "memory", "link"]].values
@@ -86,9 +86,7 @@ def train() -> None:
 
     negLogLikelihood: "Callable[[tf.Tensor, tf.Tensor], tf.Tensor]" = lambda y, p_y: -p_y.log_prob(y)
     model: tf_keras.Sequential = tf_keras.Sequential([
-        tfp.layers.DenseVariational(16, make_posterior_fn=posteriorMeanField, make_prior_fn=priorTrainable, activation="relu", kl_weight=1/xTrain.shape[0]),
-        tfp.layers.DenseVariational(8, make_posterior_fn=posteriorMeanField, make_prior_fn=priorTrainable, activation="relu", kl_weight=1/xTrain.shape[0]),
-        tfp.layers.DenseVariational(4, make_posterior_fn=posteriorMeanField, make_prior_fn=priorTrainable, activation="relu", kl_weight=1/xTrain.shape[0]),
+        tfp.layers.DenseVariational(2, make_posterior_fn=posteriorMeanField, make_prior_fn=priorTrainable, activation="relu", kl_weight=1/xTrain.shape[0]),
         tfp.layers.DenseVariational(2, make_posterior_fn=posteriorMeanField, make_prior_fn=priorTrainable, kl_weight=1/xTrain.shape[0]),
         tfp.layers.DistributionLambda(
             lambda t: tfp.distributions.Normal(loc=t[..., :1],
@@ -97,7 +95,7 @@ def train() -> None:
     ])
 
     model.compile(optimizer=tf_keras.optimizers.Adam(learning_rate=0.05), loss=negLogLikelihood)
-    history: Any = model.fit(xTrain, yTrain, epochs=30000, validation_split=0.2)
+    history: Any = model.fit(xTrain, yTrain, epochs=100, validation_split=0.2)
 
     plt.plot(history.history['loss'], label='loss')
     plt.plot(history.history['val_loss'], label='val_loss')
@@ -108,30 +106,48 @@ def train() -> None:
     plt.savefig(f"{'/'.join(dataPath.split('/')[:-2])}/plot.png")
     plt.clf()
 
-    for _index, row in testData.iterrows():
-        w: "list[float]" = row[["cpu", "memory", "link"]].values
-        mean, std = predict(w, model)
-        print(f"Predicted: {mean}, Actual: {row['latency']}, Standard Deviation: {std}")
+    output: pd.DataFrame = predict(testData, model)
+    output.to_csv("predictions.csv")
 
 
-def predict(w: "list[float]", model) -> "Tuple[float, float]":
+def predict(data: pd.DataFrame, model) -> pd.DataFrame:
     """
     Predicts the latency.
 
     Parameters:
-        w (list[float]): the weights.
+        data (pd.DataFrame): the data frame to be predicted on.
 
     Returns:
-        float: the latency and the standard deviation.
+        data (pd.DataFrame): the data frame with the prediction.
     """
 
     num: int = 100
 
-    predictions: "list[float]" = []
-    for _i in range(num):
-        predictions.append(model.predict(np.array([w]))[0][0])
+    predictions: "list[list[float]]" = []
+    dataArray: "list[list[float]]" = []
 
-    return np.median(predictions), np.quantile(predictions, 0.75) - np.quantile(predictions, 0.25)
+    for _index, row in data.iterrows():
+        dataRow: "list[float]" = row[["cpu", "memory", "link"]].values
+        
+        for _i in range(num):
+            dataArray.append(np.asarray(dataRow).astype("float32"))
+
+    predictions.extend(model.predict(np.array(dataArray)))
+    means: "list[float]" = []
+    stds: "list[float]" = []
+
+    for i in range(num, len(predictions) + num, num):
+        median: float = np.mean(predictions[i-num:i])
+        std: float = np.std(predictions[i-num:i])
+
+        means.append(median)
+        stds.append(std)
+
+    outputData: pd.DataFrame = data.copy()
+    outputData = outputData.assign(PredictedLatency = means, Confidence = stds)
+
+
+    return outputData
 
 def getHostScores(reqps: int, topology: Topology, egs: "list[EmbeddingGraph]", embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" ) -> "dict[str, ResourceDemand]":
     """
