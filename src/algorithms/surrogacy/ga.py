@@ -106,7 +106,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         maxMemoryDemand: int = 5
         if maxCPU > maxCPUDemand or maxMemory > maxMemoryDemand:
             TUI.appendToSolverLog(f"Penalty because max CPU demand is {maxCPU} and max Memory demand is {maxMemory}.")
-            latency = penaltyLatency * penalty
+            latency = penaltyLatency * penalty * (maxCPU + maxMemory)
 
             return acceptanceRatio, latency
 
@@ -151,8 +151,10 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         #    with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
         #        avgLatency.write(",".join([str(el) for el in row]) + "\n")
 
+        anomalousDuration: int = 15
+        trafficDuration: int = duration - anomalousDuration
         trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
-                        f"{duration:.0f}s")
+                        f"{trafficDuration:.0f}s")
         latency: float = 0
         for _key, value in trafficData.items():
             latency += value["averageLatency"]
@@ -285,10 +287,10 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
         list[EmbeddingGraph]: the evolved Embedding Graphs.
     """
 
-    POP_SIZE: int = 15
+    POP_SIZE: int = 20
     NGEN: int = 10
     CXPB: float = 1.0
-    MUTPB: float = 0.5
+    MUTPB: float = 0.8
 
     creator.create("MaxARMinLatency", base.Fitness, weights=(1.0, -1.0))
     creator.create("Individual", list, fitness=creator.MaxARMinLatency)
@@ -299,7 +301,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
     toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.gene, n=getWeightLength(fgs, topology))
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("crossover", tools.cxBlend, alpha=0.5)
-    toolbox.register("mutate", tools.mutGaussian, mu=0.0, sigma=1.0, indpb=0.3)
+    toolbox.register("mutate", tools.mutGaussian, mu=0.0, sigma=1.0, indpb=0.8)
     toolbox.register("select", tools.selNSGA2)
 
     pop: "list[creator.Individual]" = toolbox.population(n=POP_SIZE)
