@@ -9,7 +9,7 @@ from timeit import default_timer
 from typing import Callable, Tuple, Union
 from algorithms.surrogacy.link_embedding import EmbedLinks
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
-from algorithms.surrogacy.surrogate import getHostScores, getSFCScores
+from algorithms.surrogacy.surrogate import getHostScores, getLinkScores, getSFCScores
 from models.calibrate import ResourceDemand
 from models.traffic_generator import TrafficData
 from shared.models.traffic_design import TrafficDesign
@@ -39,7 +39,7 @@ with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/we
     weights.write("generation, w1, w2, w3, w4, w5, w6, w7, w8, w9, latency\n")
 
 with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "w", encoding="utf8") as latency:
-    latency.write("sfc, reqps, cpu, memory, link, latency\n")
+    latency.write("generation, cpu, memory, link, latency\n")
 
 def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology) -> "tuple[float, float]":
     """
@@ -80,12 +80,23 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
 
     TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}")
     maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
+    avgReqps: int = sum([td["target"] for td in trafficDesign[0]]) / len(trafficDesign[0])
     if len(egs) > 0:
         #Validate EGs
         scores: "dict[str, ResourceDemand]" = getHostScores(maxReqps, topology, egs, embedData)
         maxCPU: float = max([score["cpu"] for score in scores.values()])
         maxMemory: float = max([score["memory"] for score in scores.values()])
+
         TUI.appendToSolverLog(f"Max CPU is {maxCPU}. Max memory is {maxMemory}.")
+
+        avgScores: "dict[str, ResourceDemand]" = getHostScores(avgReqps, topology, egs, embedData)
+        avgCPU: float = sum([score["cpu"] for score in avgScores.values()]) / len(avgScores)
+        avgMemory: float = sum([score["memory"] for score in avgScores.values()]) / len(avgScores)
+
+        linkScores: "dict[str, ResourceDemand]" = getLinkScores(avgReqps, topology, egs, embedData)
+        avgLink: float = sum([score for score in linkScores.values()]) / len(scores)
+
+
         #The resource demand of deployed VNFs exceed 1.5 times the resource capacity of at least 1 host.
         #This leads to servers crashing.
         #Penalty is applied to the latency and the egs are not deployed.
@@ -132,11 +143,11 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
 
         TUI.appendToSolverLog(f"Done waiting for {duration}s.")
 
-        rows: "list[list[Union[str, float]]]" = getSFCScores(data, topology, egs, embedData, embedLinks.getLinkData())
+        #rows: "list[list[Union[str, float]]]" = getSFCScores(data, topology, egs, embedData, embedLinks.getLinkData())
 
-        for row in rows:
-            with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
-                avgLatency.write(",".join([str(el) for el in row]) + "\n")
+        #for row in rows:
+        #    with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
+        #        avgLatency.write(",".join([str(el) for el in row]) + "\n")
 
         trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
                         f"{duration:.0f}s")
@@ -155,6 +166,9 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
 
         with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/weights.csv", "a", encoding="utf8") as weights:
             weights.write(weightRow)
+
+        with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
+            avgLatency.write(f"{gen}, {avgCPU}, {avgMemory}, {avgLink}, {latency}\n")
 
         TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
         deleteEGs(egs)

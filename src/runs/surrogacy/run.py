@@ -33,7 +33,7 @@ directory = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy"
 if not os.path.exists(directory):
     os.makedirs(directory)
 
-topology: Topology = generateFatTreeTopology(4, 1000, 2, 2048)
+topology: Topology = generateFatTreeTopology(4, 10, 2, 2048)
 trafficDesign: "list[TrafficDesign]" = []
 logFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy/experiments.csv"
 latencyDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency_data.csv"

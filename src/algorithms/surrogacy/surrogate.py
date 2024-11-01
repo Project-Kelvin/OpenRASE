@@ -128,7 +128,7 @@ def predict(data: pd.DataFrame, model) -> pd.DataFrame:
 
     for _index, row in data.iterrows():
         dataRow: "list[float]" = row[["cpu", "memory", "link"]].values
-        
+
         for _i in range(num):
             dataArray.append(np.asarray(dataRow).astype("float32"))
 
@@ -210,6 +210,53 @@ def getHostScores(reqps: int, topology: Topology, egs: "list[EmbeddingGraph]", e
         data["memory"] = data["memory"] / hostMemory
 
     return hostResourceData
+
+def getLinkScores(reqps: int, topology: Topology, egs: "list[EmbeddingGraph]", linkData: "dict[str, dict[str, float]]") -> "dict[str, float]":
+    """
+    Gets the link scores.
+
+    Parameters:
+        reqps (int): the reqps.
+        topology (Topology): the topology.
+        egs (list[EmbeddingGraph]): the Embedding Graphs.
+        linkData (dict[str, dict[str, float]]): the link data.
+
+    Returns:
+        dict[str, float]: the link scores.
+    """
+
+    linkScores: "dict[str, float]" = {}
+    for eg in egs:
+        totalLinkScore: float = 0
+        for egLink in eg["links"]:
+            links: "list[str]" = [egLink["source"]["id"]]
+            links.extend(egLink["links"])
+            links.append(egLink["destination"]["id"])
+            divisor: int = egLink["divisor"]
+            reqps: float = reqps / divisor
+
+            for linkIndex in range(len(links) - 1):
+                source: str = links[linkIndex]
+                destination: str = links[linkIndex + 1]
+
+                totalRequests: int = 0
+
+                if f"{source}-{destination}" in linkData:
+                    for key, data in linkData[f"{source}-{destination}"].items():
+                        totalRequests += data * reqps
+                elif f"{destination}-{source}" in linkData:
+                    for data in linkData[f"{destination}-{source}"].values():
+                        totalRequests += data * reqps
+
+                bandwidth: float = [link["bandwidth"] for link in topology["links"] if (link["source"] == source and link["destination"] == destination) or (link["source"] == destination and link["destination"] == source)][0]
+
+                linkScore: float = getLinkScore(reqps, totalRequests, bandwidth)
+
+                totalLinkScore += linkScore
+
+        linkScores[eg["sfcID"]] = totalLinkScore
+
+    return linkScores
 
 def getSFCScores(data: "list[dict[str, dict[str, Union[int, float]]]]", topology: Topology, egs: "list[EmbeddingGraph]", embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]", linkData: "dict[str, dict[str, float]]" ) -> "list[list[Union[str, float]]]":
     """
@@ -388,6 +435,4 @@ def getLinkScore(demand: float, totalDemand: int, resource: float) -> float:
         float: the score.
     """
 
-    return totalDemand / resource
-
-train()
+    return (demand / totalDemand) * resource
