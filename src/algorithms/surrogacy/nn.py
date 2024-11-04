@@ -139,7 +139,7 @@ def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
 
             maxCL: float = max(cls)
 
-            if maxCL < 0.5:
+            if maxCL < 0.1:
                 embeddingNotFound[0] = True
 
                 return

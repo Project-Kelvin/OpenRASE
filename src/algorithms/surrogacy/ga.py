@@ -23,7 +23,9 @@ from shared.utils.config import getConfig
 from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
 import os
+import tensorflow as tf
 
+tf.get_logger().setLevel('ERROR')
 
 directory = f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy"
 if not os.path.exists(directory):
@@ -39,7 +41,7 @@ with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/we
     weights.write("generation, w1, w2, w3, w4, w5, w6, w7, w8, w9, latency\n")
 
 with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "w", encoding="utf8") as latency:
-    latency.write("generation, cpu, memory, link, latency\n")
+    latency.write("generation, cpu, memory, link, hosts, latency, ar\n")
 
 def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology) -> "tuple[float, float]":
     """
@@ -78,7 +80,6 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     latency: int = 0
     penalty: float = gen/ngen
 
-    TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}")
     maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
     avgReqps: int = sum([td["target"] for td in trafficDesign[0]]) / len(trafficDesign[0])
     if len(egs) > 0:
@@ -87,16 +88,17 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         maxCPU: float = max([score["cpu"] for score in scores.values()])
         maxMemory: float = max([score["memory"] for score in scores.values()])
 
-        TUI.appendToSolverLog(f"Max CPU is {maxCPU}. Max memory is {maxMemory}.")
-
         avgScores: "dict[str, ResourceDemand]" = getHostScores(avgReqps, topology, egs, embedData)
-        avgCPU: float = np.mean([score["cpu"] for score in avgScores.values()])
-        avgMemory: float = np.mean([score["memory"] for score in avgScores.values()])
+        avgCPU: float = np.sum([score["cpu"] for score in avgScores.values()])
+        avgMemory: float = np.sum([score["memory"] for score in avgScores.values()])
 
+        TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}")
+        TUI.appendToSolverLog(f"Max CPU is {maxCPU}. Max memory is {maxMemory}.")
         TUI.appendToSolverLog(f"Average CPU is {avgCPU}. Average memory is {avgMemory}.")
+        TUI.appendToSolverLog(f"Deployed across {len(avgScores.values())}: {', '.join(avgScores.keys())}.")
 
         linkScores: "dict[str, ResourceDemand]" = getLinkScores(avgReqps, topology, egs, embedLinks.getLinkData())
-        avgLink: float = np.mean([score for score in linkScores.values()])
+        avgLink: float = np.sum([score for score in linkScores.values()])
 
 
         #The resource demand of deployed VNFs exceed 1.5 times the resource capacity of at least 1 host.
@@ -107,7 +109,9 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         if maxCPU > maxCPUDemand or maxMemory > maxMemoryDemand:
             TUI.appendToSolverLog(f"Penalty because max CPU demand is {maxCPU} and max Memory demand is {maxMemory}.")
             latency = penaltyLatency * penalty * (maxCPU + maxMemory)
-
+            acceptanceRatio = acceptanceRatio - (penalty * (maxCPU + maxMemory))
+            
+            
             return acceptanceRatio, latency
 
         sendEGs(egs)
@@ -172,13 +176,14 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
             weights.write(weightRow)
 
         with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
-            avgLatency.write(f"{gen}, {avgCPU}, {avgMemory}, {avgLink}, {latency}\n")
+            avgLatency.write(f"{gen}, {avgCPU}, {avgMemory}, {avgLink}, {len(avgScores)}, {latency}, {acceptanceRatio}\n")
 
         TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
         deleteEGs(egs)
     else:
         latency = penaltyLatency * penalty
-
+        TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}")
+        
     TUI.appendToSolverLog(f"Latency: {latency}ms")
 
     return acceptanceRatio, latency
@@ -287,7 +292,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
         list[EmbeddingGraph]: the evolved Embedding Graphs.
     """
 
-    POP_SIZE: int = 20
+    POP_SIZE: int = 800
     NGEN: int = 10
     CXPB: float = 1.0
     MUTPB: float = 0.8
@@ -297,7 +302,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
 
     toolbox:base.Toolbox = base.Toolbox()
 
-    toolbox.register("gene", random.gauss, 0.0, 1)
+    toolbox.register("gene", random.uniform, -1000, 1000)
     toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.gene, n=getWeightLength(fgs, topology))
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("crossover", tools.cxBlend, alpha=0.5)
