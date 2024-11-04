@@ -7,6 +7,7 @@ import random
 from time import sleep
 from timeit import default_timer
 from typing import Callable, Tuple, Union
+from algorithms.surrogacy.generate import evolveInitialWeights
 from algorithms.surrogacy.link_embedding import EmbedLinks
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
 from algorithms.surrogacy.surrogate import getHostScores, getLinkScores, getSFCScores
@@ -110,8 +111,8 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
             TUI.appendToSolverLog(f"Penalty because max CPU demand is {maxCPU} and max Memory demand is {maxMemory}.")
             latency = penaltyLatency * penalty * (maxCPU + maxMemory)
             acceptanceRatio = acceptanceRatio - (penalty * (maxCPU + maxMemory))
-            
-            
+
+
             return acceptanceRatio, latency
 
         sendEGs(egs)
@@ -183,7 +184,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     else:
         latency = penaltyLatency * penalty
         TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}")
-        
+
     TUI.appendToSolverLog(f"Latency: {latency}ms")
 
     return acceptanceRatio, latency
@@ -276,7 +277,7 @@ def getWeights(individual: "list[float]", fgs: "list[EmbeddingGraph]", topology:
 
     return individual[0:vnfWeightUpper], individual[vnfWeightUpper:vnfBiasUpper], individual[vnfBiasUpper:linkWeightUpper], individual[linkWeightUpper:linkBiasUpper]
 
-def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology) -> "list[EmbeddingGraph]":
+def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology) -> None:
     """
     Evolves the weights of the Neural Network.
 
@@ -289,8 +290,9 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
         topology (Topology): the topology.
 
     Returns:
-        list[EmbeddingGraph]: the evolved Embedding Graphs.
+        None
     """
+
 
     POP_SIZE: int = 800
     NGEN: int = 10
@@ -309,7 +311,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
     toolbox.register("mutate", tools.mutGaussian, mu=0.0, sigma=1.0, indpb=0.8)
     toolbox.register("select", tools.selNSGA2)
 
-    pop: "list[creator.Individual]" = toolbox.population(n=POP_SIZE)
+    pop: "list[creator.Individual]" = evolveInitialWeights(fgs, topology) #toolbox.population(n=POP_SIZE)
 
     gen: int = 1
     for ind in pop:
