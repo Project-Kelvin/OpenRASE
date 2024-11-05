@@ -11,15 +11,18 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 import pandas as pd
 import numpy as np
-from algorithms.surrogacy.surrogate import getHostScores
 from deap import base, creator, tools
 from shared.utils.config import getConfig
+from algorithms.surrogacy.scorer import Scorer
 from models.calibrate import ResourceDemand
 from utils.tui import TUI
 import tensorflow as tf
 from shared.models.traffic_design import TrafficDesign
+from multiprocessing import Manager, Process
 
 tf.get_logger().setLevel('ERROR')
+
+scorer: Scorer = Scorer()
 
 def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, trafficDesign: TrafficDesign, topology: Topology) -> "tuple[float, float, float]":
     """
@@ -51,7 +54,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
     if len(egs) > 0:
         #Validate EGs
-        scores: "dict[str, ResourceDemand]" = getHostScores(maxReqps, topology, egs, embedData)
+        scores: "dict[str, ResourceDemand]" = scorer.getHostScores(maxReqps, topology, egs, embedData)
         maxCPU: float = max([score["cpu"] for score in scores.values()])
         maxMemory: float = max([score["memory"] for score in scores.values()])
 
@@ -201,17 +204,9 @@ def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesig
                 toolbox.mutate(mutant)
                 del mutant.fitness.values
 
-        threads: "list[threading.Thread]" = []
         for ind in offspring:
-            def evaluateThread():
-                ind.fitness.values = evaluate(ind, fgs, gen, NGEN, trafficDesign, topology)
-            evaluateThread()
-            # thread = threading.Thread(target=evaluateThread)
-            # threads.append(thread)
-            # thread.start()
+            ind.fitness.values = evaluate(ind, fgs, gen, NGEN, trafficDesign, topology)
 
-        # for thread in threads:
-        #     thread.join()
 
         pop[:] = toolbox.select(pop + offspring, k=POP_SIZE, tournsize=10)
 

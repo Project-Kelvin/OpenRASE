@@ -56,6 +56,7 @@ class Calibrate:
         self._headers: "list[str]" = ["cpu", "memory", "networkIn",
                 "networkOut", "ior", "http_reqs", "latency", "duration"]
         self._cache: "dict[str, dict[str, ResourceDemand]]" = {}
+        self._models: "dict[str, dict[str, Any]]" = {}
 
         if not os.path.exists(f"{self._config['repoAbsolutePath']}/artifacts/calibrations"):
             os.makedirs(f"{self._config['repoAbsolutePath']}/artifacts/calibrations")
@@ -354,18 +355,30 @@ class Calibrate:
                 self._trainModel(self._headers[4], vnf, epochs)  # I/O Ratio
 
 
-    def _getVNFResourceDemandModel(self, vnf: str, metric: str):
+    def _getVNFResourceDemandModel(self, vnf: str, metric: str) -> Any:
         """
         Get the resource demand model of the given metric and VNF.
 
         Parameters:
             vnf (str): The VNF to get the resource demand model for.
             metric (str): The metric to get the resource demand model for.
+
+        Returns:
+            Any: The resource demand model.
         """
 
-        modelPath: str = f"{self._calDir}/{vnf}/{metric}_{self._modelName}"
+        if vnf not in self._models or metric not in self._models[vnf]:
+            modelPath: str = f"{self._calDir}/{vnf}/{metric}_{self._modelName}"
+            model: Any = tf.keras.models.load_model(modelPath)
 
-        return tf.keras.models.load_model(modelPath)
+            if vnf in self._models:
+                self._models[vnf][metric] = model
+            else:
+                self._models[vnf] = {metric: model}
+
+            return tf.keras.models.load_model(modelPath)
+        else:
+            return self._models[vnf][metric]
 
     def _getVNFResourceDemands(self, vnf: str, reqps: float) -> ResourceDemand:
         """

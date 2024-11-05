@@ -3,7 +3,7 @@ This defines the Neural Network used for genetic encoding.
 """
 
 import copy
-from typing import Tuple, Union
+from typing import Tuple
 import pandas as pd
 from algorithms.surrogacy.local_constants import BRANCH
 from constants.topology import SERVER, SFCC
