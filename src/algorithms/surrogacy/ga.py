@@ -10,7 +10,7 @@ from typing import Callable, Tuple, Union
 from algorithms.surrogacy.generate import evolveInitialWeights
 from algorithms.surrogacy.link_embedding import EmbedLinks
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
-from algorithms.surrogacy.surrogate import getHostScores, getLinkScores, getSFCScores
+from algorithms.surrogacy.surrogate import getHostScores, getLinkScores
 from models.calibrate import ResourceDemand
 from models.traffic_generator import TrafficData
 from shared.models.traffic_design import TrafficDesign
@@ -27,6 +27,7 @@ import os
 import tensorflow as tf
 
 tf.get_logger().setLevel('ERROR')
+tf.keras.utils.disable_interactive_logging()
 
 directory = f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy"
 if not os.path.exists(directory):
@@ -44,7 +45,7 @@ with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/we
 with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "w", encoding="utf8") as latency:
     latency.write("generation, cpu, memory, link, hosts, latency, ar\n")
 
-def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology) -> "tuple[float, float]":
+def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology, trafficType: bool) -> "tuple[float, float]":
     """
     Evaluates the individual.
 
@@ -58,6 +59,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         trafficDesign (TrafficDesign): the traffic design.
         trafficGenerator (TrafficGenerator): the traffic generator.
         topology (Topology): the topology.
+        trafficType (bool): whether to use the minimal traffic design.
 
     Returns:
         tuple[float, float]: the fitness.
@@ -156,7 +158,7 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         #    with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
         #        avgLatency.write(",".join([str(el) for el in row]) + "\n")
 
-        anomalousDuration: int = 15
+        anomalousDuration: int = 15 if not trafficType else 2
         trafficDuration: int = duration - anomalousDuration
         trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
                         f"{trafficDuration:.0f}s")
@@ -277,7 +279,7 @@ def getWeights(individual: "list[float]", fgs: "list[EmbeddingGraph]", topology:
 
     return individual[0:vnfWeightUpper], individual[vnfWeightUpper:vnfBiasUpper], individual[vnfBiasUpper:linkWeightUpper], individual[linkWeightUpper:linkBiasUpper]
 
-def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology) -> None:
+def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology, trafficType: bool) -> None:
     """
     Evolves the weights of the Neural Network.
 
@@ -288,34 +290,46 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
         trafficDesign (TrafficDesign): the traffic design.
         trafficGenerator (TrafficGenerator): the traffic generator.
         topology (Topology): the topology.
+        trafficType (bool): whether to use the minimal traffic design.
 
     Returns:
         None
     """
 
 
-    POP_SIZE: int = 800
+    POP_SIZE: int = 100
     NGEN: int = 10
     CXPB: float = 1.0
     MUTPB: float = 0.8
 
+    evolvedPop: "list[creator.Individual]" = evolveInitialWeights(POP_SIZE, fgs, trafficDesign, topology)
+
     creator.create("MaxARMinLatency", base.Fitness, weights=(1.0, -1.0))
     creator.create("Individual", list, fitness=creator.MaxARMinLatency)
 
+    evolvedNewPop: "list[creator.Individual]" = []
+    for ep in evolvedPop:
+        ind = creator.Individual()
+        ind.extend(ep)
+        evolvedNewPop.append(ind)
+
     toolbox:base.Toolbox = base.Toolbox()
 
-    toolbox.register("gene", random.uniform, -1000, 1000)
+    toolbox.register("gene", random.uniform, -1, 1)
     toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.gene, n=getWeightLength(fgs, topology))
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("crossover", tools.cxBlend, alpha=0.5)
     toolbox.register("mutate", tools.mutGaussian, mu=0.0, sigma=1.0, indpb=0.8)
     toolbox.register("select", tools.selNSGA2)
 
-    pop: "list[creator.Individual]" = evolveInitialWeights(fgs, topology) #toolbox.population(n=POP_SIZE)
+    randomPop: "list[creator.Individual]" = toolbox.population(n=POP_SIZE)
+
+    alpha: float = 0.3
+    pop: "list[creator.Individual]" = random.sample(evolvedNewPop, int(POP_SIZE * alpha)) + random.sample(randomPop, int(POP_SIZE * (1 - alpha)))
 
     gen: int = 1
     for ind in pop:
-        ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology)
+        ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, trafficType)
 
     ars = [ind.fitness.values[0] for ind in pop]
     latencies = [ind.fitness.values[1] for ind in pop]
@@ -346,7 +360,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
                 del mutant.fitness.values
 
         for ind in offspring:
-            ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology)
+            ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, trafficType)
         pop[:] = toolbox.select(pop + offspring, k=POP_SIZE)
 
         hof.update(pop)
