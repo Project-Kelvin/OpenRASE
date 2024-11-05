@@ -103,3 +103,13 @@ class SFCEmulator(Subscriber):
 
         for thread in self._threads:
             thread.join()
+
+    def getSolver(self) -> Solver:
+        """
+        Get the solver.
+
+        Returns:
+            Solver: The solver.
+        """
+
+        return self._solver

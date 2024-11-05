@@ -34,7 +34,6 @@ if not os.path.exists(directory):
     os.makedirs(directory)
 
 topology: Topology = generateFatTreeTopology(4, 10, 2, 2048)
-trafficDesign: "list[TrafficDesign]" = []
 logFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy/experiments.csv"
 latencyDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency_data.csv"
 
@@ -48,9 +47,6 @@ def appendToLog(message: str) -> None:
 
     with open(logFilePath, "a", encoding="utf8") as log:
         log.write(f"{message}\n")
-
-with open(f"{configPath}/traffic-design.json", "r", encoding="utf8") as trafficFile:
-    trafficDesign = [json.load(trafficFile)]
 
 class FGR(FGRequestGenerator):
     """
@@ -90,6 +86,26 @@ class SFCSolver(Solver):
     def __init__(self, orchestrator: Orchestrator, trafficGenerator: TrafficGenerator) -> None:
         super().__init__(orchestrator, trafficGenerator)
 
+    def setTrafficDesign(self, trafficDesign: "list[TrafficDesign]") -> None:
+        """
+        Set the traffic design.
+
+        Parameters:
+            trafficDesign (list[TrafficDesign]): The traffic design.
+        """
+
+        self._trafficDesign: "list[TrafficDesign]" = trafficDesign
+
+    def setTrafficType(self, minimal: bool) -> None:
+        """
+        Set the traffic type.
+
+        Parameters:
+            minimal (bool): Whether to use the minimal traffic design.
+        """
+
+        self._trafficType: bool = minimal
+
     def generateEmbeddingGraphs(self) -> None:
         try:
             while self._requests.empty():
@@ -101,7 +117,7 @@ class SFCSolver(Solver):
 
             self._topology: Topology = self._orchestrator.getTopology()
 
-            evolveWeights(requests, self._orchestrator.sendEmbeddingGraphs, self._orchestrator.deleteEmbeddingGraphs, trafficDesign, self._trafficGenerator, self._topology)
+            evolveWeights(requests, self._orchestrator.sendEmbeddingGraphs, self._orchestrator.deleteEmbeddingGraphs, self._trafficDesign, self._trafficGenerator, self._topology, self._trafficType)
             TUI.appendToSolverLog(f"Finished experiment.")
             sleep(2)
         except Exception as e:
@@ -112,15 +128,26 @@ class SFCSolver(Solver):
 
 @click.command()
 @click.option("--headless", default=False, is_flag=True, help="If set, the emulator would run in headless mode.")
-def run(headless: bool) -> None:
+@click.option("--minimal", default=False, is_flag=True, help="If set, the emulator would use the minimal traffic design.")
+def run(headless: bool, minimal: bool) -> None:
     """
     Run the experiment.
 
     Parameters:
         headless (bool): Whether to run the emulator in headless mode.
+        minimal (bool): Whether to use the minimal traffic design.
     """
 
+
+    if minimal:
+        with open(f"{configPath}/traffic-design-min.json", "r", encoding="utf8") as trafficFile:
+            trafficDesign = [json.load(trafficFile)]
+    else:
+        with open(f"{configPath}/traffic-design.json", "r", encoding="utf8") as trafficFile:
+            trafficDesign = [json.load(trafficFile)]
     sfcEm: SFCEmulator = SFCEmulator(FGR, SFCSolver, headless)
+    sfcEm.getSolver().setTrafficDesign(trafficDesign)
+    sfcEm.getSolver().setTrafficType(minimal)
     try:
         sfcEm.startTest(topology, trafficDesign)
     except Exception as e:
