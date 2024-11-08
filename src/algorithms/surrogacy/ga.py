@@ -47,7 +47,7 @@ with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/la
 
 scorer: Scorer = Scorer()
 
-def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology, trafficType: bool) -> "tuple[float, float]":
+def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology, trafficType: bool, maxCPUDemand: float, maxMemoryDemand: float) -> "tuple[float, float]":
     """
     Evaluates the individual.
 
@@ -62,6 +62,8 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         trafficGenerator (TrafficGenerator): the traffic generator.
         topology (Topology): the topology.
         trafficType (bool): whether to use the minimal traffic design.
+        maxCPUDemand (float): maximum CPU demand.
+        maxMemoryDemand (float): maximum memory demand.
 
     Returns:
         tuple[float, float]: the fitness.
@@ -109,8 +111,6 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         #The resource demand of deployed VNFs exceed 1.5 times the resource capacity of at least 1 host.
         #This leads to servers crashing.
         #Penalty is applied to the latency and the egs are not deployed.
-        maxCPUDemand: int = 2
-        maxMemoryDemand: int = 5
         if maxCPU > maxCPUDemand or maxMemory > maxMemoryDemand:
             TUI.appendToSolverLog(f"Penalty because max CPU demand is {maxCPU} and max Memory demand is {maxMemory}.")
             latency = penaltyLatency * penalty * (maxCPU + maxMemory)
@@ -300,11 +300,13 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
 
 
     POP_SIZE: int = 100
-    NGEN: int = 10
+    NGEN: int = 50
     CXPB: float = 1.0
     MUTPB: float = 0.8
+    maxCPUDemand: int = 1
+    maxMemoryDemand: int = 5
 
-    evolvedPop: "list[creator.Individual]" = evolveInitialWeights(POP_SIZE, fgs, trafficDesign, topology)
+    evolvedPop: "list[creator.Individual]" = evolveInitialWeights(POP_SIZE, fgs, trafficDesign, topology, maxCPUDemand, maxMemoryDemand)
 
     creator.create("MaxARMinLatency", base.Fitness, weights=(1.0, -1.0))
     creator.create("Individual", list, fitness=creator.MaxARMinLatency)
@@ -326,12 +328,12 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
 
     randomPop: "list[creator.Individual]" = toolbox.population(n=POP_SIZE)
 
-    alpha: float = 0.3
+    alpha: float = 0.5
     pop: "list[creator.Individual]" = random.sample(evolvedNewPop, int(POP_SIZE * alpha)) + random.sample(randomPop, int(POP_SIZE * (1 - alpha)))
 
     gen: int = 1
     for ind in pop:
-        ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, trafficType)
+        ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, trafficType, maxCPUDemand, maxMemoryDemand)
 
     ars = [ind.fitness.values[0] for ind in pop]
     latencies = [ind.fitness.values[1] for ind in pop]
@@ -362,7 +364,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
                 del mutant.fitness.values
 
         for ind in offspring:
-            ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, trafficType)
+            ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, trafficType, maxCPUDemand, maxMemoryDemand)
         pop[:] = toolbox.select(pop + offspring, k=POP_SIZE)
 
         hof.update(pop)
@@ -370,8 +372,8 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
         ars = [ind.fitness.values[0] for ind in pop]
         latencies = [ind.fitness.values[1] for ind in pop]
 
-        with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/data.csv", "a", encoding="utf8") as topologyFile:
-            topologyFile.write(f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n")
+        with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/data.csv", "a", encoding="utf8") as dataFile:
+            dataFile.write(f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n")
 
         for ind in hof:
             TUI.appendToSolverLog(f"{gen}\t {ind.fitness.values[0]}\t {ind.fitness.values[1]}")

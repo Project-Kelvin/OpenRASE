@@ -58,6 +58,10 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         maxCPU: float = max([score["cpu"] for score in scores.values()])
         maxMemory: float = max([score["memory"] for score in scores.values()])
 
+        if acceptanceRatio < 0.75:
+            maxCPU = maxCPU + (penalty * penaltyScore)
+            maxMemory = maxMemory + (penalty * penaltyScore)
+
         return acceptanceRatio, maxCPU, maxMemory
     else:
         maxCPU: float = penalty * penaltyScore
@@ -153,7 +157,7 @@ def getWeights(individual: "list[float]", fgs: "list[EmbeddingGraph]", topology:
 
     return individual[0:vnfWeightUpper], individual[vnfWeightUpper:vnfBiasUpper], individual[vnfBiasUpper:linkWeightUpper], individual[linkWeightUpper:linkBiasUpper]
 
-def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesign: TrafficDesign, topology: Topology) -> "list[list[float]]":
+def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesign: TrafficDesign, topology: Topology, maxCPU: float, maxMemory: float) -> "list[list[float]]":
     """
     Evolves the weights of the Neural Network.
 
@@ -162,15 +166,17 @@ def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesig
         fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
         trafficDesign (TrafficDesign): the traffic design.
         topology (Topology): the topology.
+        maxCPU (float): The maximum CPU demand.
+        maxMemory (float): The maximum memory demand.
 
     Returns:
         list[list[float]]: the weights.
     """
 
     POP_SIZE: int = popSize
-    NGEN: int = 5
+    NGEN: int = 100
     CXPB: float = 1.0
-    MUTPB: float = 1.0
+    MUTPB: float = 0.8
 
     creator.create("MaxHosts", base.Fitness, weights=(1.0, -1.0, -1.0))
     creator.create("Individual", list, fitness=creator.MaxHosts)
@@ -181,8 +187,8 @@ def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesig
     toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.gene, n=getWeightLength(fgs, topology))
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("crossover", tools.cxBlend, alpha=0.5)
-    toolbox.register("mutate", tools.mutGaussian, mu=0.0, sigma=1.0, indpb=1.0)
-    toolbox.register("select", tools.selTournament)
+    toolbox.register("mutate", tools.mutGaussian, mu=0.0, sigma=1.0, indpb=0.3)
+    toolbox.register("select", tools.selNSGA2)
 
     pop: "list[creator.Individual]" = toolbox.population(n=POP_SIZE)
 
@@ -208,7 +214,7 @@ def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesig
             ind.fitness.values = evaluate(ind, fgs, gen, NGEN, trafficDesign, topology)
 
 
-        pop[:] = toolbox.select(pop + offspring, k=POP_SIZE, tournsize=10)
+        pop[:] = toolbox.select(pop + offspring, k=POP_SIZE)
 
         TUI.appendToSolverLog(f"Generation {gen} completed.")
         TUI.appendToSolverLog(f"Average AR is {np.mean([ind.fitness.values[0] for ind in pop])}. Max is {max([ind.fitness.values[0] for ind in pop])}. Min is {min([ind.fitness.values[0] for ind in pop])}.")
