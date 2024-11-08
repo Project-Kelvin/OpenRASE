@@ -43,15 +43,16 @@ with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/we
     weights.write("generation, w1, w2, w3, w4, w5, w6, w7, w8, w9, latency\n")
 
 with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "w", encoding="utf8") as latencyFile:
-    latencyFile.write("generation, cpu, memory, link, hosts, latency, ar\n")
+    latencyFile.write("generation,individual,sfc,cpu,avg_cpu,memory,avg_memory,link,latency,hosts,no_sfcs,ar\n")
 
 scorer: Scorer = Scorer()
 
-def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology, trafficType: bool, maxCPUDemand: float, maxMemoryDemand: float) -> "tuple[float, float]":
+def evaluate(index: int, individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology, trafficType: bool, maxCPUDemand: float, maxMemoryDemand: float) -> "tuple[float, float]":
     """
     Evaluates the individual.
 
     Parameters:
+        index (int): individual index.
         individual (list[float]): the individual.
         fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
         gen (int): the generation.
@@ -88,29 +89,22 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     penalty: float = gen/ngen
 
     maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
-    avgReqps: int = sum([td["target"] for td in trafficDesign[0]]) / len(trafficDesign[0])
     if len(egs) > 0:
-        #Validate EGs
-        scores: "dict[str, ResourceDemand]" = scorer.getHostScores(maxReqps, topology, egs, embedData)
+        # Validate EGs
+        data: "dict[str, dict[str, float]]" = {
+            eg["sfcID"]: {
+                "reqps": maxReqps
+            } for eg in egs
+        }
+        scorer.cacheData(data, egs)
+        scores: "dict[str, ResourceDemand]" = scorer.getHostScores(data, topology, embedData)
         maxCPU: float = max([score["cpu"] for score in scores.values()])
         maxMemory: float = max([score["memory"] for score in scores.values()])
 
-        avgScores: "dict[str, ResourceDemand]" = scorer.getHostScores(avgReqps, topology, egs, embedData)
-        avgCPU: float = np.mean([score["cpu"] for score in avgScores.values()])
-        avgMemory: float = np.mean([score["memory"] for score in avgScores.values()])
-
-        TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}")
-        TUI.appendToSolverLog(f"Max CPU is {maxCPU}. Max memory is {maxMemory}.")
-        TUI.appendToSolverLog(f"Average CPU is {avgCPU}. Average memory is {avgMemory}.")
-        TUI.appendToSolverLog(f"Deployed across {len(avgScores.values())}: {', '.join(avgScores.keys())}.")
-
-        linkScores: "dict[str, ResourceDemand]" = scorer.getLinkScores(avgReqps, topology, egs, embedLinks.getLinkData())
-        sumLink: float = np.sum([score for score in linkScores.values()])
-
-
-        #The resource demand of deployed VNFs exceed 1.5 times the resource capacity of at least 1 host.
-        #This leads to servers crashing.
-        #Penalty is applied to the latency and the egs are not deployed.
+        # Validate EGs
+        # The resource demand of deployed VNFs exceeds the resource capacity of at least 1 host.
+        # This leads to servers crashing.
+        # Penalty is applied to the latency and the egs are not deployed.
         if maxCPU > maxCPUDemand or maxMemory > maxMemoryDemand:
             TUI.appendToSolverLog(f"Penalty because max CPU demand is {maxCPU} and max Memory demand is {maxMemory}.")
             latency = penaltyLatency * penalty * (maxCPU + maxMemory)
@@ -125,40 +119,9 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         TUI.appendToSolverLog(f"Traffic Duration: {duration}s")
         TUI.appendToSolverLog(f"Waiting for {duration}s...")
 
-        step: int = 0
-        interval: int = 5
-        sleep(interval)
-        data: "list[dict[str, dict[str, Union[int, float]]]]" = []
-        while step < duration:
-            try:
-                sleep(interval)
-                trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
-                            f"{interval:.0f}s")
-
-                for sfc, trafficData in trafficData.items():
-                    requests: int = trafficData["httpReqs"]
-                    req: float = round(requests / interval)
-                    avgLatency: float = trafficData["averageLatency"]
-
-                    data.append({
-                        sfc: {
-                            "reqps": req,
-                            "latency": avgLatency
-                        }
-                    })
-
-                step += interval
-
-            except Exception as e:
-                TUI.appendToSolverLog(str(e), True)
+        sleep(duration)
 
         TUI.appendToSolverLog(f"Done waiting for {duration}s.")
-
-        #rows: "list[list[Union[str, float]]]" = getSFCScores(data, topology, egs, embedData, embedLinks.getLinkData())
-
-        #for row in rows:
-        #    with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
-        #        avgLatency.write(",".join([str(el) for el in row]) + "\n")
 
         anomalousDuration: int = 15 if not trafficType else 2
         trafficDuration: int = duration - anomalousDuration
@@ -167,6 +130,19 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
         latency: float = 0
         for _key, value in trafficData.items():
             latency += value["averageLatency"]
+
+        data: "dict[str, dict[str, float]]" = {
+            sfc: {
+                "reqps": trafficData[sfc]["httpReqs"] // trafficDuration,
+                "latency": trafficData[sfc]["averageLatency"]
+            } for sfc in trafficData
+        }
+
+        rows: "list[list[Union[str, float]]]" = scorer.getSFCScores(data, topology, egs, embedData, embedLinks.getLinkData())
+
+        for row in rows:
+            with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
+                avgLatency.write(f"{gen},{index}" + ",".join([str(el) for el in row]) + f"{len(scorer)},{len(egs)},{acceptanceRatio}\n")
 
         latency = latency / len(trafficData) if len(trafficData) > 0 else penaltyLatency
 
@@ -179,9 +155,6 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
 
         with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/weights.csv", "a", encoding="utf8") as weights:
             weights.write(weightRow)
-
-        with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
-            avgLatency.write(f"{gen}, {avgCPU}, {avgMemory}, {sumLink}, {len(avgScores)}, {latency}, {acceptanceRatio}\n")
 
         TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
         deleteEGs(egs)
@@ -300,7 +273,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
 
 
     POP_SIZE: int = 100
-    NGEN: int = 50
+    NGEN: int = 20
     CXPB: float = 1.0
     MUTPB: float = 0.8
     maxCPUDemand: int = 1
@@ -328,12 +301,12 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
 
     randomPop: "list[creator.Individual]" = toolbox.population(n=POP_SIZE)
 
-    alpha: float = 0.5
+    alpha: float = 0.9
     pop: "list[creator.Individual]" = random.sample(evolvedNewPop, int(POP_SIZE * alpha)) + random.sample(randomPop, int(POP_SIZE * (1 - alpha)))
 
     gen: int = 1
-    for ind in pop:
-        ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, trafficType, maxCPUDemand, maxMemoryDemand)
+    for i, ind in enumerate(pop):
+        ind.fitness.values = evaluate(i, ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, trafficType, maxCPUDemand, maxMemoryDemand)
 
     ars = [ind.fitness.values[0] for ind in pop]
     latencies = [ind.fitness.values[1] for ind in pop]
@@ -363,8 +336,8 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
                 toolbox.mutate(mutant)
                 del mutant.fitness.values
 
-        for ind in offspring:
-            ind.fitness.values = evaluate(ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, trafficType, maxCPUDemand, maxMemoryDemand)
+        for i, ind in enumerate(offspring):
+            ind.fitness.values = evaluate(i, ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, trafficType, maxCPUDemand, maxMemoryDemand)
         pop[:] = toolbox.select(pop + offspring, k=POP_SIZE)
 
         hof.update(pop)
