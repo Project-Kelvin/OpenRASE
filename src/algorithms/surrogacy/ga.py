@@ -43,7 +43,7 @@ with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/we
     weights.write("generation, w1, w2, w3, w4, w5, w6, w7, w8, w9, latency\n")
 
 with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "w", encoding="utf8") as latencyFile:
-    latencyFile.write("generation,individual,sfc,cpu,avg_cpu,memory,avg_memory,link,latency,hosts,no_sfcs,ar\n")
+    latencyFile.write("generation,individual,sfc,reqps,cpu,avg_cpu,memory,avg_memory,link,latency,sfc_hosts,total_hosts,no_sfcs,ar\n")
 
 scorer: Scorer = Scorer()
 
@@ -75,7 +75,6 @@ def evaluate(index: int, individual: "list[float]", fgs: "list[EmbeddingGraph]",
     df: pd.DataFrame = convertFGstoDF(copiedFGs, topology)
     newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
     egs, nodes, embedData = convertDFtoFGs(newDF, copiedFGs, topology)
-
     if len(egs) > 0:
         embedLinks: EmbedLinks = EmbedLinks(topology, egs,weights[2], weights[3])
         start: float = default_timer()
@@ -87,7 +86,6 @@ def evaluate(index: int, individual: "list[float]", fgs: "list[EmbeddingGraph]",
     acceptanceRatio: float = len(egs)/len(fgs)
     latency: int = 0
     penalty: float = gen/ngen
-
     maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
     if len(egs) > 0:
         # Validate EGs
@@ -100,7 +98,6 @@ def evaluate(index: int, individual: "list[float]", fgs: "list[EmbeddingGraph]",
         scores: "dict[str, ResourceDemand]" = scorer.getHostScores(data, topology, embedData)
         maxCPU: float = max([score["cpu"] for score in scores.values()])
         maxMemory: float = max([score["memory"] for score in scores.values()])
-
         # Validate EGs
         # The resource demand of deployed VNFs exceeds the resource capacity of at least 1 host.
         # This leads to servers crashing.
@@ -139,10 +136,9 @@ def evaluate(index: int, individual: "list[float]", fgs: "list[EmbeddingGraph]",
         }
 
         rows: "list[list[Union[str, float]]]" = scorer.getSFCScores(data, topology, egs, embedData, embedLinks.getLinkData())
-
         for row in rows:
             with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv", "a", encoding="utf8") as avgLatency:
-                avgLatency.write(f"{gen},{index}" + ",".join([str(el) for el in row]) + f"{len(scorer)},{len(egs)},{acceptanceRatio}\n")
+                avgLatency.write(f"{gen},{index}," + ",".join([str(el) for el in row]) + f",{len(scores)},{len(egs)},{acceptanceRatio}\n")
 
         latency = latency / len(trafficData) if len(trafficData) > 0 else penaltyLatency
 
@@ -280,7 +276,6 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
     maxMemoryDemand: int = 5
 
     evolvedPop: "list[creator.Individual]" = evolveInitialWeights(POP_SIZE, fgs, trafficDesign, topology, maxCPUDemand, maxMemoryDemand)
-
     creator.create("MaxARMinLatency", base.Fitness, weights=(1.0, -1.0))
     creator.create("Individual", list, fitness=creator.MaxARMinLatency)
 
@@ -303,7 +298,6 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
 
     alpha: float = 0.9
     pop: "list[creator.Individual]" = random.sample(evolvedNewPop, int(POP_SIZE * alpha)) + random.sample(randomPop, int(POP_SIZE * (1 - alpha)))
-
     gen: int = 1
     for i, ind in enumerate(pop):
         ind.fitness.values = evaluate(i, ind, fgs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, trafficType, maxCPUDemand, maxMemoryDemand)

@@ -95,11 +95,11 @@ class Scorer():
                     totalRequests: int = 0
 
                     if f"{source}-{destination}" in linkData:
-                        for key, data in linkData[f"{source}-{destination}"].items():
-                            totalRequests += data * data[key]["reqps"]
+                        for key, factor in linkData[f"{source}-{destination}"].items():
+                            totalRequests += factor * data[key]["reqps"]
                     elif f"{destination}-{source}" in linkData:
-                        for key, data in linkData[f"{destination}-{source}"].items():
-                            totalRequests += data * data[key]["reqps"]
+                        for key, factor in linkData[f"{destination}-{source}"].items():
+                            totalRequests += factor * data[key]["reqps"]
 
                     bandwidth: float = [link["bandwidth"] for link in topology["links"] if (link["source"] == source and link["destination"] == destination) or (link["source"] == destination and link["destination"] == source)][0]
 
@@ -173,16 +173,12 @@ class Scorer():
 
         rows: "list[list[Union[str, float]]]" = []
 
-        hostVNFs: "dict[str, int]" = {}
-        for host, sfcs in embeddingData.items():
-            hostVNFs[host] = sum([len(vnfs) for vnfs in sfcs.values()])
-
         for sfc, sfcData in data.items():
             totalCPUScore: float = 0
             totalMemoryScore: float = 0
             eg: EmbeddingGraph = [graph for graph in egs if graph["sfcID"] == sfc][0]
             row: "list[Union[str, float]]" = []
-            hosts: "list[ResourceDemand]" = []
+            hosts: "dict[str, ResourceDemand]" = {}
 
             def parseVNF(vnf: VNF, depth: int) -> None:
                 """
@@ -205,18 +201,19 @@ class Scorer():
 
                 totalCPUScore += vnfCPU
                 totalMemoryScore += vnfMemory
-                hosts.append(hostScores[[vnf["host"]["id"]]])
+                if vnf["host"]["id"] not in hosts:
+                    hosts.update({vnf["host"]["id"]: hostScores[vnf["host"]["id"]]})
 
             traverseVNF(eg["vnfs"], parseVNF, shouldParseTerminal=False)
-
             row.append(sfc)
             row.append(sfcData["reqps"])
             row.append(totalCPUScore)
-            row.append(sum([host["cpu"] for host in hosts])/len(hosts))
+            row.append(sum([host["cpu"] for host in hosts.values()])/len(hosts))
             row.append(totalMemoryScore)
-            row.append(sum([host["memory"] for host in hosts])/len(hosts))
+            row.append(sum([host["memory"] for host in hosts.values()])/len(hosts))
             row.append(linkScores[sfc])
             row.append(sfcData["latency"])
+            row.append(len(hosts))
             rows.append(row)
 
         return rows

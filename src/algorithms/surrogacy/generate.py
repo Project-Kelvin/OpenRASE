@@ -180,7 +180,7 @@ def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesig
     """
 
     POP_SIZE: int = popSize
-    NGEN: int = 50
+    NGEN: int = 1
     CXPB: float = 1.0
     MUTPB: float = 0.8
 
