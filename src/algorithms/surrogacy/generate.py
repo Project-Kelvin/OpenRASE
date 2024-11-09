@@ -46,15 +46,21 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
     egs, nodes, embedData = convertDFtoFGs(newDF, copiedFGs, topology)
 
-
     penaltyScore: float = 50
     acceptanceRatio: float = len(egs)/len(fgs)
     penalty: float = gen/ngen
 
     maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
     if len(egs) > 0:
-        #Validate EGs
-        scores: "dict[str, ResourceDemand]" = scorer.getHostScores(maxReqps, topology, egs, embedData)
+        # Validate EGs
+        data: "dict[str, dict[str, float]]" = {
+            eg["sfcID"]: {
+                "reqps": maxReqps
+            } for eg in egs
+        }
+
+        scorer.cacheData(data, egs)
+        scores: "dict[str, ResourceDemand]" = scorer.getHostScores(data, topology, embedData)
         maxCPU: float = max([score["cpu"] for score in scores.values()])
         maxMemory: float = max([score["memory"] for score in scores.values()])
 

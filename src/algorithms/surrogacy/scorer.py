@@ -42,7 +42,7 @@ class Scorer():
             otherCPU: float = 0
             otherMemory: float = 0
 
-            for sfc, vnfs in sfcs.ietms():
+            for sfc, vnfs in sfcs.items():
                 for vnf, depth in vnfs:
                     divisor: int = 2**(depth-1)
                     effectiveReqps: float = data[sfc]["reqps"] / divisor
@@ -98,7 +98,7 @@ class Scorer():
                         for key, data in linkData[f"{source}-{destination}"].items():
                             totalRequests += data * data[key]["reqps"]
                     elif f"{destination}-{source}" in linkData:
-                        for key, data in linkData[f"{destination}-{source}"].ietms():
+                        for key, data in linkData[f"{destination}-{source}"].items():
                             totalRequests += data * data[key]["reqps"]
 
                     bandwidth: float = [link["bandwidth"] for link in topology["links"] if (link["source"] == source and link["destination"] == destination) or (link["source"] == destination and link["destination"] == source)][0]
@@ -249,4 +249,4 @@ class Scorer():
             float: the score.
         """
 
-        return totalDemand / demand
+        return totalDemand / resource

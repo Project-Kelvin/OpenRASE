@@ -170,6 +170,10 @@ def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
             eg: EmbeddingGraph = copy.deepcopy(fg)
 
             egs.append(eg)
+        else:
+            for hosts in embeddingData.values():
+                if fg["sfcID"] in hosts:
+                    del hosts[fg["sfcID"]]
 
     return (egs, nodes, embeddingData)
 
