@@ -86,7 +86,7 @@ class Scorer():
                 links.extend(egLink["links"])
                 links.append(egLink["destination"]["id"])
                 divisor: int = egLink["divisor"]
-                reqps: float = data[eg["sfcID"]]["reqps"] / divisor
+                reqps: float = (data[eg["sfcID"]]["reqps"] / divisor) if eg["sfcID"] in data else 0
 
                 for linkIndex in range(len(links) - 1):
                     source: str = links[linkIndex]
@@ -96,10 +96,10 @@ class Scorer():
 
                     if f"{source}-{destination}" in linkData:
                         for key, factor in linkData[f"{source}-{destination}"].items():
-                            totalRequests += factor * data[key]["reqps"]
+                            totalRequests += factor * (data[key]["reqps"] if key in data else 0)
                     elif f"{destination}-{source}" in linkData:
                         for key, factor in linkData[f"{destination}-{source}"].items():
-                            totalRequests += factor * data[key]["reqps"]
+                            totalRequests += factor * (data[key]["reqps"] if key in data else 0)
 
                     bandwidth: float = [link["bandwidth"] for link in topology["links"] if (link["source"] == source and link["destination"] == destination) or (link["source"] == destination and link["destination"] == source)][0]
 
