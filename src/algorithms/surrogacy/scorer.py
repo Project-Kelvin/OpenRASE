@@ -196,11 +196,16 @@ class Scorer():
                 reqps: float = sfcData["reqps"] / divisor
                 demands: ResourceDemand = self._calibrate.getVNFResourceDemandForReqps(vnf["vnf"]["id"], reqps)
 
+                host: Host = [host for host in topology["hosts"] if host["id"] == vnf["host"]["id"]][0]
+                hostCPU: float = host["cpu"]
+                hostMemory: float = host["memory"]
+
                 vnfCPU: float = demands["cpu"]
                 vnfMemory: float = demands["memory"]
 
-                totalCPUScore += vnfCPU
-                totalMemoryScore += vnfMemory
+                totalCPUScore += self._getScore(vnfCPU, hostCPU)
+                totalMemoryScore += self._getScore(vnfMemory, hostMemory)
+
                 if vnf["host"]["id"] not in hosts:
                     hosts.update({vnf["host"]["id"]: hostScores[vnf["host"]["id"]]})
 
@@ -218,20 +223,19 @@ class Scorer():
 
         return rows
 
-    def _getScore(self, demand: float, totalVNFs: int, resource: float) -> float:
+    def _getScore(self, demand: float, resource: float) -> float:
         """
         Gets the resource score.
 
         Parameters:
             demand (float): the demand.
-            totalVNFs (int): the total VNFs.
             resource (float): the resource.
 
         Returns:
             float: the score.
         """
 
-        return demand / (resource / totalVNFs)
+        return demand / resource
 
     def _getLinkScore(self, demand: float, totalDemand: int, resource: float) -> float:
         """
