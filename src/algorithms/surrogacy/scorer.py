@@ -45,7 +45,7 @@ class Scorer():
             for sfc, vnfs in sfcs.items():
                 for vnf, depth in vnfs:
                     divisor: int = 2**(depth-1)
-                    effectiveReqps: float = data[sfc]["reqps"] / divisor
+                    effectiveReqps: float = (data[sfc]["reqps"] / divisor) if sfc in data else 0
                     demands: ResourceDemand = self._calibrate.getVNFResourceDemandForReqps(vnf, effectiveReqps)
 
                     vnfCPU: float = demands["cpu"]

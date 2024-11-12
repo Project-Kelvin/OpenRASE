@@ -275,7 +275,7 @@ def evolveWeights(fgs: "list[EmbeddingGraph]", sendEGs: "Callable[[list[Embeddin
     maxCPUDemand: int = 1
     maxMemoryDemand: int = 5
 
-    evolvedPop: "list[creator.Individual]" = evolveInitialWeights(POP_SIZE, fgs, trafficDesign, topology, maxCPUDemand, maxMemoryDemand)
+    evolvedPop: "list[creator.Individual]" = evolveInitialWeights(POP_SIZE, fgs, trafficDesign, topology)
     creator.create("MaxARMinLatency", base.Fitness, weights=(1.0, -1.0))
     creator.create("Individual", list, fitness=creator.MaxARMinLatency)
 

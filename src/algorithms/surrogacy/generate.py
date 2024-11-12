@@ -163,7 +163,7 @@ def getWeights(individual: "list[float]", fgs: "list[EmbeddingGraph]", topology:
 
     return individual[0:vnfWeightUpper], individual[vnfWeightUpper:vnfBiasUpper], individual[vnfBiasUpper:linkWeightUpper], individual[linkWeightUpper:linkBiasUpper]
 
-def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesign: TrafficDesign, topology: Topology, maxCPU: float, maxMemory: float) -> "list[list[float]]":
+def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesign: TrafficDesign, topology: Topology) -> "list[list[float]]":
     """
     Evolves the weights of the Neural Network.
 
@@ -180,7 +180,7 @@ def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesig
     """
 
     POP_SIZE: int = popSize
-    NGEN: int = 50
+    NGEN: int = 200
     CXPB: float = 1.0
     MUTPB: float = 0.8
 
