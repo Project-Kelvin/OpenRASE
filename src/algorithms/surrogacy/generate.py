@@ -19,11 +19,19 @@ import tensorflow as tf
 from shared.models.traffic_design import TrafficDesign
 from multiprocessing import Pool, cpu_count
 
-tf.get_logger().setLevel('ERROR')
+tf.get_logger().setLevel("ERROR")
 
 scorer: Scorer = Scorer()
 
-def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, ngen: int, trafficDesign: TrafficDesign, topology: Topology) -> "tuple[float, float, float]":
+
+def evaluate(
+    individual: "list[float]",
+    fgs: "list[EmbeddingGraph]",
+    gen: int,
+    ngen: int,
+    trafficDesign: TrafficDesign,
+    topology: Topology,
+) -> "tuple[float, float, float]":
     """
     Evaluates the individual.
 
@@ -40,26 +48,28 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
     """
 
     copiedFGs: "list[EmbeddingGraph]" = [deepcopy(fg) for fg in fgs]
-    weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(individual, copiedFGs, topology)
+    weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(
+        individual, copiedFGs, topology
+    )
     df: pd.DataFrame = convertFGstoDF(copiedFGs, topology)
     newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
     egs, _nodes, embedData = convertDFtoFGs(newDF, copiedFGs, topology)
 
     penaltyScore: float = 50
-    acceptanceRatio: float = len(egs)/len(fgs)
-    penalty: float = gen/ngen
+    acceptanceRatio: float = len(egs) / len(fgs)
+    penalty: float = gen / ngen
 
     maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
     if len(egs) > 0:
         # Validate EGs
         data: "dict[str, dict[str, float]]" = {
-            eg["sfcID"]: {
-                "reqps": maxReqps
-            } for eg in egs
+            eg["sfcID"]: {"reqps": maxReqps} for eg in egs
         }
 
         scorer.cacheData(data, egs)
-        scores: "dict[str, ResourceDemand]" = scorer.getHostScores(data, topology, embedData)
+        scores: "dict[str, ResourceDemand]" = scorer.getHostScores(
+            data, topology, embedData
+        )
         maxCPU: float = max([score["cpu"] for score in scores.values()])
         maxMemory: float = max([score["memory"] for score in scores.values()])
 
@@ -70,7 +80,14 @@ def evaluate(individual: "list[float]", fgs: "list[EmbeddingGraph]",  gen: int, 
 
         return acceptanceRatio, maxCPU, maxMemory
 
-def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesign: TrafficDesign, topology: Topology) -> "list[list[float]]":
+
+def evolveInitialWeights(
+    popSize: int,
+    fgs: "list[EmbeddingGraph]",
+    trafficDesign: TrafficDesign,
+    topology: Topology,
+    minAR: float,
+) -> "list[list[float]]":
     """
     Evolves the weights of the Neural Network.
 
@@ -81,6 +98,7 @@ def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesig
         topology (Topology): the topology.
         maxCPU (float): The maximum CPU demand.
         maxMemory (float): The maximum memory demand.
+        minAR (float): The minimum acceptance ratio.
 
     Returns:
         list[list[float]]: the weights.
@@ -93,18 +111,23 @@ def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesig
     NGEN: int = 200
     CXPB: float = 1.0
     MUTPB: float = 1.0
-    minAR: float = 0.2
     maxCPU: float = 1
     maxMemory: float = 5
-    minInd: int = POP_SIZE//4
+    minInd: int = POP_SIZE // 4
 
     creator.create("MaxHosts", base.Fitness, weights=(1.0, -1.0, -1.0))
     creator.create("Individual", list, fitness=creator.MaxHosts)
 
-    toolbox:base.Toolbox = base.Toolbox()
+    toolbox: base.Toolbox = base.Toolbox()
 
     toolbox.register("gene", random.uniform, -1, 1)
-    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.gene, n=getWeightLength(fgs, topology))
+    toolbox.register(
+        "individual",
+        tools.initRepeat,
+        creator.Individual,
+        toolbox.gene,
+        n=getWeightLength(fgs, topology),
+    )
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("crossover", tools.cxBlend, alpha=0.5)
     toolbox.register("mutate", tools.mutGaussian, mu=0.0, sigma=1.0, indpb=0.9)
@@ -114,7 +137,20 @@ def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesig
 
     gen: int = 1
     pool: Any = Pool(processes=cpu_count())
-    results: tuple[float, float, float] = pool.starmap(evaluate, [(ind, fgs, gen, NGEN, trafficDesign, topology,) for ind in pop])
+    results: tuple[float, float, float] = pool.starmap(
+        evaluate,
+        [
+            (
+                ind,
+                fgs,
+                gen,
+                NGEN,
+                trafficDesign,
+                topology,
+            )
+            for ind in pop
+        ],
+    )
 
     for ind, result in zip(pop, results):
         ind.fitness.values = result
@@ -156,18 +192,34 @@ def evolveInitialWeights(popSize: int, fgs: "list[EmbeddingGraph]", trafficDesig
 
         pop[:] = toolbox.select(pop + offspring, k=POP_SIZE)
         alpha: float = 1.0
-        pop[:] = random.sample(pop, int(alpha * POP_SIZE)) + random.sample(offspring, int((1 - alpha) * POP_SIZE))
+        pop[:] = random.sample(pop, int(alpha * POP_SIZE)) + random.sample(
+            offspring, int((1 - alpha) * POP_SIZE)
+        )
 
-        ar1 = [ind for ind in pop if ind.fitness.values[0] >= minAR and ind.fitness.values[1] < maxCPU and ind.fitness.values[2] < maxMemory]
+        ar1 = [
+            ind
+            for ind in pop
+            if ind.fitness.values[0] >= minAR
+            and ind.fitness.values[1] < maxCPU
+            and ind.fitness.values[2] < maxMemory
+        ]
 
         averageAR = np.mean([ind.fitness.values[0] for ind in pop])
         averageCPU = np.mean([ind.fitness.values[1] for ind in pop])
 
         TUI.appendToSolverLog(f"Generation {gen} completed.")
-        TUI.appendToSolverLog(f"Average AR is {averageAR}. Max is {max([ind.fitness.values[0] for ind in pop])}. Min is {min([ind.fitness.values[0] for ind in pop])}.")
-        TUI.appendToSolverLog(f"{len(ar1)} individuals have AR >= {minAR} and CPU <= {maxCPU}.")
-        TUI.appendToSolverLog(f"Average max CPU is {averageCPU}. Max is {max([ind.fitness.values[1] for ind in pop])}. Min is {min([ind.fitness.values[1] for ind in pop])}.")
-        TUI.appendToSolverLog(f"Average max memory is {np.mean([ind.fitness.values[2] for ind in pop])}. Max is {max([ind.fitness.values[2] for ind in pop])}. Min is {min([ind.fitness.values[2] for ind in pop])}.")
+        TUI.appendToSolverLog(
+            f"Average AR is {averageAR}. Max is {max([ind.fitness.values[0] for ind in pop])}. Min is {min([ind.fitness.values[0] for ind in pop])}."
+        )
+        TUI.appendToSolverLog(
+            f"{len(ar1)} individuals have AR >= {minAR} and CPU <= {maxCPU}."
+        )
+        TUI.appendToSolverLog(
+            f"Average max CPU is {averageCPU}. Max is {max([ind.fitness.values[1] for ind in pop])}. Min is {min([ind.fitness.values[1] for ind in pop])}."
+        )
+        TUI.appendToSolverLog(
+            f"Average max memory is {np.mean([ind.fitness.values[2] for ind in pop])}. Max is {max([ind.fitness.values[2] for ind in pop])}. Min is {min([ind.fitness.values[2] for ind in pop])}."
+        )
         gen = gen + 1
 
     del creator.Individual

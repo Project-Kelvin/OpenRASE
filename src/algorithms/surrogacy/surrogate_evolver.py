@@ -27,6 +27,7 @@ from utils.tui import TUI
 
 scorer: Scorer = Scorer()
 
+
 def evaluate(
     individual: "list[float]",
     fgs: "list[EmbeddingGraph]",
@@ -98,8 +99,7 @@ def evaluate(
         avg: float = reqs / time
 
         data: "dict[str, dict[str, float]]" = {
-            eg["sfcID"]: {"reqps": avg, "latency": 0}
-            for eg in egs
+            eg["sfcID"]: {"reqps": avg, "latency": 0.0} for eg in egs
         }
 
         rows: "list[list[Union[str, float]]]" = scorer.getSFCScores(
@@ -121,7 +121,7 @@ def evaluate(
                 "link",
                 "latency",
                 "sfc_hosts",
-                "no_sfcs"
+                "no_sfcs",
             ],
         )
 
@@ -158,6 +158,8 @@ def evolveUsingSurrogate(
     trafficDesign: TrafficDesign,
     topology: Topology,
     popSize: int,
+    minAR: float,
+    maxLatency: int,
 ) -> "list[creator.Individual]":
     """
     Evolves the weights of the Neural Network.
@@ -167,12 +169,16 @@ def evolveUsingSurrogate(
         trafficDesign (TrafficDesign): the traffic design.
         topology (Topology): the topology.
         popSize (int): the population size.
+        minAR (float): the minimum acceptance ratio.
+        maxLatency (int): the maximum latency.
 
     Returns:
         None
     """
 
-    TUI.appendToSolverLog("Starting the evolution of the weights using the surrogate model.")
+    TUI.appendToSolverLog(
+        "Starting the evolution of the weights using the surrogate model."
+    )
 
     POP_SIZE: int = 100
     NGEN: int = 5
@@ -180,11 +186,9 @@ def evolveUsingSurrogate(
     MUTPB: float = 0.8
     maxCPUDemand: int = 1
     maxMemoryDemand: int = 5
-    minAR: float = 0.3
-    maxLatency: int = 1500
 
     evolvedPop: "list[creator.Individual]" = evolveInitialWeights(
-        POP_SIZE, fgs, trafficDesign, topology
+        POP_SIZE, fgs, trafficDesign, topology, minAR
     )
     creator.create("MaxARMinLatency", base.Fitness, weights=(1.0, -1.0))
     creator.create("Individual", list, fitness=creator.MaxARMinLatency)
@@ -242,13 +246,16 @@ def evolveUsingSurrogate(
     ars = [ind.fitness.values[0] for ind in pop]
     latencies = [ind.fitness.values[1] for ind in pop]
 
-    TUI.appendToSolverLog(f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n")
+    TUI.appendToSolverLog(
+        f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n"
+    )
 
     hof = tools.ParetoFront()
     hof.update(pop)
 
+    selInds: "list[creator.Individual]" = []
     gen = gen + 1
-    while gen <= NGEN:
+    while len(selInds) < popSize:
         offspring: "list[creator.Individual]" = list(map(toolbox.clone, pop))
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
             if random.random() < CXPB:
@@ -288,7 +295,9 @@ def evolveUsingSurrogate(
         ars = [ind.fitness.values[0] for ind in pop]
         latencies = [ind.fitness.values[1] for ind in pop]
 
-        TUI.appendToSolverLog(f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n")
+        TUI.appendToSolverLog(
+            f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n"
+        )
 
         for ind in hof:
             TUI.appendToSolverLog(
@@ -297,13 +306,13 @@ def evolveUsingSurrogate(
 
         gen = gen + 1
 
-    selInds: "list[creator.Individual]" = [ind for ind in pop if ind.fitness.values[0] >= minAR and ind.fitness.values[1] <= maxLatency]
-    if len(selInds) > popSize:
-        selectedInds: "list[creator.Individual]" = toolbox.select(selInds, popSize)
-    else:
-        selectedInds = selInds
+        selInds = [
+            ind
+            for ind in pop
+            if ind.fitness.values[0] >= minAR and ind.fitness.values[1] <= maxLatency
+        ]
 
     del creator.Individual
     del creator.MaxARMinLatency
 
-    return selectedInds
+    return selInds
