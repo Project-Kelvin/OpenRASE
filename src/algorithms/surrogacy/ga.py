@@ -65,7 +65,7 @@ with open(
     encoding="utf8",
 ) as latencyFile:
     latencyFile.write(
-        "generation,individual,sfc,reqps,cpu,avg_cpu,memory,avg_memory,link,latency,sfc_hosts,total_hosts,no_sfcs,ar\n"
+        "generation,individual,sfc,reqps,cpu,avg_cpu,memory,avg_memory,link,latency,sfc_hosts,no_sfcs,var,q3,q1,q2,max,min,total_hosts,ar\n"
     )
 
 scorer: Scorer = Scorer()
@@ -225,6 +225,15 @@ def evaluate(
                 ]
 
             for row in rows:
+                sfc: str = row[0]
+                row[7] = trafficData[sfc]["averageLatency"]
+                row.append(trafficData[sfc]["variance"])
+                row.append(trafficData[sfc]["q3"])
+                row.append(trafficData[sfc]["q1"])
+                row.append(trafficData[sfc]["q2"])
+                row.append(trafficData[sfc]["max"])
+                row.append(trafficData[sfc]["min"])
+
                 with open(
                     f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv",
                     "a",
@@ -233,7 +242,7 @@ def evaluate(
                     avgLatency.write(
                         f"{gen},{index},"
                         + ",".join([str(el) for el in row])
-                        + f",{len(scores)},{len(egs)},{acceptanceRatio}\n"
+                        + f",{len(scores)},{acceptanceRatio}\n"
                     )
 
             latency = (
