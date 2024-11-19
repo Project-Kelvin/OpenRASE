@@ -9,4 +9,9 @@ class TrafficData(dict):
 
     httpReqs = int
     averageLatency = float
-
+    variance= float
+    q2 = float
+    q3 = float
+    q1 = float
+    max = float
+    min = float

@@ -8,6 +8,7 @@ from threading import Thread
 from time import sleep
 from typing import Any
 from jinja2 import Template, TemplateSyntaxError
+import numpy as np
 from shared.models.config import Config
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.traffic_design import TrafficDesign
@@ -39,7 +40,6 @@ class TrafficGenerator(Subscriber):
     Class that generates traffic.
     """
 
-
     def __init__(self) -> None:
         """
         Constructor for the class.
@@ -52,7 +52,6 @@ class TrafficGenerator(Subscriber):
 
         NotificationSystem.subscribe(EMBEDDING_GRAPH_DEPLOYED, self)
         NotificationSystem.subscribe(EMBEDDING_GRAPH_DELETED, self)
-
 
     def startParentContainer(self) -> None:
         """
@@ -104,7 +103,6 @@ class TrafficGenerator(Subscriber):
 
         TUI.appendToLog("Traffic generator parent container started.")
         self._parentContainerStarted = True
-
 
     def setDesign(self, design: "list[TrafficDesign]") -> None:
         """
@@ -233,11 +231,12 @@ class TrafficGenerator(Subscriber):
             f' |> filter(fn: (r) => r["expected_response"] == "true")')
 
         data: "dict[str, TrafficData]" = {}
-
+        averages: "dict[str, list[float]]" = {}
         for table in tables:
             for record in table.records:
                 measurement: str = record.values["_measurement"]
                 sfc: str = record.values["sfcID"]
+
                 if sfc != "" or sfc is not None:
                     if sfc not in data:
                         data[sfc] = TrafficData(httpReqs = 0, averageLatency = 0)
@@ -245,9 +244,19 @@ class TrafficGenerator(Subscriber):
                         data[sfc]["httpReqs"] += int(record.values["_value"])
                     elif measurement == HTTP_REQ_DURATION:
                         data[sfc]["averageLatency"] += float(record.values["_value"])
+                        if sfc in averages:
+                            averages[sfc].append(float(record.values["_value"]))
+                        else:
+                            averages[sfc] = [float(record.values["_value"])]
 
         for _key, value in data.items():
             value["averageLatency"] = value["averageLatency"] / value["httpReqs"] if value["averageLatency"] != 0 or value["httpReqs"] != 0 else 0
+            value["variance"] = np.var(averages[_key]) if _key in averages else 0
+            value["q3"] = np.quantile(averages[_key], 0.75)
+            value["q1"] = np.quantile(averages[_key], 0.25)
+            value["q2"] = np.quantile(averages[_key], 0.50)
+            value["max"] = np.max(averages[_key])
+            value["min"] = np.min(averages[_key])
 
         return data
 
