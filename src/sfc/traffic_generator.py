@@ -249,14 +249,14 @@ class TrafficGenerator(Subscriber):
                         else:
                             averages[sfc] = [float(record.values["_value"])]
 
-        for _key, value in data.items():
+        for key, value in data.items():
             value["averageLatency"] = value["averageLatency"] / value["httpReqs"] if value["averageLatency"] != 0 or value["httpReqs"] != 0 else 0
-            value["variance"] = np.var(averages[_key]) if _key in averages else 0
-            value["q3"] = np.quantile(averages[_key], 0.75)
-            value["q1"] = np.quantile(averages[_key], 0.25)
-            value["q2"] = np.quantile(averages[_key], 0.50)
-            value["max"] = np.max(averages[_key])
-            value["min"] = np.min(averages[_key])
+            value["variance"] = np.var(averages[key]) if key in averages else 0
+            value["q3"] = np.quantile(averages[key], 0.75) if key in averages else 0
+            value["q1"] = np.quantile(averages[key], 0.25) if key in averages else 0
+            value["q2"] = np.quantile(averages[key], 0.50) if key in averages else 0
+            value["max"] = np.max(averages[key]) if key in averages else 0
+            value["min"] = np.min(averages[key]) if key in averages else 0
 
         return data
 
