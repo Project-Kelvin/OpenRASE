@@ -1,42 +1,6 @@
 [
     {
         "duration": "2m",
-        "target": 20
-    },
-    {
-        "duration": "2m",
-        "target": 40
-    },
-    {
-        "duration": "2m",
-        "target": 60
-    },
-    {
-        "duration": "2m",
-        "target": 80
-    },
-    {
-        "duration": "2m",
-        "target": 100
-    },
-    {
-        "duration": "2m",
-        "target": 120
-    },
-    {
-        "duration": "2m",
-        "target": 140
-    },
-    {
-        "duration": "2m",
-        "target": 160
-    },
-    {
-        "duration": "2m",
-        "target": 180
-    },
-    {
-        "duration": "2m",
-        "target": 200
+        "target": 400
     }
 ]
