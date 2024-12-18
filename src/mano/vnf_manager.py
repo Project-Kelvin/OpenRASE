@@ -168,24 +168,18 @@ class VNFManager():
             vnfName: str = vnf["name"]
 
             if host["id"] != SERVER:
-                attempt: int = 0
-                isDeleted: bool = False
+                try:
+                    dindClient: DockerClient = connectToDind(f"{host['id']}Node")
 
-                while not isDeleted and attempt < 3:
-                    try:
-                        dindClient: DockerClient = connectToDind(f"{host['id']}Node")
+                    TUI.appendToLog(f"    Deleting {vnfName}.")
+                    dindClient.containers.get(vnfName).stop()
+                    dindClient.containers.get(vnfName).remove(force=True)
 
-                        TUI.appendToLog(f"    Deleting {vnfName}.")
-                        dindClient.containers.get(vnfName).stop()
-                        dindClient.containers.get(vnfName).remove(force=True)
-                        isDeleted = True
-                    except Exception as e:
-                        TUI.appendToLog(f"    Attempt {attempt+1}: Error deleting {vnfName}: {e}.\nRetrying in 5s...", True)
-                        attempt += 1
-                        sleep(5)
+                    with self._deleteLocks[host["id"]]:
+                        dindClient.volumes.prune()
+                except Exception as e:
+                    TUI.appendToLog(f"    Error deleting {vnfName}: {e}", True)
 
-                with self._deleteLocks[host["id"]]:
-                    dindClient.volumes.prune()
 
         def traverseCallback(vnfs: VNF, _depth: int) -> None:
             """

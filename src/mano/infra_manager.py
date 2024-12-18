@@ -4,7 +4,6 @@ Defines the class that corresponds to the Virtualized Infrastructure Manager in 
 
 from ipaddress import IPv4Address, IPv4Network
 from threading import Thread
-from time import sleep
 from typing import Any, Tuple
 import requests
 from shared.constants.embedding_graph import TERMINAL
@@ -18,12 +17,14 @@ from mininet.net import Containernet
 from mininet.cli import CLI
 from constants.notification import TOPOLOGY_INSTALLED
 from constants.topology import SERVER, SFCC
-from constants.container import CPU_PERIOD, DIND_IMAGE, SERVER_IMAGE, SFCC_IMAGE, SFF_IMAGE, SFCC_CMD, SERVER_CMD, SFF_CMD
+from constants.container import SERVER_IMAGE, SFCC_IMAGE, SFF_IMAGE, SFCC_CMD, SERVER_CMD, SFF_CMD
+from utils.liveness_checker import checkLiveness
 from mano.notification_system import NotificationSystem
 from mano.sdn_controller import SDNController
 from mano.telemetry import Telemetry
 from utils.container import getContainerIP, waitTillContainerReady
 from utils.embedding_graph import traverseVNF
+from utils.host import addHostNode
 from utils.tui import TUI
 
 
@@ -55,6 +56,7 @@ class InfraManager():
         self._hostMACs: "dict[str, str]" = {}
         self._linkedPorts: "dict[str, tuple[int, int]]" = {}
         self._gatewayMACs: "dict[str, str]" = {}
+        self._stopLivenessChecker: "list[bool]" = [False]
 
     def installTopology(self, topology: Topology) -> None:
         """
@@ -125,20 +127,7 @@ class InfraManager():
                     ]
                 )
 
-                hostNode: Host = self._net.addDocker(
-                    f"{host['id']}Node",
-                    ip=f"{getConfig()['sff']['network1']['hostIP']}/{getConfig()['sff']['network1']['mask']}",
-                    cpu_quota=int(host["cpu"] * CPU_PERIOD if "cpu" in host else -1),
-                    mem_limit=f"{host['memory']}mb" if "memory" in host and host["memory"] is not None else None,
-                    memswap_limit=f"{host['memory']}mb" if "memory" in host and host["memory"] is not None else None,
-                    dimage=DIND_IMAGE,
-                    privileged=True,
-                    dcmd="dockerd",
-                    volumes=[
-                        config["repoAbsolutePath"]
-                        + "/docker/files:/home/docker/files"
-                    ]
-                )
+                hostNode: Host = addHostNode(host, self._net)
                 hostNodes.append(hostNode)
                 self._net.addLink(sff, hostNode)
 
@@ -204,7 +193,7 @@ class InfraManager():
                 thread.join()
 
             TUI.appendToLog("Topology installed successfully!")
-
+            checkLiveness(self._net, self._topology, self._stopLivenessChecker)
             NotificationSystem.publish(TOPOLOGY_INSTALLED)
         except Exception as e:
             TUI.appendToLog(f"Error: {str(e)}", True)
@@ -315,6 +304,7 @@ class InfraManager():
         """
 
         self._net.stop()
+        self._stopLivenessChecker[0] = True
 
     def startCLI(self) -> None:
         """
