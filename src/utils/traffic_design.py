@@ -5,13 +5,14 @@ This defines utils associated with traffic design.
 from shared.models.traffic_design import TrafficDesign
 
 
-def generateTrafficDesign(dataFile: str, scale: int = 1) -> "TrafficDesign":
+def generateTrafficDesign(dataFile: str, scale: float = 1.5, hourDuration: float = 4) -> "TrafficDesign":
     """
     Generate the Traffic Design.
 
     Parameters:
         dataFile (str): the CSV data file.
-        scale (int): the scale factor.
+        scale (float): the scale factor.
+        hourDuration (float): the simulated duration of the hour in seconds.
 
     Returns:
         TrafficDesign: the Traffic Design.
@@ -24,12 +25,12 @@ def generateTrafficDesign(dataFile: str, scale: int = 1) -> "TrafficDesign":
         for line in file:
             numOfReqs: int = int(line)
             # scale by 1
-            numOfReqs = numOfReqs * scale
-            #Considering an hour is equal to 4 seconds
-            rate: int = numOfReqs // 4
+            numOfReqs = round(numOfReqs * scale)
+            #Considering an hour is equal to `hourDuration` seconds
+            rate: int = numOfReqs // hourDuration
             design.append({
                 "target": rate,
-                "duration": '4s'
+                "duration": f'{hourDuration}s'
             })
 
     return design
