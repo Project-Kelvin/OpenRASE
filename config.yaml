@@ -12,8 +12,8 @@ sff:
   port: 80
 
 k6:
-  vus: 10
-  maxVus: 500
+  vus: 100
+  maxVus: 5000
   timeUnit: 1s
   startRate: 0
   executor: ramping-arrival-rate
@@ -28,7 +28,7 @@ sfcClassifier:
   port: 80
 
 general:
-  requestTimeout: 60
+  requestTimeout: 120
 
 repoAbsolutePath: "/home/thivi/OpenRASE"
 
@@ -52,6 +52,7 @@ vnfs:
     - "ids"
     - "dpi"
     - "ha"
+    - "dummy"
   sharedVolumes:
     waf:
       - "/home/docker/files/waf/shared/Caddyfile:/etc/caddy/Caddyfile"
@@ -74,5 +75,7 @@ vnfs:
       - "/home/docker/files/lb/shared/Caddyfile:/etc/caddy/Caddyfile"
     tm:
       - "/home/docker/files/tm/shared/node-logs:/home/OpenRASE/apps/vnf_proxy/node-logs"
+    dummy:
+      - "/home/docker/files/dummy/shared/node-logs:/home/OpenRASE/apps/vnf_proxy/node-logs"
   splitters:
     - "lb"
