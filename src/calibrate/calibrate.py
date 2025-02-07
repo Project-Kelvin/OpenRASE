@@ -359,7 +359,7 @@ class Calibrate:
                                     else 0
                                 )
                                 averageLatency: float = (
-                                    trafficData[eg["sfcID"]]["averageLatency"]
+                                    trafficData[eg["sfcID"]]["q2"]
                                     if eg["sfcID"] in trafficData
                                     else 0
                                 )
