@@ -303,8 +303,8 @@ class InfraManager():
         Stop the network.
         """
 
-        self._net.stop()
         self._stopLivenessChecker[0] = True
+        self._net.stop()
 
     def startCLI(self) -> None:
         """
