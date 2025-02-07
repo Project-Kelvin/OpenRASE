@@ -42,7 +42,7 @@ def clean(logs: bool, docker: bool, prune: bool, stop: bool) -> None:
 
     def stopRegistry() -> None:
         """
-        Thsi function stops and removes the SFC Docker registry. 
+        This function stops and removes the SFC Docker registry.
         """
 
         print("Stopping and removing the SFC Registry.")
@@ -51,7 +51,6 @@ def clean(logs: bool, docker: bool, prune: bool, stop: bool) -> None:
             client.containers.get(SFC_REGISTRY).stop()
         except errors.NotFound as e:
             print(f"SFC registry is not running.\n\t{str(e)}")
-
 
     def cleanLogs() -> None:
         """
@@ -71,6 +70,9 @@ def clean(logs: bool, docker: bool, prune: bool, stop: bool) -> None:
         removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/files/node-sfcc/shared/node-logs")
         removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/files/node-sff/shared/node-logs")
         removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/files/tm/shared/node-logs")
+        removeFiles(
+            f"{getConfig()['repoAbsolutePath']}/docker/files/dummy/shared/node-logs"
+        )
 
     def cleanDocker() -> None:
         """
