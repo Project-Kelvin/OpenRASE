@@ -8,9 +8,11 @@ RUN apk add --update --no-cache \
     busybox-extras \
     iproute2 \
     iputils \
-    curl
+    curl \
+    libstdc++
 
 RUN curl -fsSL https://unofficial-builds.nodejs.org/download/release/v22.2.0/node-v22.2.0-linux-x64-musl.tar.gz | tar -xz -C /usr/local --strip-components=1
+RUN npm install -g corepack@latest
 RUN corepack enable pnpm
 RUN npm install -g pm2
 

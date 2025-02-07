@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y \
     iproute2 \
     curl
 
-RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+RUN curl -fsSL https://deb.nodesource.com/setup_23.x | bash -
 RUN apt-get install -y nodejs
 
 RUN corepack enable pnpm
