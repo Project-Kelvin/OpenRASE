@@ -10,10 +10,11 @@ sff:
     hostIP: "172.16.0.1"
     mask: 24
   port: 80
+  txPort: 8080
 
 k6:
   vus: 100
-  maxVus: 5000
+  maxVus: 500000
   timeUnit: 1s
   startRate: 0
   executor: ramping-arrival-rate

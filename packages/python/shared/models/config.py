@@ -22,6 +22,7 @@ class SFF(dict):
     network1: SFFNetwork
     network2: SFFNetwork
     port: int
+    txPort: int
 
 
 class Server(dict):

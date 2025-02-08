@@ -68,7 +68,10 @@ def clean(logs: bool, docker: bool, prune: bool, stop: bool) -> None:
         removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/files/ips/shared/node-logs")
         removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/files/influxdb/data")
         removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/files/node-sfcc/shared/node-logs")
-        removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/files/node-sff/shared/node-logs")
+        removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/files/node-sff-rx/shared/node-logs")
+        removeFiles(
+            f"{getConfig()['repoAbsolutePath']}/docker/files/node-sff-tx/shared/node-logs"
+        )
         removeFiles(f"{getConfig()['repoAbsolutePath']}/docker/files/tm/shared/node-logs")
         removeFiles(
             f"{getConfig()['repoAbsolutePath']}/docker/files/dummy/shared/node-logs"

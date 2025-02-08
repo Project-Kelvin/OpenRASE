@@ -24,7 +24,7 @@ from mano.sdn_controller import SDNController
 from mano.telemetry import Telemetry
 from utils.container import getContainerIP, waitTillContainerReady
 from utils.embedding_graph import traverseVNF
-from utils.host import addHostNode
+from utils.host import addHostNode, addSFF, addSFFEnds
 from utils.tui import TUI
 
 
@@ -110,25 +110,15 @@ class InfraManager():
             self._hosts[SERVER] = server
 
             hostNodes: "list[Host]" = []
+            sffs: "list[Host]" = []
 
             TUI.appendToLog("  Installing hosts:")
             for host in topology['hosts']:
                 TUI.appendToLog(f"    Installing host {host['id']}.")
-                sffDir: str = SFF_IMAGE.split("/")[1].split(":")[0]
-                sff: Host = self._net.addDocker(
-                    host['id'],
-                    ip=f"{getConfig()['sff']['network1']['sffIP']}/{getConfig()['sff']['network1']['mask']}",
-                    dimage=SFF_IMAGE,
-                    dcmd=SFF_CMD,
-                    defaultRoute=f"dev {host['id']}-eth1",
-                    volumes=[
-                        config["repoAbsolutePath"]
-                        + f"/docker/files/{sffDir}/shared/node-logs:/home/OpenRASE/apps/sff/node-logs"
-                    ]
-                )
-
+                sff: Host = addSFF(host, self._net)
                 hostNode: Host = addHostNode(host, self._net)
                 hostNodes.append(hostNode)
+                sffs.append(sff)
                 self._net.addLink(sff, hostNode)
 
                 self._hosts[host["id"]] = sff
@@ -182,14 +172,31 @@ class InfraManager():
                     f"ip addr add {getConfig()['sff']['network2']['hostIP']}/{getConfig()['sff']['network2']['mask']} dev {hostNode.name}-eth0")
 
             TUI.appendToLog("Waiting till host containers are ready.")
-            # Notify
             threads: "list[Thread]" = []
             for host in hostNodes:
+                TUI.appendToLog(f"  Waiting for {host.name} to be ready.")
                 thread: Thread = Thread(target=waitTillContainerReady, args=(host.name,))
                 thread.start()
                 threads.append(thread)
 
+            for sff in sffs:
+                TUI.appendToLog(f"  Waiting for {sff} to be ready.")
+                thread: Thread = Thread(target=waitTillContainerReady, args=(sff.name,))
+                thread.start()
+                threads.append(thread)
+
             for thread in threads:
+                thread.join()
+
+            TUI.appendToLog("Initiating RX and TX ends of SFF.")
+
+            sffThreads: "list[Thread]" = []
+            for sff in sffs:
+                thread: Thread = Thread(target=addSFFEnds, args=(sff.name,))
+                thread.start()
+                sffThreads.append(thread)
+
+            for thread in sffThreads:
                 thread.join()
 
             TUI.appendToLog("Topology installed successfully!")
@@ -270,16 +277,6 @@ class InfraManager():
                 self._net.get(vnfs['host']['id']).cmd(
                     f"ip addr add {str(ipAddr[1])}/{ipAddr[0].prefixlen} dev {vnfs['host']['id']}-{port}")
 
-                # Add ip to SFF
-                hostIP: str = getContainerIP(vnfs["host"]["id"])
-                TUI.appendToLog(f"    Adding host {vnfs['host']['id']} to SFF.")
-                if not vnfs["next"] == TERMINAL:
-                    try:
-                        requests.post(f"http://{hostIP}:{getConfig()['sff']['port']}/add-host",
-                                    json={"hostIP": str(ipAddr[1])},
-                                    timeout=getConfig()["general"]["requestTimeout"])
-                    except Exception as e:
-                        TUI.appendToLog(f"    Error: {str(e)}", True)
 
         traverseVNF(vnfs, traverseCallback, vnfHosts)
 

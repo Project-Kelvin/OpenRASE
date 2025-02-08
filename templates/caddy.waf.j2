@@ -11,7 +11,7 @@
 		`
 	}
 
-	rewrite * /tx{uri}
+	rewrite * {uri}
 
-	reverse_proxy {{SFF_NETWORK1_IP}}
+	reverse_proxy {{SFF_NETWORK1_IP}}:{{SFF_PORT}}
 }

@@ -145,7 +145,7 @@ def generateTemplateData() -> TemplateData:
         SFF_NETWORK1_IP=config["sff"]["network1"]["sffIP"],
         SFF_NETWORK2_IP=config["sff"]["network2"]["sffIP"],
         SFF_NETWORK1_NETWORK_IP=config["sff"]["network1"]["networkIP"],
-        SFF_PORT=config["sff"]["port"]
+        SFF_PORT=config["sff"]["txPort"]
     )
 
 

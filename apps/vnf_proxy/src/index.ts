@@ -11,24 +11,25 @@ const config: Config = getConfig();
 
 app.get('/', async (req: FastifyRequest, res: FastifyReply) => {
     const sffIP: string = config.sff.network1.sffIP;
-    const sffPort: number = config.sff.port;
+    const sffPort: number = config.sff.txPort;
 
     const requestConfig: AxiosRequestConfig = {
         method: req.method as any,
-        url: `http://${ sffIP }:${ sffPort }/tx${ req.url }`,
+        url: `http://${ sffIP }:${ sffPort }${ req.url }`,
         data: req.body,
         headers: req.headers,
-        timeout: config.general.requestTimeout * 1000,
-        maxRedirects: 0
+        maxRedirects: 0,
+        timeout: config.general.requestTimeout * 1000
     };
 
-    axios(requestConfig)
+    await axios(requestConfig)
         .then((response: AxiosResponse) => {
             res.status(response.status).send(response.data);
         })
         .catch((error: AxiosError) => {
-            logger.error(`[${ req.headers[ SFC_ID ] as string }] ${ error.response?.data }`);
-            res.status(error.response?.status ?? 500).send(error?.response?.data);
+            let msg: string = `[${ req.headers[ SFC_ID ] as string }] ${ error.response?.data ?? error.toString() }`;
+            logger.error(msg);
+            res.status(error.response?.status ?? 500).send(msg);
         });
 });
 

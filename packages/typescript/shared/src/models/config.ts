@@ -9,6 +9,7 @@ export interface SFF {
     network1: SFFNetwork;
     network2: SFFNetwork;
     port: number;
+    txPort: number;
 }
 
 export interface Server {

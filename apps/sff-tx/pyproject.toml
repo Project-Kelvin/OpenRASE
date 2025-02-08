@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "sff"
+version = "0.1.0"
+description = "A Service Function Forwarder (SFF) that receives traffic to the host it runs on and forwards it to the VNF, and transmits the traffic from the VNF to the next SFF/VNF in the Service Function Chain."
+authors = ["Theviyanthan K."]
+license = "Apache-2.0 license"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+Flask = "^3.0.0"
+requests = "^2.31.0"
+packages = {path = "../../packages/python"}
+requests-toolbelt = "^1.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

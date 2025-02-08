@@ -1,5 +1,5 @@
 import fastify, { FastifyReply, FastifyRequest } from 'fastify';
-import axios, { AxiosError, AxiosResponse } from 'axios';
+import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { SFC_HEADER, SFC_ID } from "shared/constants";
 import { Config, VNF, EmbeddingGraph } from "shared/models";
 import { getConfig, sfcEncode, logger } from "shared/utils";
@@ -22,7 +22,7 @@ app.post('/add-eg', (req: FastifyRequest, res: FastifyReply) => {
     res.status(201).send('The Embedding Graph has been successfully added.\n');
 });
 
-app.get('/', (req: FastifyRequest, res: FastifyReply) => {
+app.get('/', async (req: FastifyRequest, res: FastifyReply) => {
     try {
         if (!req.headers[ SFC_ID ]) {
             logger.error('The SFC-ID Header is missing in the request.');
@@ -42,18 +42,19 @@ app.get('/', (req: FastifyRequest, res: FastifyReply) => {
         const sfc: VNF = embeddingGraphs[ sfcID ].vnfs;
 
         const sfcBase64: string = sfcEncode(sfc);
-
         const headers: IncomingHttpHeaders = { ...req.headers };
         headers[ SFC_HEADER ] = sfcBase64;
 
-        axios.request({
+        const requestOptions: AxiosRequestConfig = {
             method: req.method,
-            url: `http://${ sfc.host.ip }/rx${ req.url }`,
+            url: `http://${ sfc.host.ip }/${ req.url }`,
             data: req.body,
             headers,
             maxRedirects: 0,
-            timeout: config.general.requestTimeout * 1000,
-        }).then((response: AxiosResponse) => {
+            timeout: config.general.requestTimeout * 1000
+        };
+
+        await axios(requestOptions).then((response: AxiosResponse) => {
             res.status(response.status).send(response.data);
         }).catch((error: AxiosError) => {
             logger.error(`[${ sfcID }] [${error?.response?.status}] ${ error?.response?.data ?? error.toString() }`);

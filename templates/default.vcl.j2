@@ -11,7 +11,7 @@ sub vcl_init {
 }
 
 sub vcl_recv {
-	set req.url = "/tx" + req.url;
+	set req.url = req.url;
 
     return (pass);
 }
