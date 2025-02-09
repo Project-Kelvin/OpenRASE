@@ -29,7 +29,14 @@ class SingleHostData(dict):
     vnfs: "dict[str, VNFData]"
 
 
-HostData = dict[str, SingleHostData]
+class HostData(dict):
+    """
+    Represents the data of the hosts.
+    """
+
+    startTime: int
+    endTime: int
+    hostData: "dict[str, SingleHostData]"
 
 class SrcDstData(dict):
     """

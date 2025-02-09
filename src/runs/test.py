@@ -2,39 +2,43 @@
 This file is used to test the functionality of the SFC Emulator.
 """
 
-from time import sleep
+import os
+from timeit import default_timer
 import click
+import pandas as pd
 from shared.constants.embedding_graph import TERMINAL
 from shared.models.embedding_graph import EmbeddingGraph
-from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
+from shared.utils.config import getConfig
 from constants.topology import SERVER, SFCC
+from mano.telemetry import Telemetry
+from models.telemetry import HostData
 from models.traffic_generator import TrafficData
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
+from utils.data import hostDataToFrame, mergeHostAndTrafficData
 from utils.tui import TUI
+
+artifactsDir: str = os.path.join(getConfig()["repoAbsolutePath"],"artifacts", "test")
+
+if not os.path.exists(artifactsDir):
+    os.makedirs(artifactsDir)
+
+dataPath: str = os.path.join(artifactsDir, "data.csv")
 
 topo: Topology = {
     "hosts": [
         {
             "id": "h1",
-            "cpu": 4,
-            "memory": 1024
-        },
-        {
-            "id": "h2",
-            "cpu": 4,
+            "cpu": 0.7,
             "memory": 1024
         }
     ],
     "switches": [
         {
             "id": "s1"
-        },
-        {
-            "id": "s2"
         }
     ],
     "links": [
@@ -43,22 +47,12 @@ topo: Topology = {
             "destination": "s1",
         },
         {
-            "source": "s2",
+            "source": "s1",
             "destination": SERVER,
         },
         {
             "source": "h1",
             "destination": "s1",
-            "bandwidth": 1000
-        },
-        {
-            "source": "h2",
-            "destination": "s2",
-            "bandwidth": 1000
-        },
-        {
-            "source": "s1",
-            "destination": "s2",
             "bandwidth": 1000
         }
     ]
@@ -66,152 +60,23 @@ topo: Topology = {
 
 eg: EmbeddingGraph = {
     "sfcID": "sfc1",
-    "vnfs": {
-        "host": {
-            "id": "h1"
-        },
-        "vnf": {
-            "id": "waf"
-        },
-        "next": {
-            "host": {
-                "id": "h2"
-            },
-            "vnf": {
-                "id": "ha"
-            },
-            "next": {
-                "host": {
-                    "id": SERVER
-                },
-                "next": TERMINAL
-            }
-        }
-    },
-    "links": [
-        {
-            "source": {
-                "id": SFCC
-            },
-            "destination": {
-                "id": "h1"
-            },
-            "links": ["s1"]
-        },
-        {
-            "source": {
-                "id": "h1"
-            },
-            "destination": {
-                "id": "h2"
-            },
-            "links": ["s1", "s2"]
-        },
-        {
-            "source": {
-                "id": "h2"
-            },
-            "destination": {
-                "id": SERVER
-            },
-            "links": ["s2"]
-        }
-    ]
-}
-
-simpleEG: EmbeddingGraph = {
-    "sfcID": "sfc2",
-    "vnfs": {
-        "host": {
-            "id": "h1"
-        },
-        "vnf": {
-            "id": "waf"
-        },
-        "next": {
-            "host": {
-                "id": SERVER
-            },
-            "next": TERMINAL
-        }
-    },
-    "links": [
-        {
-            "source": {
-                "id": SFCC
-            },
-            "destination": {
-                "id": "h1"
-            },
-            "links": ["s1"]
-        },
-        {
-            "source": {
-                "id": "h1"
-            },
-            "destination": {
-                "id": SERVER
-            },
-            "links": ["s1", "s2"]
-        }
-    ]
-}
-
-simpleEGUpdated: EmbeddingGraph = {
-    "sfcID": "sfc3",
-    "vnfs": {
-        "host": {
-            "id": "h1"
-        },
-        "vnf": {
-            "id": "lb"
-        },
-        "next": [{
-            "host": {
-                "id": SERVER
-            },
-            "next": TERMINAL
-        }, {
-            "host": {
-                "id": SERVER
-            },
-            "next": TERMINAL
-        }]
-    },
-    "links": [
-        {
-            "source": {
-                "id": SFCC
-            },
-            "destination": {
-                "id": "h1"
-            },
-            "links": ["s1"]
-        },
-        {
-            "source": {
-                "id": "h1"
-            },
-            "destination": {
-                "id": SERVER
-            },
-            "links": ["s1", "s2"]
-        }
-    ]
-}
-
-sfcRequest: SFCRequest = {
     "sfcrID": "sfcr1",
-    "latency": 100,
-    "vnfs": ["lb", "ha", "tm", "waf"],
-    "strictOrder": ["waf", "ha"],
+    "vnfs": {
+        "host": {"id": "h1"},
+        "vnf": {"id": "waf"},
+        "next": {"host": {"id": SERVER}, "next": TERMINAL},
+    },
+    "links": [
+        {"source": {"id": SFCC}, "destination": {"id": "h1"}, "links": ["s1"]},
+        {"source": {"id": "h1"}, "destination": {"id": SERVER}, "links": ["s1"]},
+    ],
 }
 
 trafficDesign: "list[TrafficDesign]" = [
     [
         {
-            "target": 100,
-            "duration": "30s"
+            "target": 2000,
+            "duration": "1m"
         }
     ]
 ]
@@ -223,7 +88,7 @@ class SFCR(SFCRequestGenerator):
 
     def generateRequests(self) -> None:
 
-        self._orchestrator.sendRequests([sfcRequest])
+        self._orchestrator.sendRequests([eg])
 
 class SFCSolver(Solver):
     """
@@ -237,23 +102,33 @@ class SFCSolver(Solver):
 
         def updateTUI():
             TUI.appendToSolverLog("Starting traffic generation.")
-            duration = 0.5*60
+            duration = 75
             elapsed = 0
+            hostDataList: "list[HostData]" = []
             while elapsed < duration:
-                sleep(5)
-                data: "dict[str, TrafficData]" = self._trafficGenerator.getData("5s")
+                try:
+                    tele: Telemetry = self._orchestrator.getTelemetry()
+                    start: float = default_timer()
+                    hostData: HostData = tele.getHostData()
+                    end: float = default_timer()
+                    hostDataList.append(hostData)
+                    teleDuration: int = round(end - start, 0)
+                    elapsed += teleDuration
+                except Exception as e:
+                    TUI.appendToSolverLog(f"Error: {e}", True)
 
-                for key, value in data.items():
-                    httpReqs: int = value["httpReqs"]
-                    averageLatency: float = value["averageLatency"]
-                    httpReqsRate: float = httpReqs / 5 if httpReqs != 0 else 0
-                    TUI.appendToSolverLog(f"{httpReqsRate} requests took {averageLatency} seconds on average for {key}.")
-                    print(f"{httpReqsRate} requests took {averageLatency} seconds on average for {key}.")
-                elapsed += 5
+            try:
+                trafficData: pd.DataFrame = self._trafficGenerator.getData("75s")
+                hostData: pd.DataFrame = hostDataToFrame(hostDataList)
+                hostData = mergeHostAndTrafficData(hostData, trafficData)
+
+                hostData.to_csv(dataPath, index=False)
+            except Exception as e:
+                TUI.appendToSolverLog(f"Error: {e}", True)
+
             TUI.appendToSolverLog("Solver has finished.")
-        self._orchestrator.sendEmbeddingGraphs([simpleEG, simpleEGUpdated])
-        updateTUI()
-        self._orchestrator.sendEmbeddingGraphs([simpleEGUpdated])
+
+        self._orchestrator.sendEmbeddingGraphs([eg])
         updateTUI()
         TUI.exit()
 

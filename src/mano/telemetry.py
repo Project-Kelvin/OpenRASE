@@ -13,7 +13,7 @@ import socket
 from struct import pack, unpack
 from sys import maxsize
 from threading import Thread
-from typing import Any
+from typing import Any, Callable
 from urllib.request import HTTPHandler, Request, build_opener
 import requests
 from shared.models.embedding_graph import VNF, EmbeddingGraph, VNFEntity
@@ -89,7 +89,7 @@ class Telemetry(Subscriber):
         )
 
     @classmethod
-    def runSflow(cls):
+    def runSflow(cls) -> "Callable":
         """
         Run sflow.py script sourced from the sflow-rt package.
         This allows sflow to monitor the Mininet topology.
@@ -226,6 +226,7 @@ class Telemetry(Subscriber):
                     hostDataFutures[host["id"]]["vnfs"][vnf["name"]] = stats
 
         with ThreadPoolExecutor() as executor:
+            startTime: int = int(time.time())
             for host in hosts:
                 thread: Thread = Thread(target=createHostThread, args=(host,))
                 thread.start()
@@ -236,7 +237,12 @@ class Telemetry(Subscriber):
 
             for hostKey, host in hostDataFutures.items():
                 stats: HostStats = hostDataFutures[hostKey]["stats"].result()
-                hostData[hostKey] = {
+                endTime: int = int(time.time())
+
+                hostData["startTime"] = startTime
+                hostData["endTime"] = endTime
+                hostData["hostData"] = {}
+                hostData["hostData"][hostKey] = {
                     "cpuUsage": stats[0],
                     "memoryUsage": stats[1],
                     "networkUsage": stats[2],
@@ -246,7 +252,7 @@ class Telemetry(Subscriber):
                 if hostDataFutures[hostKey]["vnfs"] != {}:
                     for vnfKey, _vnf in hostDataFutures[hostKey]["vnfs"].items():
                         stats: HostStats = hostDataFutures[hostKey]["vnfs"][vnfKey].result()
-                        hostData[hostKey]["vnfs"][vnfKey] = {
+                        hostData["hostData"][hostKey]["vnfs"][vnfKey] = {
                             "cpuUsage": stats[0],
                             "memoryUsage": stats[1],
                             "networkUsage": stats[2]

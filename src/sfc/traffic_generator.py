@@ -9,6 +9,7 @@ from time import sleep
 from typing import Any
 from jinja2 import Template, TemplateSyntaxError
 import numpy as np
+import pandas as pd
 from shared.models.config import Config
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.traffic_design import TrafficDesign
@@ -22,7 +23,10 @@ from models.traffic_generator import TrafficData
 from utils.container import connectToDind, getContainerIP, waitTillContainerReady
 from docker import DockerClient, from_env, errors
 from utils.tui import TUI
+import warnings
+from influxdb_client.client.warnings import MissingPivotFunction
 
+warnings.simplefilter("ignore", MissingPivotFunction)
 
 TG_HOME_PATH: str = "/home/docker/files/influxdb"
 INFLUX_DB_CONFIG = {
@@ -208,7 +212,7 @@ class TrafficGenerator(Subscriber):
         except Exception as e:
             TUI.appendToLog(f"Error stopping traffic generator for SFC {sfcID}: {e}. Possibly because it has already been stopped.", True)
 
-    def getData(self, dataRange: str) -> "dict[str, TrafficData]":
+    def getData(self, dataRange: str) -> "pd.DataFrame":
         """
         Get the data from the traffic generator.
 
@@ -216,49 +220,20 @@ class TrafficGenerator(Subscriber):
             dataRange (str): Data range.
 
         Returns:
-            "dict[str, TrafficData]": The traffic data for each SFC.
+            pd.DataFrame: The data from the traffic generator.
         """
 
-        HTTP_REQS: str = "http_reqs"
         HTTP_REQ_DURATION: str = "http_req_duration"
 
-        data: "list[TrafficData]" = []
-        tables = self._influxDBClient.query_api().query(
+        return self._influxDBClient.query_api().query_data_frame(
             f'from(bucket: "{INFLUX_DB_CONFIG["BUCKET"]}")'
-            f' |> range(start: -{dataRange})'
-            f' |> filter(fn: (r) => r["_measurement"] == "{HTTP_REQ_DURATION}" or r["_measurement"] == "{HTTP_REQS}")'
-            f' |> filter(fn: (r) => r["_field"] == "value")'
-            f' |> filter(fn: (r) => r["expected_response"] == "true")')
-
-        data: "dict[str, TrafficData]" = {}
-        averages: "dict[str, list[float]]" = {}
-        for table in tables:
-            for record in table.records:
-                measurement: str = record.values["_measurement"]
-                sfc: str = record.values["sfcID"]
-
-                if sfc != "" or sfc is not None:
-                    if sfc not in data:
-                        data[sfc] = TrafficData(httpReqs = 0, averageLatency = 0)
-                    if measurement == HTTP_REQS:
-                        data[sfc]["httpReqs"] += int(record.values["_value"])
-                    elif measurement == HTTP_REQ_DURATION:
-                        data[sfc]["averageLatency"] += float(record.values["_value"])
-                        if sfc in averages:
-                            averages[sfc].append(float(record.values["_value"]))
-                        else:
-                            averages[sfc] = [float(record.values["_value"])]
-
-        for key, value in data.items():
-            value["averageLatency"] = value["averageLatency"] / value["httpReqs"] if value["averageLatency"] != 0 or value["httpReqs"] != 0 else 0
-            value["variance"] = np.var(averages[key]) if key in averages else 0
-            value["q3"] = np.quantile(averages[key], 0.75) if key in averages else 0
-            value["q1"] = np.quantile(averages[key], 0.25) if key in averages else 0
-            value["q2"] = np.quantile(averages[key], 0.50) if key in averages else 0
-            value["max"] = np.max(averages[key]) if key in averages else 0
-            value["min"] = np.min(averages[key]) if key in averages else 0
-
-        return data
+            f" |> range(start: -{dataRange})"
+            " |> truncateTimeColumn(unit: 1s)"
+            f' |> filter(fn: (r) => r["_measurement"] == "{HTTP_REQ_DURATION}")'
+            ' |> filter(fn: (r) => r["_field"] == "value")'
+            " |> map(fn: (r) => ({r with _time: uint(v: r._time)}))"
+            ' |> drop(columns: ["_start", "_stop", "_measurement", "_field", "method", "name", "proto", "scenario", "status", "result", "table"])'
+        )
 
     def receiveNotification(self, topic, *args: "list[Any]") -> None:
         if topic == EMBEDDING_GRAPH_DEPLOYED:
