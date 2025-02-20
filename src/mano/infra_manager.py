@@ -5,8 +5,6 @@ Defines the class that corresponds to the Virtualized Infrastructure Manager in 
 from ipaddress import IPv4Address, IPv4Network
 from threading import Thread
 from typing import Any, Tuple
-import requests
-from shared.constants.embedding_graph import TERMINAL
 from shared.models.config import Config
 from shared.utils.config import getConfig
 from shared.utils.ip import generateIP
@@ -17,18 +15,23 @@ from mininet.net import Containernet
 from mininet.cli import CLI
 from constants.notification import TOPOLOGY_INSTALLED
 from constants.topology import SERVER, SFCC
-from constants.container import SERVER_IMAGE, SFCC_IMAGE, SFF_IMAGE, SFCC_CMD, SERVER_CMD, SFF_CMD
+from constants.container import (
+    SERVER_IMAGE,
+    SFCC_IMAGE,
+    SFCC_CMD,
+    SERVER_CMD,
+)
 from utils.liveness_checker import checkLiveness
-from mano.notification_system import NotificationSystem
-from mano.sdn_controller import SDNController
-from mano.telemetry import Telemetry
-from utils.container import getContainerIP, waitTillContainerReady
+from utils.container import waitTillContainerReady
 from utils.embedding_graph import traverseVNF
 from utils.host import addHostNode, addSFF, addSFFEnds
 from utils.tui import TUI
+from mano.notification_system import NotificationSystem
+from mano.sdn_controller import SDNController
+from mano.telemetry import Telemetry
 
 
-class InfraManager():
+class InfraManager:
     """
     Class that corresponds to the Virtualized Infrastructure Manager in the NFV architecture.
     """
@@ -50,13 +53,13 @@ class InfraManager():
         Telemetry.runSflow()
         self._sdnController = sdnController
         self._net: Any = Containernet()
-        self._ryu: Ryu = Ryu('ryu', ryuArgs="ryu.app.ofctl_rest",
-                       command="ryu-manager")
+        self._ryu: Ryu = Ryu("ryu", ryuArgs="ryu.app.ofctl_rest", command="ryu-manager")
         self._net.addController(self._ryu)
         self._hostMACs: "dict[str, str]" = {}
         self._linkedPorts: "dict[str, tuple[int, int]]" = {}
         self._gatewayMACs: "dict[str, str]" = {}
         self._stopLivenessChecker: "list[bool]" = [False]
+        self._firstHostIPs: "dict[str, Tuple[IPv4Network, IPv4Address]]" = {}
 
     def installTopology(self, topology: Topology) -> None:
         """
@@ -74,8 +77,7 @@ class InfraManager():
             config: Config = getConfig()
 
             # Add SFCC
-            ipSFCC: "Tuple[IPv4Network, IPv4Address]" = generateIP(
-                self._networkIPs)
+            ipSFCC: "Tuple[IPv4Network, IPv4Address]" = generateIP(self._networkIPs)
 
             TUI.appendToLog("  Installing SFCC.")
             sfccDir: str = SFCC_IMAGE.split("/")[1].split(":")[0]
@@ -88,15 +90,15 @@ class InfraManager():
                 volumes=[
                     config["repoAbsolutePath"]
                     + f"/docker/files/{sfccDir}/shared/node-logs:/home/OpenRASE/apps/sfc_classifier/node-logs"
-                ]
+                ],
             )
             self._hosts[SFCC] = sfcc
             self._hostIPs[SFCC] = ipSFCC
             self._sfcHostByIPs[str(ipSFCC[1])] = (None, SFCC)
+            self._firstHostIPs[SFCC] = ipSFCC
 
             # Add server
-            ipServer: "Tuple[IPv4Network, IPv4Address]" = generateIP(
-                self._networkIPs)
+            ipServer: "Tuple[IPv4Network, IPv4Address]" = generateIP(self._networkIPs)
             self._hostIPs[SERVER] = ipServer
 
             TUI.appendToLog("  Installing server.")
@@ -105,7 +107,7 @@ class InfraManager():
                 ip=f"{ipServer[1]}/{ipServer[0].prefixlen}",
                 dimage=SERVER_IMAGE,
                 dcmd=SERVER_CMD,
-                defaultRoute=f"dev {SERVER}-eth0"
+                defaultRoute=f"dev {SERVER}-eth0",
             )
             self._hosts[SERVER] = server
 
@@ -113,7 +115,7 @@ class InfraManager():
             sffs: "list[Host]" = []
 
             TUI.appendToLog("  Installing hosts:")
-            for host in topology['hosts']:
+            for host in topology["hosts"]:
                 TUI.appendToLog(f"    Installing host {host['id']}.")
                 sff: Host = addSFF(host, self._net)
                 hostNode: Host = addHostNode(host, self._net)
@@ -124,21 +126,25 @@ class InfraManager():
                 self._hosts[host["id"]] = sff
 
             TUI.appendToLog("  Installing switches:")
-            for switch in topology['switches']:
+            for switch in topology["switches"]:
                 TUI.appendToLog(f"    Installing {switch['id']}.")
-                switchNode: OVSKernelSwitch = self._net.addSwitch(switch['id'])
-                TUI.appendToLog(f"    Installed {switch['id']} with id {switchNode.dpid}.")
+                switchNode: OVSKernelSwitch = self._net.addSwitch(switch["id"])
+                TUI.appendToLog(
+                    f"    Installed {switch['id']} with id {switchNode.dpid}."
+                )
                 self._switches[switch["id"]] = switchNode
                 switchNode.start([self._ryu])
 
             TUI.appendToLog("  Establishing links:")
-            for link in topology['links']:
-                TUI.appendToLog(f"    Linking {link['source']} to {link['destination']}.")
+            for link in topology["links"]:
+                TUI.appendToLog(
+                    f"    Linking {link['source']} to {link['destination']}."
+                )
                 mnLink: Any = self._net.addLink(
-                    self._net.get(
-                        link['source']),
-                    self._net.get(link['destination']),
-                    bw=link['bandwidth'] if 'bandwidth' in link else None)
+                    self._net.get(link["source"]),
+                    self._net.get(link["destination"]),
+                    bw=link["bandwidth"] if "bandwidth" in link else None,
+                )
 
                 if link["source"] in self._hosts:
                     self._hostMACs[link["source"]] = mnLink.intf1.MAC()
@@ -150,8 +156,14 @@ class InfraManager():
                 port1: int = mnLink.intf1.node.ports[mnLink.intf1]
                 port2: int = mnLink.intf2.node.ports[mnLink.intf2]
 
-                self._linkedPorts[f"{link['source']}-{link['destination']}"] = (port1, port2)
-                self._linkedPorts[f"{link['destination']}-{link['source']}"] = (port2, port1)
+                self._linkedPorts[f"{link['source']}-{link['destination']}"] = (
+                    port1,
+                    port2,
+                )
+                self._linkedPorts[f"{link['destination']}-{link['source']}"] = (
+                    port2,
+                    port1,
+                )
 
             TUI.appendToLog("Starting Mininet.")
             try:
@@ -165,17 +177,22 @@ class InfraManager():
             TUI.appendToLog("Adding IP addresses to hosts.")
             for name, host in self._hosts.items():
                 if name != SERVER and name != SFCC:
-                    host.cmd(f"ip addr add {getConfig()['sff']['network2']['sffIP']}/{getConfig()['sff']['network2']['mask']} dev {name}-eth0")
+                    host.cmd(
+                        f"ip addr add {getConfig()['sff']['network2']['sffIP']}/{getConfig()['sff']['network2']['mask']} dev {name}-eth0"
+                    )
 
             for hostNode in hostNodes:
                 hostNode.cmd(
-                    f"ip addr add {getConfig()['sff']['network2']['hostIP']}/{getConfig()['sff']['network2']['mask']} dev {hostNode.name}-eth0")
+                    f"ip addr add {getConfig()['sff']['network2']['hostIP']}/{getConfig()['sff']['network2']['mask']} dev {hostNode.name}-eth0"
+                )
 
             TUI.appendToLog("Waiting till host containers are ready.")
             threads: "list[Thread]" = []
             for host in hostNodes:
                 TUI.appendToLog(f"  Waiting for {host.name} to be ready.")
-                thread: Thread = Thread(target=waitTillContainerReady, args=(host.name,))
+                thread: Thread = Thread(
+                    target=waitTillContainerReady, args=(host.name,)
+                )
                 thread.start()
                 threads.append(thread)
 
@@ -223,8 +240,15 @@ class InfraManager():
         TUI.appendToLog("  Deleting flows from switches:")
 
         try:
-            self._sdnController.deleteFlows(
-                eg, self._sfcHostIPs[eg["sfcID"]], self._switches, self._linkedPorts, self._hostMACs)
+            self._sdnController.configureSwitchFlows(
+                eg,
+                self._sfcHostIPs[eg["sfcID"]],
+                self._switches,
+                self._linkedPorts,
+                self._hostMACs,
+                self._firstHostIPs,
+                False,
+            )
         except RuntimeError as e:
             TUI.appendToLog(f"  Error: {e}", True)
 
@@ -239,17 +263,29 @@ class InfraManager():
             EmbeddingGraph: The embedding graph with the IPs assigned.
         """
 
-        vnfs: VNF = eg['vnfs']
+        vnfs: VNF = eg["vnfs"]
 
         if eg["sfcID"] in self._sfcHostIPs:
-            vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address]]" = self._sfcHostIPs[eg["sfcID"]]
+            vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address]]" = self._sfcHostIPs[
+                eg["sfcID"]
+            ]
         else:
-            vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address]]" = {
-                SFCC: self._hostIPs[SFCC]
-            }
+            sfccIP: "Tuple[IPv4Network, IPv4Address]" = generateIP(self._networkIPs)
 
-        def traverseCallback(vnfs: VNF, _depth: int,
-                             vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address]]") -> None:
+            TUI.appendToLog(f"    Assigning IP {str(sfccIP[1])} to {SFCC}.")
+
+            self._sfcHostByIPs[str(sfccIP[1])] = (eg["sfcID"], SFCC)
+            self._net.get(SFCC).cmd(
+                f"ip addr add {str(sfccIP[1])}/{sfccIP[0].prefixlen} dev {SFCC}-eth0"
+            )
+
+            vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address]]" = {SFCC: sfccIP}
+
+        def traverseCallback(
+            vnfs: VNF,
+            _depth: int,
+            vnfHosts: "dict[str, Tuple[IPv4Network, IPv4Address]]",
+        ) -> None:
             """
             Callback function for the traverseVNF function.
 
@@ -262,35 +298,45 @@ class InfraManager():
             if vnfs["host"]["id"] in vnfHosts:
                 vnfs["host"]["ip"] = str(vnfHosts[vnfs["host"]["id"]][1])
             else:
-                ipAddr: "Tuple[IPv4Network, IPv4Address]" = generateIP(
-                    self._networkIPs)
+                ipAddr: "Tuple[IPv4Network, IPv4Address]" = generateIP(self._networkIPs)
 
-                TUI.appendToLog(f"    Assigning IP {str(ipAddr[1])} to {vnfs['host']['id']}.")
+                TUI.appendToLog(
+                    f"    Assigning IP {str(ipAddr[1])} to {vnfs['host']['id']}."
+                )
 
-                vnfs['host']['ip'] = str(ipAddr[1])
-                vnfHosts[vnfs['host']['id']] = ipAddr
-                self._sfcHostByIPs[str(ipAddr[1])] = (
-                    eg["sfcID"], vnfs['host']['id'])
+                vnfs["host"]["ip"] = str(ipAddr[1])
+
+                if vnfs["host"]["id"] not in self._firstHostIPs:
+                    self._firstHostIPs[vnfs["host"]["id"]] = ipAddr
+
+                vnfHosts[vnfs["host"]["id"]] = ipAddr
+                self._sfcHostByIPs[str(ipAddr[1])] = (eg["sfcID"], vnfs["host"]["id"])
 
                 # Assign IP to the host
-                port: str = "eth0" if vnfs['host']['id'] == SERVER else "eth1"
-                self._net.get(vnfs['host']['id']).cmd(
-                    f"ip addr add {str(ipAddr[1])}/{ipAddr[0].prefixlen} dev {vnfs['host']['id']}-{port}")
-
+                port: str = "eth0" if vnfs["host"]["id"] == SERVER else "eth1"
+                self._net.get(vnfs["host"]["id"]).cmd(
+                    f"ip addr add {str(ipAddr[1])}/{ipAddr[0].prefixlen} dev {vnfs['host']['id']}-{port}"
+                )
 
         traverseVNF(vnfs, traverseCallback, vnfHosts)
 
-        server: Host = self._net.get(SERVER)
-        for name, ips in vnfHosts.items():
+        for name in vnfHosts.keys():
             host: Host = self._net.get(name)
-            server.cmd(f"arp -s {str(ips[1])} {self._gatewayMACs[server.name]}")
             for name1, ips1 in vnfHosts.items():
                 if name != name1:
                     host.cmd(f"arp -s {str(ips1[1])} {self._gatewayMACs[name]}")
 
         # Install flows
         TUI.appendToLog("    Installing flows in switches.")
-        eg = self._sdnController.installFlows(eg, vnfHosts, self._switches, self._linkedPorts, self._hostMACs)
+        eg = self._sdnController.configureSwitchFlows(
+            eg,
+            vnfHosts,
+            self._switches,
+            self._linkedPorts,
+            self._hostMACs,
+            self._firstHostIPs,
+            True,
+        )
         self._sfcHostIPs[eg["sfcID"]] = vnfHosts
 
         return eg

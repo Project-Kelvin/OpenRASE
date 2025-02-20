@@ -3,9 +3,10 @@ Defines the VNFManager class that corresponds to the VNF Manager in the NFV arch
 """
 
 from concurrent.futures import Future, ThreadPoolExecutor
+import json
 from threading import Thread, Lock
-from time import sleep
 import requests
+from uuid import uuid4
 from shared.models.embedding_graph import VNF, EmbeddingGraph, VNFEntity
 from shared.models.topology import Host as TopoHost
 from shared.utils.config import getConfig
@@ -18,9 +19,9 @@ from docker import DockerClient, from_env
 from utils.container import connectToDind, getContainerIP
 from utils.embedding_graph import traverseVNF
 from utils.tui import TUI
-from uuid import uuid4
 
-class VNFManager():
+
+class VNFManager:
     """
     Class that corresponds to the VNF Manager in the NFV architecture.
     """
@@ -32,7 +33,6 @@ class VNFManager():
         Parameters:
             infraManager (InfraManager): The infrastructure manager.
         """
-
 
         self._infraManager: InfraManager = infraManager
         self._portLock: Lock = Lock()
@@ -63,8 +63,7 @@ class VNFManager():
         vnfs: VNF = updatedEG["vnfs"]
         sfcId: str = updatedEG["sfcID"]
         vnfList: "list[str]" = []
-        sharedVolumes: "dict[str, list[str]]" = getConfig()[
-            "vnfs"]["sharedVolumes"]
+        sharedVolumes: "dict[str, list[str]]" = getConfig()["vnfs"]["sharedVolumes"]
         threads: "list[Thread]" = []
 
         def deployVNF(vnfs: VNF):
@@ -83,7 +82,7 @@ class VNFManager():
                     for vol in sharedVolumes[vnf["id"]]:
                         volumes[vol.split(":")[0]] = {
                             "bind": vol.split(":")[1],
-                            "mode": "rw"
+                            "mode": "rw",
                         }
 
                 port: int = 5000
@@ -94,7 +93,9 @@ class VNFManager():
                         self._ports[host["id"]] = 5000
                     port = self._ports[host["id"]]
 
-                TUI.appendToLog(f"    Deploying {vnfName} ({getVNFContainerTag(vnf['id'])}) on {host['id']} with IP {getConfig()['sff']['network1']['hostIP']}:{port}.")
+                TUI.appendToLog(
+                    f"    Deploying {vnfName} ({getVNFContainerTag(vnf['id'])}) on {host['id']} with IP {getConfig()['sff']['network1']['hostIP']}:{port}."
+                )
                 try:
                     dindClient.containers.run(
                         getVNFContainerTag(vnf["id"]),
@@ -135,7 +136,7 @@ class VNFManager():
         requests.post(
             f"http://{sfccIP}/add-eg",
             json=updatedEG,
-            timeout=getConfig()["general"]["requestTimeout"]
+            timeout=getConfig()["general"]["requestTimeout"],
         )
 
         TUI.appendToLog(f"  Deployed embedding graph {sfcId} successfully.")
@@ -157,6 +158,7 @@ class VNFManager():
         threads: "list[Thread]" = []
 
         TUI.appendToLog("  Deleting VNFs:")
+
         def deleteVNF(vnfs: VNF):
             host: TopoHost = vnfs["host"]
             vnf: VNFEntity = vnfs["vnf"]
@@ -179,7 +181,6 @@ class VNFManager():
                         dindClient.volumes.prune()
                 except Exception as e:
                     TUI.appendToLog(f"    Error deleting {vnfName}: {e}", True)
-
 
         def traverseCallback(vnfs: VNF, _depth: int) -> None:
             """
@@ -215,7 +216,7 @@ class VNFManager():
 
         with ThreadPoolExecutor() as executor:
             for eg in egs:
-                if(eg["sfcID"] in self._embeddingGraphs):
+                if eg["sfcID"] in self._embeddingGraphs:
                     del self._embeddingGraphs[eg["sfcID"]]
                     TUI.appendToLog(f"  {eg['sfcID']}")
                     futures.append(executor.submit(self._deleteEmbeddingGraph, eg))
@@ -228,7 +229,6 @@ class VNFManager():
         client.images.prune()
         client.networks.prune()
         client.volumes.prune()
-
 
     def deployEmbeddingGraphs(self, egs: "list[EmbeddingGraph]") -> None:
         """
