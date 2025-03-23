@@ -41,7 +41,7 @@ def run(algorithm: str, vnf: str, metric: str, train: bool, epochs: int, headles
         design = json.load(traffic)
     maxTarget: int = max(design, key=lambda x: x["target"])["target"]
     resourceDemands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(maxTarget)
-    demandsDirectory = f"{getConfig()['repoAbsolutePath']}/calibrations"
+    demandsDirectory = f"{getConfig()['repoAbsolutePath']}/artifacts/calibrations"
     if not os.path.exists(demandsDirectory):
         os.makedirs(demandsDirectory)
     with open(f"{demandsDirectory}/resource_demands_of_vnfs.json", "w", encoding="utf8") as demandsFile:
