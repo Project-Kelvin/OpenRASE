@@ -22,6 +22,7 @@ from sfc.sfc_emulator import SFCEmulator
 from sfc.solver import Solver
 from sfc.traffic_generator import TrafficGenerator
 from utils.topology import generateFatTreeTopology
+from utils.traffic_design import generateTrafficDesign
 from utils.tui import TUI
 
 
@@ -33,7 +34,11 @@ directory = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy"
 if not os.path.exists(directory):
     os.makedirs(directory)
 
-topology: Topology = generateFatTreeTopology(4, 10, 2, 2048)
+# 6 1
+# 3 0.5
+# 6 0.2
+# 3 0.2
+topology: Topology = generateFatTreeTopology(4, 3, 0.2, 5120)
 logFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy/experiments.csv"
 latencyDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency_data.csv"
 
@@ -59,7 +64,7 @@ class FGR(FGRequestGenerator):
 
         with open(f"{configPath}/forwarding-graphs.json", "r", encoding="utf8") as fgFile:
             fgs: "list[EmbeddingGraph]" = json.load(fgFile)
-            for fg in fgs:
+            for fg in fgs[:2]:
                 self._fgs.append(copy.deepcopy(fg))
 
     def generateRequests(self) -> None:
@@ -69,7 +74,7 @@ class FGR(FGRequestGenerator):
 
         copiedFGs: "list[EmbeddingGraph]" = []
         for index, fg in enumerate(self._fgs):
-            for i in range(0, 8):
+            for i in range(0, 16):
                 copiedFG: EmbeddingGraph = copy.deepcopy(fg)
                 copiedFG["sfcrID"] = f"sfc{index}-{i}"
                 copiedFGs.append(copiedFG)
@@ -110,7 +115,7 @@ class SFCSolver(Solver):
         try:
             while self._requests.empty():
                 pass
-            requests: "list[Union[FGR, SFCRequest]]" = []
+            requests: "list[Union[EmbeddingGraph, SFCRequest]]" = []
             while not self._requests.empty():
                 requests.append(self._requests.get())
                 sleep(0.1)
@@ -138,13 +143,22 @@ def run(headless: bool, minimal: bool) -> None:
         minimal (bool): Whether to use the minimal traffic design.
     """
 
-
     if minimal:
-        with open(f"{configPath}/traffic-design-min.json", "r", encoding="utf8") as trafficFile:
-            trafficDesign = [json.load(trafficFile)]
+        trafficDesign: "list[TrafficDesign]" = [generateTrafficDesign(
+            f"{getConfig()['repoAbsolutePath']}/src/runs/surrogacy/data/requests.csv",
+            0.1,
+            1,
+            True,
+        )]
+
     else:
-        with open(f"{configPath}/traffic-design.json", "r", encoding="utf8") as trafficFile:
-            trafficDesign = [json.load(trafficFile)]
+        trafficDesign: "list[TrafficDesign]" = [
+            generateTrafficDesign(
+                f"{getConfig()['repoAbsolutePath']}/src/runs/surrogacy/data/requests.csv",
+                1,
+                4
+            )
+        ]
     sfcEm: SFCEmulator = SFCEmulator(FGR, SFCSolver, headless)
     sfcEm.getSolver().setTrafficDesign(trafficDesign)
     sfcEm.getSolver().setTrafficType(minimal)
