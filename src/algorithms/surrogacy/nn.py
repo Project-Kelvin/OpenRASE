@@ -15,7 +15,7 @@ from utils.embedding_graph import traverseVNF
 import tensorflow as tf
 import numpy as np
 
-def convertFGstoDF(fgs: "list[EmbeddingGraph]", topology: Topology) -> pd.DataFrame:
+def convertFGsToDF(fgs: "list[EmbeddingGraph]", topology: Topology) -> pd.DataFrame:
     """
     Converts a list of EmbeddingGraphs to a Pandas Dataframe.
 
@@ -217,7 +217,7 @@ def getConfidenceValues(data: pd.DataFrame, weights: "list[float]", bias: "list[
                 bStartIndex = bEndIndex
                 bEndIndex = bStartIndex + layers[index + 1]
 
-    prediction = model.predict(np.array(copiedData))
+    prediction = model.predict(np.array(copiedData), verbose=0)
     copiedData = copiedData.assign(ConfidenceLevel=prediction)
 
     return copiedData

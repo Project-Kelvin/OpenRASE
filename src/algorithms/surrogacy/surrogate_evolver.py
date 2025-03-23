@@ -5,24 +5,21 @@ This defines the GA that evolves teh weights of the Neural Network.
 from copy import deepcopy
 from multiprocessing import Pool, cpu_count
 import random
-from time import sleep
 from timeit import default_timer
-from typing import Any, Callable, Tuple, Union
+from typing import Any, Tuple, Union
 from algorithms.surrogacy.extract_weights import getWeightLength
-from algorithms.surrogacy.generate import evolveInitialWeights, getWeights
+from algorithms.surrogacy.surogate.data_generator.init_pop_generator import evolveInitialWeights, getWeights
 from algorithms.surrogacy.link_embedding import EmbedLinks
-from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
+from algorithms.surrogacy.nn import convertDFtoFGs, convertFGsToDF, getConfidenceValues
 from algorithms.surrogacy.scorer import Scorer
 from algorithms.surrogacy.surrogate import Surrogate
 from models.calibrate import ResourceDemand
 from shared.models.traffic_design import TrafficDesign
-from sfc.traffic_generator import TrafficGenerator
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 import pandas as pd
 import numpy as np
 from deap import base, creator, tools
-from shared.utils.config import getConfig
 from utils.tui import TUI
 
 scorer: Scorer = Scorer()
@@ -59,7 +56,7 @@ def evaluate(
     weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(
         individual, copiedFGs, topology
     )
-    df: pd.DataFrame = convertFGstoDF(copiedFGs, topology)
+    df: pd.DataFrame = convertFGsToDF(copiedFGs, topology)
     newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
     egs, nodes, embedData = convertDFtoFGs(newDF, copiedFGs, topology)
     if len(egs) > 0:

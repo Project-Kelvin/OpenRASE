@@ -32,8 +32,6 @@ from docker import DockerClient, from_env
 from docker.models.containers import Container
 import time
 
-from utils.tui import TUI
-
 
 SFLOW_CONTAINER: str = "sflow"
 SFLOW_IMAGE: str = "sflow/sflow-rt"

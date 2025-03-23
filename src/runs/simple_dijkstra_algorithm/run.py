@@ -25,25 +25,35 @@ from sfc.sfc_emulator import SFCEmulator
 from sfc.solver import Solver
 from sfc.traffic_generator import TrafficGenerator
 from utils.topology import generateFatTreeTopology
-from utils.traffic_design import calculateTrafficDuration, generateTrafficDesign
+from utils.traffic_design import calculateTrafficDuration, generateTrafficDesign, getTrafficDesignRate
 import click
 from utils.tui import TUI
 import os
 
 config: Config = getConfig()
-configPath: str = f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/configs"
+configPath: str = (
+    f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/configs"
+)
 
 
-directory = f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm"
+directory = (
+    f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm"
+)
 
 if not os.path.exists(directory):
     os.makedirs(directory)
 
 topology1: Topology = generateFatTreeTopology(4, 1000, 4, None)
 topologyPointFive: Topology = generateFatTreeTopology(4, 1000, 2, None)
-logFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm/experiments.csv"
-hostDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm/host_data.csv"
-latencyDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm/latency_data.csv"
+logFilePath: str = (
+    f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm/experiments.csv"
+)
+hostDataFilePath: str = (
+    f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm/host_data.csv"
+)
+latencyDataFilePath: str = (
+    f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm/latency_data.csv"
+)
 
 with open(logFilePath, "w", encoding="utf8") as log:
     log.write("experiment,failed_fgs,accepted_fgs,execution_time,deployment_time\n")
@@ -56,6 +66,7 @@ with open(latencyDataFilePath, "w", encoding="utf8") as latencyData:
 
 experiment: str = ""
 expName: str = ""
+
 
 @click.command()
 @click.option("--experiment", type=int, help="The experiment to run.")
@@ -218,8 +229,10 @@ def appendToLog(message: str) -> None:
     with open(logFilePath, "a", encoding="utf8") as log:
         log.write(f"{message}\n")
 
+
 with open(f"{configPath}/traffic-design.json", "r", encoding="utf8") as trafficFile:
     trafficDesign: "list[TrafficDesign]" = [json.load(trafficFile)]
+
 
 class FGR(FGRequestGenerator):
     """
@@ -230,10 +243,13 @@ class FGR(FGRequestGenerator):
         super().__init__(orchestrator)
         self._fgs: "list[EmbeddingGraph]" = []
 
-        with open(f"{configPath}/forwarding-graphs.json", "r", encoding="utf8") as fgFile:
+        with open(
+            f"{configPath}/forwarding-graphs.json", "r", encoding="utf8"
+        ) as fgFile:
             fgs: "list[EmbeddingGraph]" = json.load(fgFile)
             for fg in fgs:
                 self._fgs.append(copy.deepcopy(fg))
+
 
 class FGR4SFC(FGR):
     """
@@ -245,6 +261,7 @@ class FGR4SFC(FGR):
             fg["sfcrID"] = f"sfc{index}-{expName}"
 
         self._orchestrator.sendRequests(self._fgs)
+
 
 class FGR8SFC(FGR):
     """
@@ -263,6 +280,7 @@ class FGR8SFC(FGR):
 
         self._orchestrator.sendRequests(self._fgs)
 
+
 class FGR32SFC(FGR):
     """
     FG Request Generator that generates all 4 FGs 8 times.
@@ -279,6 +297,7 @@ class FGR32SFC(FGR):
         self._fgs = copiedFGs
 
         self._orchestrator.sendRequests(self._fgs)
+
 
 class FGR16SFC(FGR):
     """
@@ -303,7 +322,9 @@ class SFCSolver(Solver):
     SFC Solver.
     """
 
-    def __init__(self, orchestrator: Orchestrator, trafficGenerator: TrafficGenerator) -> None:
+    def __init__(
+        self, orchestrator: Orchestrator, trafficGenerator: TrafficGenerator
+    ) -> None:
         super().__init__(orchestrator, trafficGenerator)
         self._resourceDemands: "dict[str, ResourceDemand]" = None
 
@@ -314,7 +335,9 @@ class SFCSolver(Solver):
             design = json.load(traffic)
         maxTarget: int = max(design, key=lambda x: x["target"])["target"]
 
-        self._resourceDemands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(maxTarget)
+        self._resourceDemands: "dict[str, ResourceDemand]" = (
+            calibrate.getResourceDemands(maxTarget)
+        )
 
     def generateEmbeddingGraphs(self) -> None:
         try:
@@ -325,7 +348,9 @@ class SFCSolver(Solver):
                 requests.append(self._requests.get())
                 sleep(0.1)
             self._topology: Topology = self._orchestrator.getTopology()
-            sda = SimpleDijkstraAlgorithm(requests, self._topology, self._resourceDemands)
+            sda = SimpleDijkstraAlgorithm(
+                requests, self._topology, self._resourceDemands
+            )
             start: float = default_timer()
             fgs, failedFGs, _nodes = sda.run()
             end: float = default_timer()
@@ -337,24 +362,28 @@ class SFCSolver(Solver):
             TUI.appendToSolverLog(f"Accepted FGs: {len(fgs)}")
             logRow.append(str(len(failedFGs)))
             logRow.append(str(len(fgs)))
-            TUI.appendToSolverLog(f"Acceptance Ratio: {len(fgs) / (len(fgs) + len(failedFGs)) * 100:.2f}%")
+            TUI.appendToSolverLog(
+                f"Acceptance Ratio: {len(fgs) / (len(fgs) + len(failedFGs)) * 100:.2f}%"
+            )
             logRow.append(f"{executionTime:.6f}")
             TUI.appendToSolverLog(f"Execution Time: {executionTime:.6f}s")
 
-            TUI.appendToSolverLog(f"Deploying Embedding Graphs.")
+            TUI.appendToSolverLog("Deploying Embedding Graphs.")
             start = default_timer()
             self._orchestrator.sendEmbeddingGraphs(fgs)
             end = default_timer()
-            TUI.appendToSolverLog(f"Finished deploying Embedding Graphs.")
+            TUI.appendToSolverLog("Finished deploying Embedding Graphs.")
             deploymentTime = end - start
 
             logRow.append(f"{deploymentTime:.6f}")
-            TUI.appendToSolverLog(f"Deployment Time: {deploymentTime:.6f}s")
+            TUI.appendToSolverLog("Deployment Time: {deploymentTime:.6f}s")
 
             with open(logFilePath, "a", encoding="utf8") as log:
                 log.write(f"{','.join(logRow)}\n")
 
-            trafficDuration: int = calculateTrafficDuration(self._trafficGenerator.getDesign()[0])
+            trafficDuration: int = calculateTrafficDuration(
+                self._trafficGenerator.getDesign()[0]
+            )
             TUI.appendToSolverLog(f"Waiting for {trafficDuration}s.")
             time: int = 0
             telemetry: Telemetry = self._orchestrator.getTelemetry()
@@ -365,8 +394,9 @@ class SFCSolver(Solver):
                     hostData: HostData = telemetry.getHostData()
                     end: float = default_timer()
                     duration: int = round(end - start, 0)
-                    trafficData: "dict[str, TrafficData]" = self._trafficGenerator.getData(
-                        f"{duration:.0f}s")
+                    trafficData: "dict[str, TrafficData]" = (
+                        self._trafficGenerator.getData(f"{duration:.0f}s")
+                    )
 
                     for key, data in hostData.items():
                         hostRow: "list[str]" = []
@@ -374,9 +404,17 @@ class SFCSolver(Solver):
                         hostRow.append(key)
 
                         hostRow.append(str(data["cpuUsage"][0]))
-                        hostRow.append(str(data["memoryUsage"][0]/(1024*1024) if data["memoryUsage"][0] != 0 else 0))
+                        hostRow.append(
+                            str(
+                                data["memoryUsage"][0] / (1024 * 1024)
+                                if data["memoryUsage"][0] != 0
+                                else 0
+                            )
+                        )
                         hostRow.append(str(duration))
-                        with open(hostDataFilePath, "a", encoding="utf8") as hostDataFile:
+                        with open(
+                            hostDataFilePath, "a", encoding="utf8"
+                        ) as hostDataFile:
                             hostDataFile.write(f"{','.join(hostRow)}\n")
 
                     for key, data in trafficData.items():
@@ -387,22 +425,27 @@ class SFCSolver(Solver):
                         row.append(str(data["averageLatency"]))
                         row.append(str(duration))
                         TUI.appendToSolverLog(f"{key}: {str(data['averageLatency'])}")
-                        with open(latencyDataFilePath, "a", encoding="utf8") as latencyDataFile:
+                        with open(
+                            latencyDataFilePath, "a", encoding="utf8"
+                        ) as latencyDataFile:
                             latencyDataFile.write(f"{','.join(row)}\n")
 
                     time += duration
             except Exception as e:
                 TUI.appendToSolverLog(str(e), True)
 
-            TUI.appendToSolverLog(f"Finished waiting.")
+            TUI.appendToSolverLog("Finished waiting.")
 
-            data: "dict[str, TrafficData]" = self._trafficGenerator.getData(f"{trafficDuration}s")
+            data: "dict[str, TrafficData]" = self._trafficGenerator.getData(
+                f"{trafficDuration}s"
+            )
 
-            TUI.appendToSolverLog(f"Finished experiment.")
+            TUI.appendToSolverLog("Finished experiment.")
             sleep(2)
         except Exception as e:
             TUI.appendToSolverLog(str(e), True)
         TUI.exit()
+
 
 def getTrafficDesign() -> None:
     """
@@ -410,7 +453,13 @@ def getTrafficDesign() -> None:
     """
 
     design: TrafficDesign = generateTrafficDesign(
-        f"{getConfig()['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/data/requests.csv", 2)
+        f"{getConfig()['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/data/requests.csv",
+        0.20,
+        1,
+        True
+    )
 
     with open(f"{configPath}/traffic-design.json", "w", encoding="utf8") as traffic:
         json.dump(design, traffic, indent=4)
+
+    print(getTrafficDesignRate(design, [2]*(len(design) // 2)))
