@@ -3,14 +3,16 @@ This defines the GA that evolves teh weights of the Neural Network.
 """
 
 from copy import deepcopy
+import json
+from math import floor
 import random
 from time import sleep
 from timeit import default_timer
 from typing import Callable, Tuple, Union
 from algorithms.surrogacy.extract_weights import getWeightLength
-from algorithms.surrogacy.generate import evolveInitialWeights, getWeights
+from algorithms.surrogacy.surogate.data_generator.init_pop_generator import evolveInitialWeights, getWeights
 from algorithms.surrogacy.link_embedding import EmbedLinks
-from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
+from algorithms.surrogacy.nn import convertDFtoFGs, convertFGsToDF, getConfidenceValues
 from algorithms.surrogacy.scorer import Scorer
 from algorithms.surrogacy.surrogate import Surrogate
 from algorithms.surrogacy.surrogate_evolver import evolveUsingSurrogate
@@ -24,7 +26,7 @@ import pandas as pd
 import numpy as np
 from deap import base, creator, tools
 from shared.utils.config import getConfig
-from utils.traffic_design import calculateTrafficDuration
+from utils.traffic_design import calculateTrafficDuration, getTrafficDesignRate
 from utils.tui import TUI
 import os
 import tensorflow as tf
@@ -65,14 +67,14 @@ with open(
     encoding="utf8",
 ) as latencyFile:
     latencyFile.write(
-        "generation,individual,sfc,reqps,cpu,avg_cpu,memory,avg_memory,link,latency,sfc_hosts,no_sfcs,var,q3,q1,q2,max,min,total_hosts,ar\n"
+        "generation,individual,sfc,reqps,real_reqps,cpu,avg_cpu,total_cpu,max_cpu,memory,avg_memory,total_memory,max_memory,link,latency,sfc_hosts,no_sfcs,total_hosts,ar\n"
     )
 
 scorer: Scorer = Scorer()
 
 
 def evaluate(
-    index: int,
+    individualIndex: int,
     individual: "list[float]",
     fgs: "list[EmbeddingGraph]",
     gen: int,
@@ -116,7 +118,7 @@ def evaluate(
     weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(
         individual, copiedFGs, topology
     )
-    df: pd.DataFrame = convertFGstoDF(copiedFGs, topology)
+    df: pd.DataFrame = convertFGsToDF(copiedFGs, topology)
     newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
     egs, nodes, embedData = convertDFtoFGs(newDF, copiedFGs, topology)
     if len(egs) > 0:
@@ -126,16 +128,19 @@ def evaluate(
         end: float = default_timer()
         TUI.appendToSolverLog(f"Link Embedding Time for all EGs: {end - start}s")
 
+    with open(f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/egs.json", "w", encoding="utf8") as egsFile:
+        json.dump(egs, egsFile)
+
     penaltyLatency: float = 50000
     acceptanceRatio: float = len(egs) / len(fgs)
     latency: int = 0
     penalty: float = gen / ngen
     maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
+
     TUI.appendToSolverLog(
         f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}"
     )
     if len(egs) > 0:
-        # Validate EGs
         data: "dict[str, dict[str, float]]" = {
             eg["sfcID"]: {"reqps": maxReqps} for eg in egs
         }
@@ -150,7 +155,7 @@ def evaluate(
         # The resource demand of deployed VNFs exceeds the resource capacity of at least 1 host.
         # This leads to servers crashing.
         # Penalty is applied to the latency and the egs are not deployed.
-        if maxCPU > maxCPUDemand or maxMemory > maxMemoryDemand:
+        if maxMemory > maxMemoryDemand:
             TUI.appendToSolverLog(
                 f"Penalty because max CPU demand is {maxCPU} and max Memory demand is {maxMemory}."
             )
@@ -165,42 +170,35 @@ def evaluate(
         time: "list[int]" = sum([int(td["duration"][:-1]) for td in trafficDesign[0]])
         avg: float = reqs / time
 
-        data: "dict[str, dict[str, float]]" = {
-            eg["sfcID"]: {"reqps": avg, "latency": 0.0} for eg in egs
-        }
+        # inputData: pd.DataFrame = pd.DataFrame(
+        #     rows,
+        #     columns=[
+        #         "sfc",
+        #         "reqps",
+        #         "cpu",
+        #         "avg_cpu",
+        #         "total_cpu",
+        #         "max_cpu",
+        #         "memory",
+        #         "avg_memory",
+        #         "total_memory",
+        #         "max_memory",
+        #         "link",
+        #         "latency",
+        #         "sfc_hosts",
+        #         "no_sfcs",
+        #     ],
+        # )
 
-        rows: "list[list[Union[str, float]]]" = scorer.getSFCScores(
-            data, topology, egs, embedData, embedLinks.getLinkData()
-        )
+        # surrogate: Surrogate = Surrogate()
+        # outputData: pd.DataFrame = surrogate.predict(inputData)
 
-        for row in rows:
-            row.append(len(egs))
+        # latency = outputData["PredictedLatency"].mean()
+        # confidence: float = outputData["Confidence"].mean()
 
-        inputData: pd.DataFrame = pd.DataFrame(
-            rows,
-            columns=[
-                "sfc",
-                "reqps",
-                "cpu",
-                "avg_cpu",
-                "memory",
-                "avg_memory",
-                "link",
-                "latency",
-                "sfc_hosts",
-                "no_sfcs",
-            ],
-        )
+        # TUI.appendToSolverLog(f"Latency: {latency}ms, Confidence: {confidence}.")
 
-        surrogate: Surrogate = Surrogate()
-        outputData: pd.DataFrame = surrogate.predict(inputData)
-
-        latency = outputData["PredictedLatency"].mean()
-        confidence: float = outputData["Confidence"].mean()
-
-        TUI.appendToSolverLog(f"Latency: {latency}ms, Confidence: {confidence}.")
-
-        if acceptanceRatio >= minAR and latency <= maxLatency and confidence > 50:
+        if True:
             sendEGs(egs)
 
             duration: int = calculateTrafficDuration(trafficDesign[0])
@@ -211,43 +209,92 @@ def evaluate(
 
             TUI.appendToSolverLog(f"Done waiting for {duration}s.")
 
-            anomalousDuration: int = 15 if not trafficType else 2
-            trafficDuration: int = duration - anomalousDuration
-            trafficData: "dict[str, TrafficData]" = trafficGenerator.getData(
-                f"{trafficDuration:.0f}s"
+            # anomalousDuration: int = 15 if not trafficType else 2
+            # trafficDuration: int = duration - anomalousDuration
+            trafficData: pd.DataFrame = trafficGenerator.getData(
+                f"{duration + 5:.0f}s"
             )
-            latency: float = 0
-            for key, value in trafficData.items():
-                latency += value["averageLatency"]
 
-                outputData.loc[outputData["sfc"] == key, "latency"] = value[
-                    "averageLatency"
-                ]
+            if trafficData.empty or "_time" not in trafficData.columns or "_value" not in trafficData.columns:
+                TUI.appendToSolverLog("Traffic data is empty.")
+                return 0, penaltyLatency * penalty
+
+            trafficData["_time"] = trafficData["_time"] // 1000000000
+
+            groupedTrafficData: pd.DataFrame = trafficData.groupby(["_time", "sfcID"]).agg(
+                reqps=("_value", "count"),
+                medianLatency=("_value", "median"),
+            )
+
+            simulatedReqps: "list[float]" = getTrafficDesignRate(
+                trafficDesign[0], [1] * groupedTrafficData.index.get_level_values(0).unique().size
+            )
+
+            latency: float = 0
+
+            data: "list[dict[str, dict[str, float]]]" = []
+            index: int = 0
+            for i, group in groupedTrafficData.groupby(level=0):
+                data.append(
+                    {
+                        eg["sfcID"]: {
+                            "reqps": (
+                                simulatedReqps[index]
+                                if index < len(simulatedReqps)
+                                else simulatedReqps[-1]
+                            ),
+                            "realReqps": (
+                                group.loc[(i, eg["sfcID"])]["reqps"]
+                                if eg["sfcID"] in group.index.get_level_values(1)
+                                else 0
+                            ),
+                            "latency": (
+                                group.loc[(i, eg["sfcID"])]["medianLatency"]
+                                if eg["sfcID"] in group.index.get_level_values(1)
+                                else 0
+                            ),
+                        }
+                        for eg in egs
+                    }
+                )
+                index += 1
+
+            # data: "dict[str, dict[str, float]]" = {
+            #     eg["sfcID"]: {
+            #         "reqps": (
+            #             trafficData[eg["sfcID"]]["requests"] / trafficDuration
+            #             if eg["sfcID"] in trafficData
+            #             else 0
+            #         ),
+            #         "latency": 0.0,
+            #     }
+            #     for eg in egs
+            # }
+
+            rows: "list[list[Union[str, float]]]" = []
+
+            for dataReqps in data:
+                row = scorer.getSFCScores(
+                    dataReqps, topology, egs, embedData, embedLinks.getLinkData()
+                )
+                for r in row:
+                    r.insert(0, str(individualIndex))
+
+                rows.extend(row)
 
             for row in rows:
-                sfc: str = row[0]
-                row[7] = trafficData[sfc]["averageLatency"]
-                row.append(trafficData[sfc]["variance"])
-                row.append(trafficData[sfc]["q3"])
-                row.append(trafficData[sfc]["q1"])
-                row.append(trafficData[sfc]["q2"])
-                row.append(trafficData[sfc]["max"])
-                row.append(trafficData[sfc]["min"])
-
+                row.append(len(egs))
                 with open(
                     f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency.csv",
                     "a",
                     encoding="utf8",
                 ) as avgLatency:
                     avgLatency.write(
-                        f"{gen},{index},"
+                        f"{gen},"
                         + ",".join([str(el) for el in row])
                         + f",{len(scores)},{acceptanceRatio}\n"
                     )
-
-            latency = (
-                latency / len(trafficData) if len(trafficData) > 0 else penaltyLatency
-            )
+            latency = trafficData["_value"].median()
 
             weightRow: str = f"{gen}, "
 
@@ -263,16 +310,16 @@ def evaluate(
             ) as weights:
                 weights.write(weightRow)
 
-            trainData: pd.DataFrame = outputData.loc[outputData["latency"] > 0]
-            if len(trainData) > 0:
-                surrogate.trainModel(trainData, True)
-
             TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
             deleteEGs(egs)
+            sleep(30)
     else:
         latency = penaltyLatency * penalty
 
     TUI.appendToSolverLog(f"Latency: {latency}ms")
+
+    if acceptanceRatio < minAR:
+        latency = latency + (penaltyLatency * penalty * (1 - floor(random.uniform(0, 1))))
 
     return acceptanceRatio, latency
 
@@ -302,18 +349,27 @@ def evolveWeights(
         None
     """
 
-    POP_SIZE: int = 10
-    NGEN: int = 5
+    POP_SIZE: int = 20
+    NGEN: int = 20
     CXPB: float = 1.0
     MUTPB: float = 0.8
     maxCPUDemand: int = 1
-    maxMemoryDemand: int = 5
+    maxMemoryDemand: int = 1
     minAR: float = 0.8
-    maxLatency: int = 1000
+    maxLatency: int = 1500
 
-    evolvedPop: "list[creator.Individual]" = evolveUsingSurrogate(
-        fgs, trafficDesign, topology, POP_SIZE, minAR, maxLatency
+    # evolvedPop: "list[creator.Individual]" = evolveUsingSurrogate(
+    #     fgs, trafficDesign, topology, POP_SIZE, minAR, maxLatency
+    # )
+
+    evolvedPop: "list[creator.Individual]" = evolveInitialWeights(
+        POP_SIZE, fgs, trafficDesign, topology, minAR
     )
+
+    # evolvedPop: "list[creator.Individual]" = []
+
+    # with open( f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/weights.json", "r", encoding="utf8") as weightsFile:
+    #     evolvedPop = json.load(weightsFile)
 
     TUI.appendToSolverLog("Starting the evolution of the weights using OpenRASE.")
 
@@ -343,10 +399,11 @@ def evolveWeights(
 
     randomPop: "list[creator.Individual]" = toolbox.population(n=POP_SIZE)
 
-    alpha: float = 1.0
+    alpha: float = 0.9
     pop: "list[creator.Individual]" = random.sample(
         evolvedNewPop, int(POP_SIZE * alpha)
     ) + random.sample(randomPop, int(POP_SIZE * (1 - alpha)))
+    # pop: "list[creator.Individual]" = randomPop[:]
     gen: int = 1
     for i, ind in enumerate(pop):
         ind.fitness.values = evaluate(
