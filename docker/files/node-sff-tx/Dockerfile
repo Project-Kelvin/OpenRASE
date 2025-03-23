@@ -27,4 +27,4 @@ RUN pnpm build
 WORKDIR /home/OpenRASE/apps/sff-tx/
 RUN pnpm install
 
-CMD pnpm run start:dev
+CMD pnpm run start
