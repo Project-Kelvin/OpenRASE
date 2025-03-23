@@ -311,7 +311,7 @@ class EmbedLinks:
                     bStartIndex = bEndIndex
                     bEndIndex = bStartIndex + layers[index + 1]
 
-        prediction = model.predict(np.array(data))
+        prediction = model.predict(np.array(data), verbose=0)
 
         return data.assign(Cost=prediction)
 
