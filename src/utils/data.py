@@ -58,5 +58,6 @@ def mergeHostAndTrafficData(
     hostData = hostData.drop(rowsToDelete)
     hostData["median"] = medians
     hostData["reqps"] = reqpss
+    hostData["duration"] = hostData["endTime"] - hostData["startTime"]
 
     return hostData
