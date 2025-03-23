@@ -3,25 +3,29 @@ This defines the GA that evolves teh weights of the Neural Network.
 """
 
 from copy import deepcopy
+import json
 import random
 from typing import Any, Tuple
-from algorithms.surrogacy.extract_weights import getWeightLength, getWeights
-from algorithms.surrogacy.nn import convertDFtoFGs, convertFGstoDF, getConfidenceValues
+from multiprocessing import Pool, cpu_count
+import pandas as pd
+from deap import base, creator, tools
+import tensorflow as tf
+from shared.utils.config import getConfig
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
-import pandas as pd
-import numpy as np
-from deap import base, creator, tools
-from algorithms.surrogacy.scorer import Scorer
-from models.calibrate import ResourceDemand
-from utils.tui import TUI
-import tensorflow as tf
 from shared.models.traffic_design import TrafficDesign
-from multiprocessing import Pool, cpu_count
+from algorithms.surrogacy.extract_weights import getWeightLength, getWeights
+from algorithms.surrogacy.nn import convertDFtoFGs, convertFGsToDF, getConfidenceValues
+from algorithms.surrogacy.scorer import Scorer
+from utils.tui import TUI
+from models.calibrate import ResourceDemand
+
 
 tf.get_logger().setLevel("ERROR")
 
 scorer: Scorer = Scorer()
+
+artifactDir: str = f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy"
 
 
 def evaluate(
@@ -51,7 +55,7 @@ def evaluate(
     weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(
         individual, copiedFGs, topology
     )
-    df: pd.DataFrame = convertFGstoDF(copiedFGs, topology)
+    df: pd.DataFrame = convertFGsToDF(copiedFGs, topology)
     newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
     egs, _nodes, embedData = convertDFtoFGs(newDF, copiedFGs, topology)
 
@@ -87,6 +91,9 @@ def evolveInitialWeights(
     trafficDesign: TrafficDesign,
     topology: Topology,
     minAR: float,
+    maxCPU: float,
+    maxMemory: float,
+    dataType: int,
 ) -> "list[list[float]]":
     """
     Evolves the weights of the Neural Network.
@@ -96,9 +103,10 @@ def evolveInitialWeights(
         fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
         trafficDesign (TrafficDesign): the traffic design.
         topology (Topology): the topology.
+        minAR (float): The minimum acceptance ratio.
         maxCPU (float): The maximum CPU demand.
         maxMemory (float): The maximum memory demand.
-        minAR (float): The minimum acceptance ratio.
+        dataType (int): The data type (LC LL:0, LC HL:1, HC LL:2, HC HL:3 ).
 
     Returns:
         list[list[float]]: the weights.
@@ -106,14 +114,12 @@ def evolveInitialWeights(
 
     TUI.appendToSolverLog("Starting the evolution of the weights.")
 
-    MULTIPLIER: int = 1
+    MULTIPLIER: int = 10
     POP_SIZE: int = popSize * MULTIPLIER
     NGEN: int = 200
     CXPB: float = 1.0
     MUTPB: float = 1.0
-    maxCPU: float = 1
-    maxMemory: float = 5
-    minInd: int = POP_SIZE // 4
+    MIN_IND: int = round(popSize * 0.8)
 
     creator.create("MaxHosts", base.Fitness, weights=(1.0, -1.0, -1.0))
     creator.create("Individual", list, fitness=creator.MaxHosts)
@@ -156,10 +162,8 @@ def evolveInitialWeights(
         ind.fitness.values = result
 
     gen = gen + 1
-    averageAR: float = 0
-    averageCPU: float = 5
-    ar1: "list[creator.Individual]" = []
-    while len(ar1) < minInd:
+    filteredPop: "list[creator.Individual]" = []
+    while len(filteredPop) < MIN_IND:
         offspring: "list[creator.Individual]" = list(map(toolbox.clone, pop))
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
             if random.random() < CXPB:
@@ -196,32 +200,45 @@ def evolveInitialWeights(
             offspring, int((1 - alpha) * POP_SIZE)
         )
 
-        ar1 = [
+        firstFilteredPop: "list[creator.Individual]" = [
             ind
             for ind in pop
             if ind.fitness.values[0] >= minAR
-            and ind.fitness.values[1] < maxCPU
             and ind.fitness.values[2] < maxMemory
         ]
 
-        averageAR = np.mean([ind.fitness.values[0] for ind in pop])
-        averageCPU = np.mean([ind.fitness.values[1] for ind in pop])
+        if dataType == 0 or dataType == 1:
+            filteredPop = [
+                ind
+                for ind in firstFilteredPop
+                if ind.fitness.values[1] < maxCPU
+            ]
+        else:
+            filteredPop = [
+                ind
+                for ind in firstFilteredPop
+                if ind.fitness.values[1] > 1.1
+                and ind.fitness.values[1] <= 2
+            ]
 
         TUI.appendToSolverLog(f"Generation {gen} completed.")
         TUI.appendToSolverLog(
-            f"Average AR is {averageAR}. Max is {max([ind.fitness.values[0] for ind in pop])}. Min is {min([ind.fitness.values[0] for ind in pop])}."
-        )
-        TUI.appendToSolverLog(
-            f"{len(ar1)} individuals have AR >= {minAR} and CPU <= {maxCPU}."
-        )
-        TUI.appendToSolverLog(
-            f"Average max CPU is {averageCPU}. Max is {max([ind.fitness.values[1] for ind in pop])}. Min is {min([ind.fitness.values[1] for ind in pop])}."
-        )
-        TUI.appendToSolverLog(
-            f"Average max memory is {np.mean([ind.fitness.values[2] for ind in pop])}. Max is {max([ind.fitness.values[2] for ind in pop])}. Min is {min([ind.fitness.values[2] for ind in pop])}."
+            f"{len(filteredPop)} individuals satisfy the criteria."
         )
         gen = gen + 1
 
     del creator.Individual
 
-    return pop
+    doubledPop = filteredPop * 2
+    newPop: "list[creator.Individual]" = []
+    if len(doubledPop) < popSize:
+        rem: int = popSize - len(doubledPop)
+        newPop = doubledPop + random.sample(pop, rem)
+    else:
+        rem: int = popSize - len(filteredPop)
+        newPop = filteredPop + random.sample(pop, rem)
+
+    with open(f"{artifactDir}/weights.json", "w", encoding="utf8") as f:
+        json.dump(newPop, f)
+
+    return newPop
