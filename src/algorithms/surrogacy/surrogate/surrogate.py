@@ -6,11 +6,11 @@ import os
 import random
 from typing import Any
 import numpy as np
-from shared.utils.config import getConfig
 import tensorflow as tf
 import pandas as pd
 import matplotlib.pyplot as plt
 from algorithms.surrogacy.local_constants import (
+    SURROGACY_PATH,
     SURROGATE_DATA_PATH,
     SURROGATE_MODELS_PATH,
 )
@@ -64,9 +64,7 @@ def train() -> None:
     Trains the model.
     """
 
-    artifactsPath: str = (
-        getConfig()["repoAbsolutePath"] + "/artifacts/experiments/surrogacy"
-    )
+    artifactsPath: str = SURROGACY_PATH
 
     highCpuHighLinkData: pd.DataFrame = pd.read_csv(highCpuHighLinkPath, sep=r"\s*,\s*")
     highCpuLowLinkData: pd.DataFrame = pd.read_csv(highCpuLowLinkPath, sep=r"\s*,\s*")
@@ -236,7 +234,7 @@ def train() -> None:
     model.compile(
         optimizer=tf.keras.optimizers.Adamax(learning_rate=0.05),
         loss="mse",
-        metrics=[tf.keras.metrics.RootMeanSquaredError()],
+        metrics=[tf.keras.metrics.RootMeanSquaredError()]
     )
     history: Any = model.fit(xTrain, yTrain, epochs=10000, validation_split=0.2)
     print(model.evaluate(xTest, yTest))
@@ -353,4 +351,4 @@ def train() -> None:
     plt.savefig(f"{artifactsPath}/simulated_latency_scatter.png")
     plt.clf()
 
-    model.save(modelPath)
+    model.save(f"{modelPath}/surrogate.keras")

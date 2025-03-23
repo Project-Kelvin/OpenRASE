@@ -14,10 +14,9 @@ from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
-from algorithms.surrogacy.surrogate import Surrogate
+from algorithms.surrogacy.local_constants import SURROGACY_PATH
 from algorithms.surrogacy.surrogate.data_generator.evolver import evolveWeights
-from algorithms.surrogacy.surrogate_point import train as train_point
-from algorithms.surrogacy.surrogate_dt import train as train_dt
+from algorithms.surrogacy.surrogate.surrogate import train
 from mano.orchestrator import Orchestrator
 from sfc.fg_request_generator import FGRequestGenerator
 from sfc.sfc_emulator import SFCEmulator
@@ -30,35 +29,18 @@ from utils.tui import TUI
 config: Config = getConfig()
 configPath: str = f"{config['repoAbsolutePath']}/src/runs/surrogacy/configs"
 
-directory = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy"
+directory = SURROGACY_PATH
 
 if not os.path.exists(directory):
     os.makedirs(directory)
 
 
-@click.command()
-@click.option("--point", default=False, is_flag=True, help="Use point estimator.")
-@click.option("--dt", default=False, is_flag=True, help="Use decision forest.")
-def train(point: bool, dt: bool) -> None:
+def trainModel() -> None:
     """
     Runs the surrogate model.
-
-    Parameters:
-        point (bool): Whether to use the point estimator.
-        dt (bool): Whether to use the decision forest.
     """
-    if point:
-        train_point()
 
-        return
-
-    if dt:
-        train_dt()
-
-        return
-
-    surrogate: Surrogate = Surrogate()
-    surrogate.train()
+    train()
 
 
 @click.command()
