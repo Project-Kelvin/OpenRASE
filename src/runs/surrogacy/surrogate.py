@@ -56,7 +56,7 @@ def trainModel() -> None:
 @click.option(
     "--hchl", default=False, is_flag=True, help="High CPU usage. High link usage."
 )
-def generateData(lcll: bool, lchl: bool, hcll: bool, hchl: bool) -> None:
+def generateData(_lcll: bool, lchl: bool, hcll: bool, hchl: bool) -> None:
     """
     Generates data for the surrogate model.
 
@@ -68,26 +68,20 @@ def generateData(lcll: bool, lchl: bool, hcll: bool, hchl: bool) -> None:
     """
 
     dataType: int = 0
-
-    if lcll:
-        dataType = 0
-    elif lchl:
-        dataType = 1
-    elif hcll:
-        dataType = 2
-    elif hchl:
-        dataType = 3
-
     topology: Topology = None
 
-    if lcll:
-        topology = generateFatTreeTopology(4, 6, 1, 5120)
-    elif lchl:
+    if lchl:
+        dataType = 1
         topology = generateFatTreeTopology(4, 3, 1, 5120)
     elif hcll:
+        dataType = 2
         topology = generateFatTreeTopology(4, 6, 0.2, 5120)
     elif hchl:
+        dataType = 3
         topology = generateFatTreeTopology(4, 3, 0.2, 5120)
+    else:
+        dataType = 0
+        topology = generateFatTreeTopology(4, 6, 1, 5120)
 
     class FGR(FGRequestGenerator):
         """
@@ -131,7 +125,7 @@ def generateData(lcll: bool, lchl: bool, hcll: bool, hchl: bool) -> None:
         ) -> None:
             super().__init__(orchestrator, trafficGenerator)
             self._trafficDesign: "list[TrafficDesign]" = []
-            self._topology: Topology = self._orchestrator.getTopology()
+            self._topology: Topology = None
 
         def setTrafficDesign(self, trafficDesign: "list[TrafficDesign]") -> None:
             """
@@ -144,6 +138,7 @@ def generateData(lcll: bool, lchl: bool, hcll: bool, hchl: bool) -> None:
             self._trafficDesign: "list[TrafficDesign]" = trafficDesign
 
         def generateEmbeddingGraphs(self) -> None:
+            self._topology = self._orchestrator.getTopology()
             try:
                 while self._requests.empty():
                     pass

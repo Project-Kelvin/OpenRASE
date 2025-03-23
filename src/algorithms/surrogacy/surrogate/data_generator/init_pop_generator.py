@@ -112,7 +112,7 @@ def evolveInitialWeights(
         list[list[float]]: the weights.
     """
 
-    TUI.appendToSolverLog("Starting the evolution of the weights.")
+    TUI.appendToSolverLog("Evolving initial population.")
 
     MULTIPLIER: int = 10
     POP_SIZE: int = popSize * MULTIPLIER
@@ -125,7 +125,6 @@ def evolveInitialWeights(
     creator.create("Individual", list, fitness=creator.MaxHosts)
 
     toolbox: base.Toolbox = base.Toolbox()
-
     toolbox.register("gene", random.uniform, -1, 1)
     toolbox.register(
         "individual",

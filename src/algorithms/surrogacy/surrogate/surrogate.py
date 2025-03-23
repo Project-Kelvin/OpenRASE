@@ -227,7 +227,7 @@ def train() -> None:
             tf.keras.layers.Dense(
                 16, kernel_initializer="glorot_normal", activation=activation
             ),
-            tf.keras.layers.Dense(1),
+            tf.keras.layers.Dense(1)
         ]
     )
 

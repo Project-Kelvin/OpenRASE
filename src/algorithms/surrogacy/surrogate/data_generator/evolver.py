@@ -61,6 +61,7 @@ def evaluate(
     topology: Topology,
     maxMemoryDemand: float,
     minAR: float,
+    fileName: str
 ) -> "tuple[float, float]":
     """
     Evaluates the individual.
@@ -78,6 +79,7 @@ def evaluate(
         topology (Topology): the topology.
         maxMemoryDemand (float): maximum memory demand.
         minAR (float): minimum acceptance ratio.
+        fileName (str): the file name.
 
     Returns:
         tuple[float, float]: the fitness.
@@ -207,7 +209,7 @@ def evaluate(
         for row in rows:
             row.append(len(egs))
             with open(
-                f"{surrogateDataDirectory}/artifacts/experiments/surrogacy/latency.csv",
+                f"{surrogateDataDirectory}/{fileName}",
                 "a",
                 encoding="utf8",
             ) as avgLatency:
@@ -342,33 +344,11 @@ def evolveWeights(
             topology,
             MAX_MEMORY_DEMAND,
             MIN_AR,
-        )
-
-    ars = [ind.fitness.values[0] for ind in pop]
-    latencies = [ind.fitness.values[1] for ind in pop]
-
-    with open(
-        f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/data.csv",
-        "a",
-        encoding="utf8",
-    ) as dataFile:
-        dataFile.write(
-            f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n"
+            fileName
         )
 
     hof = tools.ParetoFront()
     hof.update(pop)
-
-    for ind in hof:
-        TUI.appendToSolverLog(
-            f"{gen}\t {ind.fitness.values[0]}\t {ind.fitness.values[1]}"
-        )
-        with open(
-            f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/pfs.csv",
-            "a",
-            encoding="utf8",
-        ) as pf:
-            pf.write(f"{gen}, {ind.fitness.values[1]}, {ind.fitness.values[0]}\n")
 
     gen = gen + 1
     while gen <= NGEN:
@@ -398,31 +378,10 @@ def evolveWeights(
                 topology,
                 MAX_MEMORY_DEMAND,
                 MIN_AR,
+                fileName
             )
         pop[:] = toolbox.select(pop + offspring, k=POP_SIZE)
 
         hof.update(pop)
 
-        ars = [ind.fitness.values[0] for ind in pop]
-        latencies = [ind.fitness.values[1] for ind in pop]
-
-        with open(
-            f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/data.csv",
-            "a",
-            encoding="utf8",
-        ) as dataFile:
-            dataFile.write(
-                f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n"
-            )
-
-        for ind in hof:
-            TUI.appendToSolverLog(
-                f"{gen}\t {ind.fitness.values[0]}\t {ind.fitness.values[1]}"
-            )
-            with open(
-                f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy/pfs.csv",
-                "a",
-                encoding="utf8",
-            ) as pf:
-                pf.write(f"{gen}, {ind.fitness.values[1]}, {ind.fitness.values[0]}\n")
         gen = gen + 1
