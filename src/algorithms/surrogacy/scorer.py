@@ -24,12 +24,12 @@ class Scorer():
         self._calibrate: Calibrate = Calibrate()
 
 
-    def getHostScores(self,data: "dict[str, dict[str, float]]", topology: Topology, embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" ) -> "dict[str, ResourceDemand]":
+    def getHostScores(self,data: "dict[str, dict[str, float, float]]", topology: Topology, embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" ) -> "dict[str, ResourceDemand]":
         """
         Gets the host scores.
 
         Parameters:
-            data (dict[str, dict[str, float]]): the data.
+            data (dict[str, dict[str, float, float]]): the data.
             topology (Topology): the topology.
             embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): the embedding data.
 
@@ -64,12 +64,12 @@ class Scorer():
 
         return hostResourceData
 
-    def getLinkScores(self, data: "dict[str, dict[str, float]]", topology: Topology, egs: "list[EmbeddingGraph]", linkData: "dict[str, dict[str, float]]") -> "dict[str, float]":
+    def getLinkScores(self, data: "dict[str, dict[str, float, float]]", topology: Topology, egs: "list[EmbeddingGraph]", linkData: "dict[str, dict[str, float]]") -> "dict[str, float]":
         """
         Gets the link scores.
 
         Parameters:
-            data (dict[str, dict[str, float]]): the data.
+            data (dict[str, dict[str, float, float]]): the data.
             topology (Topology): the topology.
             egs (list[EmbeddingGraph]): the Embedding Graphs.
             linkData (dict[str, dict[str, float]]): the link data.
@@ -111,12 +111,12 @@ class Scorer():
 
         return linkScores
 
-    def cacheData(self, data: "dict[str, dict[str, float]]", egs: "list[EmbeddingGraph]") -> None:
+    def cacheData(self, data: "dict[str, dict[str, float, float]]", egs: "list[EmbeddingGraph]") -> None:
         """
         Caches the data.
 
         Parameters:
-            data (dict[str, dict[str, float]]): the data.
+            data (dict[str, dict[str, float, float]]): the data.
             egs (list[EmbeddingGraph]): the Embedding Graphs.
         """
 
@@ -153,12 +153,12 @@ class Scorer():
         self._calibrate = Calibrate()
         self._calibrate.predictAndCache(dataToCache)
 
-    def getSFCScores(self, data: "dict[str, dict[str, float]]", topology: Topology, egs: "list[EmbeddingGraph]", embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]", linkData: "dict[str, dict[str, float]]" ) -> "list[list[Union[str, float]]]":
+    def getSFCScores(self, data: "dict[str, dict[str, float, float]]", topology: Topology, egs: "list[EmbeddingGraph]", embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]", linkData: "dict[str, dict[str, float]]" ) -> "list[list[Union[str, float]]]":
         """
         Gets the SFC scores.
 
         Parameters:
-            data (dict[str, dict[str, float]]): the data.
+            data (dict[str, dict[str, float, float]]): the data.
             topology (Topology): the topology.
             egs (list[EmbeddingGraph]): the Embedding Graphs.
             embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): the embedding data.
@@ -179,6 +179,8 @@ class Scorer():
             eg: EmbeddingGraph = [graph for graph in egs if graph["sfcID"] == sfc][0]
             row: "list[Union[str, float]]" = []
             hosts: "dict[str, ResourceDemand]" = {}
+            totalHostCPU: float = 0
+            totalHostMemory: float = 0
 
             def parseVNF(vnf: VNF, depth: int) -> None:
                 """
@@ -191,6 +193,8 @@ class Scorer():
 
                 nonlocal totalCPUScore
                 nonlocal totalMemoryScore
+                nonlocal totalHostCPU
+                nonlocal totalHostMemory
 
                 divisor: int = 2**(depth-1)
                 reqps: float = sfcData["reqps"] / divisor
@@ -206,16 +210,25 @@ class Scorer():
                 totalCPUScore += self._getScore(vnfCPU, hostCPU)
                 totalMemoryScore += self._getScore(vnfMemory, hostMemory)
 
+                totalHostCPU += hostScores[vnf["host"]["id"]]["cpu"]
+                totalHostMemory += hostScores[vnf["host"]["id"]]["memory"]
+
                 if vnf["host"]["id"] not in hosts:
                     hosts.update({vnf["host"]["id"]: hostScores[vnf["host"]["id"]]})
 
             traverseVNF(eg["vnfs"], parseVNF, shouldParseTerminal=False)
+
             row.append(sfc)
             row.append(sfcData["reqps"])
+            row.append(sfcData["realReqps"])
             row.append(totalCPUScore)
             row.append(sum([host["cpu"] for host in hosts.values()])/len(hosts))
+            row.append(totalHostCPU)
+            row.append(max([host["cpu"] for host in hosts.values()]))
             row.append(totalMemoryScore)
             row.append(sum([host["memory"] for host in hosts.values()])/len(hosts))
+            row.append(totalHostMemory)
+            row.append(max([host["memory"] for host in hosts.values()]))
             row.append(linkScores[sfc])
             row.append(sfcData["latency"])
             row.append(len(hosts))
