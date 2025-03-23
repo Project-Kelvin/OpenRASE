@@ -34,10 +34,6 @@ setuptools = "<60" # To suppress 'distutils Version classes are deprecated. Use 
 textual = "^0.57.1"
 deap = "^1.4.1"
 networkx = {version = "3.2.1", extras = ["default"]}
-tensorflow-probability = "^0.24.0"
-tf-keras = "^2.17.0"
-ydf = "^0.11.0"
-tensorflow-decision-forests = "1.11.0"
 
 [build-system]
 requires = ["poetry-core"]
