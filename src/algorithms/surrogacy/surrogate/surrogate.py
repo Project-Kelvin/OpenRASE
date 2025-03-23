@@ -10,8 +10,10 @@ from shared.utils.config import getConfig
 import tensorflow as tf
 import pandas as pd
 import matplotlib.pyplot as plt
-
-from algorithms.surrogacy.local_constants import SURROGATE_DATA_PATH, SURROGATE_MODELS_PATH
+from algorithms.surrogacy.local_constants import (
+    SURROGATE_DATA_PATH,
+    SURROGATE_MODELS_PATH,
+)
 
 os.environ["PYTHONHASHSEED"] = "100"
 
@@ -56,6 +58,7 @@ highCpuHighLink2Path: str = os.path.join(
     "latency_hc_hl_2.csv",
 )
 
+
 def train() -> None:
     """
     Trains the model.
@@ -70,7 +73,9 @@ def train() -> None:
     lowCpuHighLinkData: pd.DataFrame = pd.read_csv(lowCpuHighLinkPath, sep=r"\s*,\s*")
     lowCpuLowLinkData: pd.DataFrame = pd.read_csv(lowCpuLowLinkPath, sep=r"\s*,\s*")
     highCpuLowLink2Data: pd.DataFrame = pd.read_csv(highCpuLowLink2Path, sep=r"\s*,\s*")
-    highCpuHighLink2Data: pd.DataFrame = pd.read_csv(highCpuHighLink2Path, sep=r"\s*,\s*")
+    highCpuHighLink2Data: pd.DataFrame = pd.read_csv(
+        highCpuHighLink2Path, sep=r"\s*,\s*"
+    )
 
     highCpuHighLinkData.loc[highCpuHighLinkData[OUTPUT] == 0, OUTPUT] = 1500
     highCpuLowLinkData.loc[highCpuLowLinkData[OUTPUT] == 0, OUTPUT] = 1500
@@ -94,18 +99,20 @@ def train() -> None:
     highCpuLowLink2Data = highCpuLowLink2Data.groupby(["generation", "individual"]).agg(
         latency=("latency", "mean"), max_cpu=("max_cpu", "mean"), link=("link", "mean")
     )
-    highCpuHighLink2Data = highCpuHighLink2Data.groupby(["generation", "individual"]).agg(
+    highCpuHighLink2Data = highCpuHighLink2Data.groupby(
+        ["generation", "individual"]
+    ).agg(
         latency=("latency", "mean"), max_cpu=("max_cpu", "mean"), link=("link", "mean")
     )
 
     def clean(data: pd.DataFrame) -> pd.DataFrame:
-        q1 = data[OUTPUT].quantile(0.25)
-        q3 = data[OUTPUT].quantile(0.75)
-        iqr = q3 - q1
-        lower_bound = q1 - 1.5 * iqr
-        upper_bound = q3 + 1.5 * iqr
+        q1: float = data[OUTPUT].quantile(0.25)
+        q3: float = data[OUTPUT].quantile(0.75)
+        iqr: float = q3 - q1
+        lowerBound: float = q1 - 1.5 * iqr
+        upperBound: float = q3 + 1.5 * iqr
 
-        return data[(data[OUTPUT] > lower_bound) & (data[OUTPUT] < upper_bound)]
+        return data[(data[OUTPUT] > lowerBound) & (data[OUTPUT] < upperBound)]
 
     highCpuHighLinkData = clean(highCpuHighLinkData)
     highCpuLowLinkData = clean(highCpuLowLinkData)
@@ -114,28 +121,66 @@ def train() -> None:
     highCpuLowLink2Data = clean(highCpuLowLink2Data)
     highCpuHighLink2Data = clean(highCpuHighLink2Data)
 
-    highCpuHighLinkTrainData: pd.DataFrame = highCpuHighLinkData.sample(frac=0.8, random_state=0)
-    highCpuLowLinkTrainData: pd.DataFrame = highCpuLowLinkData.sample(frac=0.8, random_state=0)
-    lowCpuHighLinkTrainData: pd.DataFrame = lowCpuHighLinkData.sample(frac=0.8, random_state=0)
-    lowCpuLowLinkTrainData: pd.DataFrame = lowCpuLowLinkData.sample(frac=0.8, random_state=0)
-    highCpuLowLink2TrainData: pd.DataFrame = highCpuLowLink2Data.sample(frac=0.8, random_state=0)
-    highCpuHighLink2TrainData: pd.DataFrame = highCpuHighLink2Data.sample(frac=0.8, random_state=0)
+    highCpuHighLinkTrainData: pd.DataFrame = highCpuHighLinkData.sample(
+        frac=0.8, random_state=0
+    )
+    highCpuLowLinkTrainData: pd.DataFrame = highCpuLowLinkData.sample(
+        frac=0.8, random_state=0
+    )
+    lowCpuHighLinkTrainData: pd.DataFrame = lowCpuHighLinkData.sample(
+        frac=0.8, random_state=0
+    )
+    lowCpuLowLinkTrainData: pd.DataFrame = lowCpuLowLinkData.sample(
+        frac=0.8, random_state=0
+    )
+    highCpuLowLink2TrainData: pd.DataFrame = highCpuLowLink2Data.sample(
+        frac=0.8, random_state=0
+    )
+    highCpuHighLink2TrainData: pd.DataFrame = highCpuHighLink2Data.sample(
+        frac=0.8, random_state=0
+    )
 
-    highCpuHighLinkTestData: pd.DataFrame = highCpuHighLinkData.drop(highCpuHighLinkTrainData.index)
-    highCpuLowLinkTestData: pd.DataFrame = highCpuLowLinkData.drop(highCpuLowLinkTrainData.index)
-    lowCpuHighLinkTestData: pd.DataFrame = lowCpuHighLinkData.drop(lowCpuHighLinkTrainData.index)
-    lowCpuLowLinkTestData: pd.DataFrame = lowCpuLowLinkData.drop(lowCpuLowLinkTrainData.index)
-    highCpuLowLink2TestData: pd.DataFrame = highCpuLowLink2Data.drop(highCpuLowLink2TrainData.index)
-    highCpuHighLink2TestData: pd.DataFrame = highCpuHighLink2Data.drop(highCpuHighLink2TrainData.index)
+    highCpuHighLinkTestData: pd.DataFrame = highCpuHighLinkData.drop(
+        highCpuHighLinkTrainData.index
+    )
+    highCpuLowLinkTestData: pd.DataFrame = highCpuLowLinkData.drop(
+        highCpuLowLinkTrainData.index
+    )
+    lowCpuHighLinkTestData: pd.DataFrame = lowCpuHighLinkData.drop(
+        lowCpuHighLinkTrainData.index
+    )
+    lowCpuLowLinkTestData: pd.DataFrame = lowCpuLowLinkData.drop(
+        lowCpuLowLinkTrainData.index
+    )
+    highCpuLowLink2TestData: pd.DataFrame = highCpuLowLink2Data.drop(
+        highCpuLowLink2TrainData.index
+    )
+    highCpuHighLink2TestData: pd.DataFrame = highCpuHighLink2Data.drop(
+        highCpuHighLink2TrainData.index
+    )
 
     filteredData: pd.DataFrame = pd.concat(
-        [highCpuHighLinkData, highCpuLowLinkData, lowCpuHighLinkData, lowCpuLowLinkData, highCpuLowLink2Data, highCpuHighLink2Data]
+        [
+            highCpuHighLinkData,
+            highCpuLowLinkData,
+            lowCpuHighLinkData,
+            lowCpuLowLinkData,
+            highCpuLowLink2Data,
+            highCpuHighLink2Data,
+        ]
     )
 
     fig, ax = plt.subplots()
     fig.set_size_inches(14, 6)
     fig.set_dpi(300)
-    points: Any = ax.scatter(filteredData["max_cpu"], filteredData["link"], c=filteredData[OUTPUT], vmin=0, vmax=2750, label="CPU vs. Link. Latency")
+    points: Any = ax.scatter(
+        filteredData["max_cpu"],
+        filteredData["link"],
+        c=filteredData[OUTPUT],
+        vmin=0,
+        vmax=2750,
+        label="CPU vs. Link. Latency",
+    )
     fig.colorbar(points, label="Latency(ms)")
     ax.set_xlabel("CPU")
     ax.set_ylabel("Link")
@@ -197,10 +242,10 @@ def train() -> None:
     print(model.evaluate(xTest, yTest))
 
     plt.figure(1, (14, 6), dpi=300)
-    plt.plot(history.history['loss'], label='Loss')
-    plt.plot(history.history['val_loss'], label='Validation Loss')
-    plt.xlabel('Epoch')
-    plt.ylabel('Error')
+    plt.plot(history.history["loss"], label="Loss")
+    plt.plot(history.history["val_loss"], label="Validation Loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Error")
     plt.legend()
     plt.grid(True)
     plt.savefig(f"{artifactsPath}/loss_vs_val_loss.png")
@@ -213,9 +258,7 @@ def train() -> None:
 
     plt.figure(2, (14, 6), dpi=300)
     plt.scatter(testData.index, testData["PredictedLatency"], label="Predicted Latency")
-    plt.scatter(
-        testData.index, testData[OUTPUT], label="Actual Latency"
-    )
+    plt.scatter(testData.index, testData[OUTPUT], label="Actual Latency")
     plt.xlabel("Index")
     plt.ylabel("Latency")
     plt.legend()
@@ -233,7 +276,7 @@ def train() -> None:
         testData["link"],
         c="blue",
         marker="P",
-        label="Actual Latency"
+        label="Actual Latency",
     )
     ax.scatter(
         testData["PredictedLatency"],
@@ -241,7 +284,7 @@ def train() -> None:
         testData["link"],
         c="red",
         marker="*",
-        label="Predicted Latency"
+        label="Predicted Latency",
     )
     ax.legend()
     ax.set_xlabel("Latency")
