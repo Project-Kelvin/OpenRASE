@@ -95,6 +95,9 @@ class SDNController:
         elif sourceIP is not None:
             data["match"]["ipv4_src"] = sourceIP
 
+        operation: str = "install" if installFlow else "delete"
+        operationPast: str = "Installed" if installFlow else "Deleted"
+
         try:
             response: Response = requests.request(
                 method="POST",
@@ -102,9 +105,6 @@ class SDNController:
                 json=data,
                 timeout=config["general"]["requestTimeout"],
             )
-
-            operation: str = "install" if installFlow else "delete"
-            operationPast: str = "Installed" if installFlow else "Deleted"
 
             if response.status_code != 200:
                 TUI.appendToLog(
