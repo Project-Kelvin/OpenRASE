@@ -36,6 +36,8 @@ deap = "^1.4.1"
 networkx = {version = "3.2.1", extras = ["default"]}
 tensorflow-probability = "^0.24.0"
 tf-keras = "^2.17.0"
+ydf = "^0.11.0"
+tensorflow-decision-forests = "1.11.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -52,4 +54,9 @@ db = "runs.influxdb:run"
 ga = "runs.ga_dijkstra_algorithm.run:run"
 clean = "runs.clean:clean"
 surrogacy = "runs.surrogacy.run:run"
-surrogate_train = "runs.surrogacy.train:run"
+surrogate_train = "runs.surrogacy.surrogate:train"
+debug = "runs.debug:run"
+bm_cpu = "runs.surrogacy.benchmark:benchmarkCPU"
+bm_mem = "runs.surrogacy.benchmark:benchmarkMemory"
+bm_control = "runs.surrogacy.benchmark:benchmarkControl"
+bm_link = "runs.surrogacy.benchmark:benchmarkLinks"
