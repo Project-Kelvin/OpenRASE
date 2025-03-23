@@ -13,6 +13,7 @@ from shared.models.embedding_graph import VNF, EmbeddingGraph
 from mininet.node import Ryu, Host, OVSKernelSwitch
 from mininet.net import Containernet
 from mininet.cli import CLI
+from mininet.link import TCLink
 from constants.notification import TOPOLOGY_INSTALLED
 from constants.topology import SERVER, SFCC
 from constants.container import (
@@ -144,6 +145,7 @@ class InfraManager:
                     self._net.get(link["source"]),
                     self._net.get(link["destination"]),
                     bw=link["bandwidth"] if "bandwidth" in link else None,
+                    cls=TCLink,
                 )
 
                 if link["source"] in self._hosts:
