@@ -26,7 +26,6 @@ requests = ">=2.14.2, !=2.18.0, <2.29.0"
 influxdb-client = {extras = ["ciso"], version = "^1.40.0"}
 dijkstar = "^2.6.0"
 numpy = "^1.26.4"
-tensorflow = "^2.16.1"
 pandas = "^2.2.1"
 matplotlib = "^3.8.3"
 click = "^8.1.7"
@@ -34,6 +33,7 @@ setuptools = "<60" # To suppress 'distutils Version classes are deprecated. Use 
 textual = "^0.57.1"
 deap = "^1.4.1"
 networkx = {version = "3.2.1", extras = ["default"]}
+tensorflow = "2.18"
 
 [build-system]
 requires = ["poetry-core"]
@@ -50,7 +50,8 @@ db = "runs.influxdb:run"
 ga = "runs.ga_dijkstra_algorithm.run:run"
 clean = "runs.clean:clean"
 surrogacy = "runs.surrogacy.run:run"
-surrogate_train = "runs.surrogacy.surrogate:train"
+surrogate_train = "runs.surrogacy.surrogate:trainModel"
+surrogate_data_gen = "runs.surrogacy.surrogate:generateData"
 debug = "runs.debug:run"
 bm_cpu = "runs.surrogacy.benchmark:benchmarkCPU"
 bm_mem = "runs.surrogacy.benchmark:benchmarkMemory"
