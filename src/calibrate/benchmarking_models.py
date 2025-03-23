@@ -27,15 +27,10 @@ wafCPU: "list[Any]" = [
         kernel_initializer="he_normal",
     ),
     tf.keras.layers.Dense(
-        units=16,
+        units=32,
         activation="relu",
         kernel_initializer="he_normal",
-    ),
-    tf.keras.layers.Dense(
-        units=16,
-        activation="relu",
-        kernel_initializer="he_normal",
-    ),
+    )
 ]
 
 wafMem: "list[Any]" = [
@@ -50,28 +45,20 @@ wafMem: "list[Any]" = [
         kernel_initializer="he_normal",
     ),
     tf.keras.layers.Dense(
-        units=256,
+        units=64,
         activation="relu",
         kernel_initializer="he_normal",
     ),
 ]
 
-tmCPU: "list[Any]" = [
+wafLatency: "list[Any]" = [
     tf.keras.layers.Dense(
-        units=15,
-        activation="relu",
-        kernel_initializer="he_normal",
-    )
-]
-
-tmMem: "list[Any]" = [
-    tf.keras.layers.Dense(
-        units=4,
+        units=32,
         activation="relu",
         kernel_initializer="he_normal",
     ),
     tf.keras.layers.Dense(
-        units=4,
+        units=32,
         activation="relu",
         kernel_initializer="he_normal",
     ),
@@ -82,7 +69,7 @@ tmMem: "list[Any]" = [
     ),
 ]
 
-lbCPU: "list[Any]" = [
+tmCPU: "list[Any]" = [
     tf.keras.layers.Dense(
         units=16,
         activation="relu",
@@ -100,14 +87,32 @@ lbCPU: "list[Any]" = [
     ),
 ]
 
-lbMemory: "list[Any]" = [
+tmMem: "list[Any]" = [
     tf.keras.layers.Dense(
-        units=16,
+        units=64,
         activation="relu",
         kernel_initializer="he_normal",
     ),
     tf.keras.layers.Dense(
-        units=16,
+        units=64,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=64,
+        activation="relu",
+        kernel_initializer="he_normal",
+    )
+]
+
+tmLatency: "list[Any]" = [
+    tf.keras.layers.Dense(
+        units=32,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=32,
         activation="relu",
         kernel_initializer="he_normal",
     ),
@@ -118,27 +123,27 @@ lbMemory: "list[Any]" = [
     ),
 ]
 
-ipsCPU: "list[Any]" = [
+lbCPU: "list[Any]" = [
     tf.keras.layers.Dense(
-        units=8,
+        units=4,
         activation="relu",
         kernel_initializer="he_normal",
     ),
     tf.keras.layers.Dense(
-        units=8,
+        units=24,
         activation="relu",
         kernel_initializer="he_normal",
-    ),
-    tf.keras.layers.Dense(
-        units=16,
-        activation="relu",
-        kernel_initializer="he_normal",
-    ),
+    )
 ]
 
-ipsMemory: "list[Any]" = [
+lbMemory: "list[Any]" = [
     tf.keras.layers.Dense(
         units=32,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=64,
         activation="relu",
         kernel_initializer="he_normal",
     ),
@@ -154,14 +159,9 @@ ipsMemory: "list[Any]" = [
     ),
 ]
 
-idsCPU: "list[Any]" = [
+lbLatency: "list[Any]" = [
     tf.keras.layers.Dense(
-        units=8,
-        activation="relu",
-        kernel_initializer="he_normal",
-    ),
-    tf.keras.layers.Dense(
-        units=8,
+        units=4,
         activation="relu",
         kernel_initializer="he_normal",
     ),
@@ -172,9 +172,27 @@ idsCPU: "list[Any]" = [
     ),
 ]
 
-idsMemory: "list[Any]" = [
+ipsCPU: "list[Any]" = [
     tf.keras.layers.Dense(
-        units=4,
+        units=8,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=16,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=16,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+]
+
+ipsMemory: "list[Any]" = [
+    tf.keras.layers.Dense(
+        units=64,
         activation="relu",
         kernel_initializer="he_normal",
     ),
@@ -184,7 +202,79 @@ idsMemory: "list[Any]" = [
         kernel_initializer="he_normal",
     ),
     tf.keras.layers.Dense(
+        units=128,
+        activation="relu",
+        kernel_initializer="he_normal",
+    )
+]
+
+ipsLatency: "list[Any]" = [
+    tf.keras.layers.Dense(
+        units=8,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=16,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=16,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+]
+
+idsCPU: "list[Any]" = [
+    tf.keras.layers.Dense(
+        units=8,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
         units=32,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=32,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+]
+
+idsMemory: "list[Any]" = [
+    tf.keras.layers.Dense(
+        units=64,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=64,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=256,
+        activation="relu",
+        kernel_initializer="he_normal",
+    )
+]
+
+idsLatency: "list[Any]" = [
+    tf.keras.layers.Dense(
+        units=8,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=16,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=16,
         activation="relu",
         kernel_initializer="he_normal",
     ),
@@ -202,7 +292,7 @@ haCPU: "list[Any]" = [
         kernel_initializer="he_normal",
     ),
     tf.keras.layers.Dense(
-        units=64,
+        units=128,
         activation="relu",
         kernel_initializer="he_normal",
     ),
@@ -210,7 +300,25 @@ haCPU: "list[Any]" = [
 
 haMemory: "list[Any]" = [
     tf.keras.layers.Dense(
-        units=64,
+        units=150,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=150,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=256,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+]
+
+haLatency: "list[Any]" = [
+    tf.keras.layers.Dense(
+        units=32,
         activation="relu",
         kernel_initializer="he_normal",
     ),
@@ -228,7 +336,7 @@ haMemory: "list[Any]" = [
 
 dpiCPU: "list[Any]" = [
     tf.keras.layers.Dense(
-        units=8,
+        units=4,
         activation="relu",
         kernel_initializer="he_normal",
     ),
@@ -246,7 +354,7 @@ dpiMemory: "list[Any]" = [
         kernel_initializer="he_normal",
     ),
     tf.keras.layers.Dense(
-        units=64,
+        units=128,
         activation="relu",
         kernel_initializer="he_normal",
     ),
@@ -257,33 +365,97 @@ dpiMemory: "list[Any]" = [
     ),
 ]
 
+dpiLatency: "list[Any]" = [
+    tf.keras.layers.Dense(
+        units=8,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=4,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+]
+
+dummyCPU: "list[Any]" = [
+    tf.keras.layers.Dense(
+        units=16,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=32,
+        activation="relu",
+        kernel_initializer="he_normal",
+    )
+]
+
+dummyMemory: "list[Any]" = [
+    tf.keras.layers.Dense(
+        units=128,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=128,
+        activation="relu",
+        kernel_initializer="he_normal",
+    )
+]
+
+dummyLatency: "list[Any]" = [
+    tf.keras.layers.Dense(
+        units=16,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+    tf.keras.layers.Dense(
+        units=32,
+        activation="relu",
+        kernel_initializer="he_normal",
+    ),
+]
+
 vnfModels: "dict[str, dict[str, Any]]" = {
     "waf": {
         "cpu": wafCPU,
         "memory": wafMem,
+        "median": wafLatency,
     },
     "tm": {
         "cpu": tmCPU,
         "memory": tmMem,
+        "median": tmLatency,
     },
     "lb": {
         "cpu": lbCPU,
         "memory": lbMemory,
+        "median": lbLatency,
     },
     "ips": {
         "cpu": ipsCPU,
         "memory": ipsMemory,
+        "median": ipsLatency,
     },
     "ids": {
         "cpu": idsCPU,
         "memory": idsMemory,
+        "median": idsLatency,
     },
     "ha": {
         "cpu": haCPU,
         "memory": haMemory,
+        "median": haLatency,
     },
     "dpi": {
         "cpu": dpiCPU,
         "memory": dpiMemory,
+        "median": dpiLatency,
+    },
+    "dummy": {
+        "cpu": dummyCPU,
+        "memory": dummyMemory,
+        "median": dummyLatency,
     },
 }

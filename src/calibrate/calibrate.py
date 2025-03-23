@@ -7,7 +7,6 @@ import os
 import random
 from time import sleep
 from timeit import default_timer
-import csv
 import json
 from typing import Any
 from shared.models.embedding_graph import VNF
@@ -31,11 +30,12 @@ from models.traffic_generator import TrafficData
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
+from utils.data import hostDataToFrame, mergeHostAndTrafficData
 from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
 from constants.topology import SERVER, SFCC
 
-EPOCHS: int = 2000
+EPOCHS: int = 200
 
 os.environ["PYTHONHASHSEED"] = "100"
 
@@ -68,12 +68,8 @@ class Calibrate:
         self._headers: "list[str]" = [
             "cpu",
             "memory",
-            "networkIn",
-            "networkOut",
-            "ior",
-            "http_reqs",
-            "latency",
-            "duration",
+            "median",
+            "reqps",
         ]
         self._cache: "dict[str, dict[str, ResourceDemand]]" = {}
         self._models: "dict[str, dict[str, Any]]" = {}
@@ -104,15 +100,18 @@ class Calibrate:
         directory: str = f"{self._calDir}/{vnf}"
 
         data: DataFrame = pd.read_csv(file)
-        data = data[[metric, "http_reqs"]]
+        data["memory"] = data["memory"] / (1024 * 1024)
+        data = data[[metric, "reqps"]]
 
-        #data = data[(data[metric] != 0) & (data["http_reqs"] != 0)]
-        q1: float = data[metric].quantile(0.25)
-        q3: float = data[metric].quantile(0.75)
-        iqr: float = q3 - q1
-        lowerBound: float = q1 - (1.5 * iqr)
-        upperBound: float = q3 + (1.5 * iqr)
-        data = data[(data[metric] <= upperBound) & (data[metric] >= lowerBound)]
+        data = data[(data[metric] != 0) & (data["reqps"] != 0)]
+
+        if metric == self._headers[0]:
+            q1: float = data[metric].quantile(0.25)
+            q3: float = data[metric].quantile(0.75)
+            iqr: float = q3 - q1
+            lowerBound: float = q1 - (1.5 * iqr)
+            upperBound: float = q3 + (1.5 * iqr)
+            data = data[(data[metric] <= upperBound) & (data[metric] >= lowerBound)]
 
         trainData: DataFrame = data.sample(frac=0.8, random_state=0)
         testData: DataFrame = data.drop(trainData.index)
@@ -123,7 +122,7 @@ class Calibrate:
         trainLabels: Series = trainFeatures.pop(metric)
         testLabels: Series = testFeatures.pop(metric)
 
-        reqps: Any = np.array(trainFeatures["http_reqs"])
+        reqps: Any = np.array(trainFeatures["reqps"])
         normalizer: Any = tf.keras.layers.Normalization(
             input_shape=[
                 1,
@@ -144,7 +143,7 @@ class Calibrate:
 
         print("Training the model.")
         history: Any = model.fit(
-            trainFeatures["http_reqs"],
+            trainFeatures["reqps"],
             trainLabels,
             epochs=epochs,
             verbose=0,
@@ -161,15 +160,15 @@ class Calibrate:
 
         print("Evaluating the model.")
         testResult: Any = model.evaluate(
-            testFeatures["http_reqs"], testLabels, verbose=0
+            testFeatures["reqps"], testLabels, verbose=0
         )
 
         print(f"Test loss: {testResult}")
 
-        x = tf.linspace(0, 200, 801)
+        x = tf.linspace(0, 500, 501)
         y = model.predict(x)
 
-        plt.scatter(trainFeatures["http_reqs"], trainLabels, label="Data")
+        plt.scatter(trainFeatures["reqps"], trainLabels, label="Data")
         plt.plot(x, y, color="k", label="Predictions")
         plt.xlabel("reqps")
         plt.ylabel(metric)
@@ -298,98 +297,48 @@ class Calibrate:
                 SFC Solver.
                 """
 
-                _headers: "list[str]" = self._headers
-
                 def generateEmbeddingGraphs(self) -> None:
                     """
                     Generate the embedding graphs.
                     """
 
-                    # Create a CSV file
-                    # Write headers to the CSV file
-                    with open(filename, mode="w+", newline="", encoding="utf8") as file:
-                        writer = csv.writer(file)
-                        writer.writerow(self._headers)
-
-                    maxRound: int = 10
+                    maxRound: int = 1
 
                     for i in range(maxRound):
+                        TUI.appendToSolverLog(f"Round {i + 1}")
                         self._orchestrator.sendEmbeddingGraphs([eg])
                         telemetry: Telemetry = self._orchestrator.getTelemetry()
                         seconds: int = 0
+                        hostDataList: "list[HostData]" = []
+                        runTime: int = totalDuration + 30  # 30s grace time
 
-                        while seconds < totalDuration:
+                        TUI.appendToSolverLog(f"Waiting for {runTime} seconds.")
+                        while seconds < runTime:
                             try:
                                 start: float = default_timer()
-                                hostData: HostData = telemetry.getHostData()["h1"][
-                                    "vnfs"
-                                ]
+                                hostData: HostData = telemetry.getHostData()
                                 end: float = default_timer()
                                 duration: int = round(end - start, 0)
-                                trafficData: "dict[str, TrafficData]" = (
-                                    self._trafficGenerator.getData(f"{duration:.0f}s")
-                                )
-                                row = []
-                                data = list(hostData.items())[0][1]
-                                row.append(data["cpuUsage"][0])
-                                row.append(
-                                    data["memoryUsage"][0] / (1024 * 1024)
-                                    if data["memoryUsage"][0] != 0
-                                    else 0
-                                )
-                                row.append(data["networkUsage"][0])
-                                row.append(data["networkUsage"][1])
-
-                                if (
-                                    data["networkUsage"][0] == 0
-                                    or data["networkUsage"][1] == 0
-                                ):
-                                    row.append(0)
-                                else:
-                                    row.append(
-                                        (
-                                            data["networkUsage"][0]
-                                            / data["networkUsage"][1]
-                                        )
-                                    )
-
-                                httpReqs: int = (
-                                    trafficData[eg["sfcID"]]["httpReqs"]
-                                    if eg["sfcID"] in trafficData
-                                    else 0
-                                )
-                                averageLatency: float = (
-                                    trafficData[eg["sfcID"]]["q2"]
-                                    if eg["sfcID"] in trafficData
-                                    else 0
-                                )
-                                httpReqsRate: float = (
-                                    httpReqs / duration
-                                    if httpReqs != 0 or duration != 0
-                                    else 0
-                                )
-                                row.append(httpReqsRate)
-                                row.append(averageLatency)
-
-                                TUI.appendToSolverLog(
-                                    f"{httpReqsRate} requests took {averageLatency}ms on average."
-                                )
-
-                                row.append(f"{round(end - start, 0):.0f}")
-
-                                # Write row data to the CSV file
-                                with open(
-                                    filename, mode="a", newline="", encoding="utf8"
-                                ) as file:
-                                    writer = csv.writer(file)
-                                    writer.writerow(row)
+                                hostDataList.append(hostData)
                                 seconds += duration
+                                TUI.appendToSolverLog(f"{runTime - seconds} seconds left.")
                             except Exception as e:
                                 TUI.appendToSolverLog(str(e), True)
-                        TUI.appendToSolverLog(
-                            f"Finished generating traffic for {vnf}. Round {i+1}/{maxRound}."
-                        )
+
+                        try:
+                            trafficData: pd.DataFrame = self._trafficGenerator.getData(
+                                f"{runTime:.0f}s"
+                            )
+                            hostData: DataFrame = hostDataToFrame(hostDataList)
+                            hostData = mergeHostAndTrafficData(hostData, trafficData)
+                            if i == 0:
+                                hostData.to_csv(filename, index=False)
+                            else:
+                                hostData.to_csv(filename, mode="a", header=False, index=False)
+                        except Exception as e:
+                            TUI.appendToSolverLog(str(e), True)
                         self._orchestrator.deleteEmbeddingGraphs([eg])
+                        TUI.appendToSolverLog(f"Round {i + 1} finished.")
                     sleep(2)
                     TUI.exit()
 
@@ -407,7 +356,7 @@ class Calibrate:
             else:
                 self._trainModel(self._headers[0], vnf, epochs)  # cpu
                 self._trainModel(self._headers[1], vnf, epochs)  # memory
-                # self._trainModel(self._headers[4], vnf, epochs)  # I/O Ratio
+                self._trainModel(self._headers[2], vnf, epochs)  # latency
 
             em.end()
         else:
@@ -416,7 +365,7 @@ class Calibrate:
             else:
                 self._trainModel(self._headers[0], vnf, epochs)  # cpu
                 self._trainModel(self._headers[1], vnf, epochs)  # memory
-                # self._trainModel(self._headers[4], vnf, epochs)  # I/O Ratio
+                self._trainModel(self._headers[2], vnf, epochs)  # latency
 
     def _getVNFResourceDemandModel(self, vnf: str, metric: str) -> Any:
         """
@@ -457,14 +406,14 @@ class Calibrate:
 
         cpuModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[0])
         memoryModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[1])
-        iorModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[4])
+        latencyModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[2])
 
         cpu: float = cpuModel.predict(np.array([reqps]))[0][0]
         memory: float = memoryModel.predict(np.array([reqps]))[0][0]
-        ior: float = iorModel.predict(np.array([reqps]))[0][0]
+        latency: float = latencyModel.predict(np.array([reqps]))[0][0]
 
         return ResourceDemand(
-            cpu=cpu if cpu > 0 else 0, memory=memory if memory > 0 else 0, ior=ior
+            cpu=cpu if cpu > 0 else 0, memory=memory if memory > 0 else 0, latency=latency if latency > 0 else 0
         )
 
     def _getVNFResourceDemandsForRequests(
@@ -483,23 +432,23 @@ class Calibrate:
 
         cpuModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[0])
         memoryModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[1])
-        iorModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[4])
+        latencyModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[2])
 
         cpu: float = np.array(cpuModel.predict(np.array(reqps))).flatten()
         memory: float = memoryModel.predict(np.array(reqps)).flatten()
-        ior: float = iorModel.predict(np.array(reqps)).flatten()
+        latency: float = latencyModel.predict(np.array(reqps)).flatten()
 
         demands: "list[ResourceDemand]" = []
-        for cpuPred, memoryPred, iorPred in zip(cpu, memory, ior):
+        for cpuPred, memoryPred, latencyPred in zip(cpu, memory, latency):
             cpu = cpuPred
             memory = memoryPred
-            ior = iorPred
+            latency = latencyPred
 
             demands.append(
                 ResourceDemand(
                     cpu=cpu if cpu > 0 else 0,
                     memory=memory if memory > 0 else 0,
-                    ior=ior,
+                    latency=latency if latency > 0 else 0,
                 )
             )
 
