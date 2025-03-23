@@ -7,8 +7,8 @@ import random
 from threading import Thread
 from time import sleep
 from typing import Any
+from uuid import UUID, uuid4
 from jinja2 import Template, TemplateSyntaxError
-import numpy as np
 import pandas as pd
 from shared.models.config import Config
 from shared.models.embedding_graph import EmbeddingGraph
@@ -19,7 +19,6 @@ from constants.container import DIND_IMAGE, TAG
 from constants.notification import EMBEDDING_GRAPH_DELETED, EMBEDDING_GRAPH_DEPLOYED
 from constants.topology import SFCC, TRAFFIC_GENERATOR
 from mano.notification_system import NotificationSystem, Subscriber
-from models.traffic_generator import TrafficData
 from utils.container import connectToDind, getContainerIP, waitTillContainerReady
 from docker import DockerClient, from_env, errors
 from utils.tui import TUI
@@ -53,6 +52,7 @@ class TrafficGenerator(Subscriber):
         self._tgClient: DockerClient = None
         self._influxDBClient: InfluxDBClient = None
         self._parentContainerStarted: bool = False
+        self._sfcIdUUIDs: "dict[str, UUID]" = {}
 
         NotificationSystem.subscribe(EMBEDDING_GRAPH_DEPLOYED, self)
         NotificationSystem.subscribe(EMBEDDING_GRAPH_DELETED, self)
@@ -174,7 +174,9 @@ class TrafficGenerator(Subscriber):
             INFLUXDB).attrs["NetworkSettings"]["IPAddress"]
 
         # pylint: disable=invalid-name
-        name: str = f"{sfcID}-{K6}"
+        uuid: UUID = uuid4()
+        self._sfcIdUUIDs[sfcID] = uuid
+        name: str = f"{sfcID}-{K6}-{uuid}"
         TUI.appendToLog(f"  Starting to generate traffic using k6 for SFC {sfcID}.")
         self._tgClient.containers.run(f"{TAG}/k6:latest", cap_add="NET_ADMIN", name=name,
                                     detach=True, environment={
@@ -208,7 +210,7 @@ class TrafficGenerator(Subscriber):
         """
 
         try:
-            self._tgClient.containers.get(f"{sfcID}-{K6}").remove(force=True)
+            self._tgClient.containers.get(f"{sfcID}-{K6}-{self._sfcIdUUIDs[sfcID]}").remove(force=True)
         except Exception as e:
             TUI.appendToLog(f"Error stopping traffic generator for SFC {sfcID}: {e}. Possibly because it has already been stopped.", True)
 
@@ -228,9 +230,9 @@ class TrafficGenerator(Subscriber):
         return self._influxDBClient.query_api().query_data_frame(
             f'from(bucket: "{INFLUX_DB_CONFIG["BUCKET"]}")'
             f" |> range(start: -{dataRange})"
-            " |> truncateTimeColumn(unit: 1s)"
             f' |> filter(fn: (r) => r["_measurement"] == "{HTTP_REQ_DURATION}")'
             ' |> filter(fn: (r) => r["_field"] == "value")'
+            ' |> filter(fn: (r) => r["expected_response"] == "true")'
             " |> map(fn: (r) => ({r with _time: uint(v: r._time)}))"
             ' |> drop(columns: ["_start", "_stop", "_measurement", "_field", "method", "name", "proto", "scenario", "status", "result", "table"])'
         )
