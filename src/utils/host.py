@@ -27,7 +27,7 @@ def addHostNode(host: Host, net: Any) -> MininetHost:
     return net.addDocker(
         f"{host['id']}Node",
         ip=f"{getConfig()['sff']['network1']['hostIP']}/{getConfig()['sff']['network1']['mask']}",
-        cpu_quota=int(host["cpu"] * CPU_PERIOD if "cpu" in host else -1),
+        cpu_quota=int(host["cpu"] * CPU_PERIOD if "cpu" in host and host["cpu"] is not None else -1),
         mem_limit=(
             f"{host['memory']}mb"
             if "memory" in host and host["memory"] is not None
