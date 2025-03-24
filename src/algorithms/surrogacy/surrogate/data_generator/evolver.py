@@ -8,6 +8,12 @@ import random
 from time import sleep
 from timeit import default_timer
 from typing import Callable, Tuple, Union
+import os
+import pandas as pd
+from deap import base, creator, tools
+from shared.models.traffic_design import TrafficDesign
+from shared.models.embedding_graph import EmbeddingGraph
+from shared.models.topology import Topology
 from algorithms.surrogacy.extract_weights import getWeightLength
 from algorithms.surrogacy.local_constants import SURROGACY_PATH, SURROGATE_DATA_PATH, SURROGATE_PATH
 from algorithms.surrogacy.surrogate.data_generator.init_pop_generator import (
@@ -18,21 +24,9 @@ from algorithms.surrogacy.link_embedding import EmbedLinks
 from algorithms.surrogacy.nn import convertDFtoFGs, convertFGsToDF, getConfidenceValues
 from algorithms.surrogacy.scorer import Scorer
 from models.calibrate import ResourceDemand
-from shared.models.traffic_design import TrafficDesign
 from sfc.traffic_generator import TrafficGenerator
-from shared.models.embedding_graph import EmbeddingGraph
-from shared.models.topology import Topology
-import pandas as pd
-import numpy as np
-from deap import base, creator, tools
-from shared.utils.config import getConfig
 from utils.traffic_design import calculateTrafficDuration, getTrafficDesignRate
 from utils.tui import TUI
-import os
-import tensorflow as tf
-
-tf.get_logger().setLevel("ERROR")
-tf.keras.utils.disable_interactive_logging()
 
 directory: str = SURROGACY_PATH
 if not os.path.exists(directory):

@@ -66,13 +66,23 @@ def train() -> None:
 
     artifactsPath: str = SURROGACY_PATH
 
-    highCpuHighLinkData: pd.DataFrame = pd.read_csv(highCpuHighLinkPath, sep=r"\s*,\s*")
-    highCpuLowLinkData: pd.DataFrame = pd.read_csv(highCpuLowLinkPath, sep=r"\s*,\s*")
-    lowCpuHighLinkData: pd.DataFrame = pd.read_csv(lowCpuHighLinkPath, sep=r"\s*,\s*")
-    lowCpuLowLinkData: pd.DataFrame = pd.read_csv(lowCpuLowLinkPath, sep=r"\s*,\s*")
-    highCpuLowLink2Data: pd.DataFrame = pd.read_csv(highCpuLowLink2Path, sep=r"\s*,\s*")
+    highCpuHighLinkData: pd.DataFrame = pd.read_csv(
+        highCpuHighLinkPath, sep=r"\s*,\s*", engine="python"
+    )
+    highCpuLowLinkData: pd.DataFrame = pd.read_csv(
+        highCpuLowLinkPath, sep=r"\s*,\s*", engine="python"
+    )
+    lowCpuHighLinkData: pd.DataFrame = pd.read_csv(
+        lowCpuHighLinkPath, sep=r"\s*,\s*", engine="python"
+    )
+    lowCpuLowLinkData: pd.DataFrame = pd.read_csv(
+        lowCpuLowLinkPath, sep=r"\s*,\s*", engine="python"
+    )
+    highCpuLowLink2Data: pd.DataFrame = pd.read_csv(
+        highCpuLowLink2Path, sep=r"\s*,\s*", engine="python"
+    )
     highCpuHighLink2Data: pd.DataFrame = pd.read_csv(
-        highCpuHighLink2Path, sep=r"\s*,\s*"
+        highCpuHighLink2Path, sep=r"\s*,\s*", engine="python"
     )
 
     highCpuHighLinkData.loc[highCpuHighLinkData[OUTPUT] == 0, OUTPUT] = 1500
@@ -227,16 +237,16 @@ def train() -> None:
             tf.keras.layers.Dense(
                 16, kernel_initializer="glorot_normal", activation=activation
             ),
-            tf.keras.layers.Dense(1)
+            tf.keras.layers.Dense(1),
         ]
     )
 
     model.compile(
         optimizer=tf.keras.optimizers.Adamax(learning_rate=0.05),
         loss="mse",
-        metrics=[tf.keras.metrics.RootMeanSquaredError()]
+        metrics=[tf.keras.metrics.RootMeanSquaredError()],
     )
-    history: Any = model.fit(xTrain, yTrain, epochs=10000, validation_split=0.2)
+    history: Any = model.fit(xTrain, yTrain, epochs=10000, verbose=1, validation_split=0.2)
     print(model.evaluate(xTest, yTest))
 
     plt.figure(1, (14, 6), dpi=300)

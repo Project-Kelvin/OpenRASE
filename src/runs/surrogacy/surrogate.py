@@ -1,5 +1,5 @@
 """
-This trains teh surrogate model.
+This trains the surrogate model.
 """
 
 import copy
