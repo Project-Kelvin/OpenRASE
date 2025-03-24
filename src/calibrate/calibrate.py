@@ -26,7 +26,6 @@ from calibrate.benchmarking_models import vnfModels
 from mano.telemetry import Telemetry
 from models.calibrate import ResourceDemand
 from models.telemetry import HostData
-from models.traffic_generator import TrafficData
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
@@ -146,7 +145,7 @@ class Calibrate:
             trainFeatures["reqps"],
             trainLabels,
             epochs=epochs,
-            verbose=0,
+            verbose=1,
             validation_split=0.2,
         )
         plt.plot(history.history["loss"], label="loss")
