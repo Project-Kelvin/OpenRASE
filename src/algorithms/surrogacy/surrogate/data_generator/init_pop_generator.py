@@ -3,7 +3,6 @@ This defines the GA that evolves teh weights of the Neural Network.
 """
 
 from copy import deepcopy
-import json
 import random
 from typing import Any, Tuple
 from multiprocessing import Pool, cpu_count
@@ -236,8 +235,5 @@ def evolveInitialWeights(
     else:
         rem: int = popSize - len(filteredPop)
         newPop = filteredPop + random.sample(pop, rem)
-
-    with open(f"{artifactDir}/weights.json", "w", encoding="utf8") as f:
-        json.dump(newPop, f)
 
     return newPop
