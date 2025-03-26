@@ -2,16 +2,16 @@
 Defines the CPU, memory and link scorer.
 """
 
-from typing import Tuple, Union
+from typing import Tuple
+import pandas as pd
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.topology import Host, Topology
 from calibrate.calibrate import Calibrate
 from models.calibrate import ResourceDemand
 from utils.embedding_graph import traverseVNF
-from utils.tui import TUI
 
 
-class Scorer():
+class Scorer:
     """
     This defines the scorer that computes different scoring metrics used by the surrogate model.
     """
@@ -23,13 +23,17 @@ class Scorer():
 
         self._calibrate: Calibrate = Calibrate()
 
-
-    def getHostScores(self,data: "dict[str, dict[str, float, float]]", topology: Topology, embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" ) -> "dict[str, ResourceDemand]":
+    def getHostScores(
+        self,
+        data: pd.DataFrame,
+        topology: Topology,
+        embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]",
+    ) -> "dict[str, ResourceDemand]":
         """
         Gets the host scores.
 
         Parameters:
-            data (dict[str, dict[str, float, float]]): the data.
+            data (pd.DataFrame): the data.
             topology (Topology): the topology.
             embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): the embedding data.
 
@@ -38,16 +42,23 @@ class Scorer():
         """
 
         hostResourceData: "dict[str, ResourceDemand]" = {}
-        for host, sfcs  in embeddingData.items():
+        for host, sfcs in embeddingData.items():
             otherCPU: float = 0
             otherMemory: float = 0
 
             for sfc, vnfs in sfcs.items():
                 for vnf, depth in vnfs:
-                    divisor: int = 2**(depth-1)
-                    effectiveReqps: float = (data[sfc]["reqps"] / divisor) if sfc in data else 0
-                    demands: ResourceDemand = self._calibrate.getVNFResourceDemandForReqps(vnf, effectiveReqps)
-
+                    divisor: int = 2 ** (depth - 1)
+                    effectiveReqps: float = (
+                        (data.loc[data["sfc"] == sfc, "reqps"].iloc[0] / divisor)
+                        if sfc in data["sfc"].values
+                        else 0
+                    )
+                    demands: ResourceDemand = (
+                        self._calibrate.getVNFResourceDemandForReqps(
+                            vnf, effectiveReqps
+                        )
+                    )
                     vnfCPU: float = demands["cpu"]
                     vnfMemory: float = demands["memory"]
                     otherCPU += vnfCPU
@@ -64,12 +75,18 @@ class Scorer():
 
         return hostResourceData
 
-    def getLinkScores(self, data: "dict[str, dict[str, float, float]]", topology: Topology, egs: "list[EmbeddingGraph]", linkData: "dict[str, dict[str, float]]") -> "dict[str, float]":
+    def getLinkScores(
+        self,
+        data: pd.DataFrame,
+        topology: Topology,
+        egs: "list[EmbeddingGraph]",
+        linkData: "dict[str, dict[str, float]]",
+    ) -> "dict[str, float]":
         """
         Gets the link scores.
 
         Parameters:
-            data (dict[str, dict[str, float, float]]): the data.
+            data pd.DataFrame: the data.
             topology (Topology): the topology.
             egs (list[EmbeddingGraph]): the Embedding Graphs.
             linkData (dict[str, dict[str, float]]): the link data.
@@ -80,13 +97,17 @@ class Scorer():
 
         linkScores: "dict[str, float]" = {}
         for eg in egs:
-            totalLinkScore: float = 0
+            totalLinkScore: float = 0.0
             for egLink in eg["links"]:
                 links: "list[str]" = [egLink["source"]["id"]]
                 links.extend(egLink["links"])
                 links.append(egLink["destination"]["id"])
                 divisor: int = egLink["divisor"]
-                reqps: float = (data[eg["sfcID"]]["reqps"] / divisor) if eg["sfcID"] in data else 0
+                reqps: float = (
+                    (data.loc[data["sfc"] == eg["sfcID"], "reqps"].iloc[0] / divisor)
+                    if eg["sfcID"] in data["sfc"].values
+                    else 0
+                )
 
                 for linkIndex in range(len(links) - 1):
                     source: str = links[linkIndex]
@@ -96,14 +117,35 @@ class Scorer():
 
                     if f"{source}-{destination}" in linkData:
                         for key, factor in linkData[f"{source}-{destination}"].items():
-                            totalRequests += factor * (data[key]["reqps"] if key in data else 0)
+                            totalRequests += factor * (
+                                data.loc[data["sfc"] == key, "reqps"].iloc[0]
+                                if key in data["sfc"].values
+                                else 0
+                            )
                     elif f"{destination}-{source}" in linkData:
                         for key, factor in linkData[f"{destination}-{source}"].items():
-                            totalRequests += factor * (data[key]["reqps"] if key in data else 0)
+                            totalRequests += factor * (
+                                data.loc[data["sfc"] == key, "reqps"].iloc[0]
+                                if key in data["sfc"].values
+                                else 0
+                            )
 
-                    bandwidth: float = [link["bandwidth"] for link in topology["links"] if (link["source"] == source and link["destination"] == destination) or (link["source"] == destination and link["destination"] == source)][0]
+                    bandwidth: float = [
+                        link["bandwidth"]
+                        for link in topology["links"]
+                        if (
+                            link["source"] == source
+                            and link["destination"] == destination
+                        )
+                        or (
+                            link["source"] == destination
+                            and link["destination"] == source
+                        )
+                    ][0]
 
-                    linkScore: float = self._getLinkScore(reqps, totalRequests, bandwidth)
+                    linkScore: float = self._getLinkScore(
+                        reqps, totalRequests, bandwidth
+                    )
 
                     totalLinkScore += linkScore
 
@@ -111,16 +153,17 @@ class Scorer():
 
         return linkScores
 
-    def cacheData(self, data: "dict[str, dict[str, float, float]]", egs: "list[EmbeddingGraph]") -> None:
+    def cacheData(self, data: pd.DataFrame, egs: "list[EmbeddingGraph]") -> None:
         """
         Caches the data.
 
         Parameters:
-            data (dict[str, dict[str, float, float]]): the data.
+            data (pd.DataFrame): the data.
             egs (list[EmbeddingGraph]): the Embedding Graphs.
         """
 
         vnfsInEGs: "dict[str, set[str]]" = {}
+
         def parseEG(vnf: VNF, _depth: int, egID: str) -> None:
             """
             Parses an EG.
@@ -143,8 +186,8 @@ class Scorer():
 
         dataToCache: "dict[str, list[float]]" = {}
 
-        for sfc, sfcData in data.items():
-            for vnf in vnfsInEGs[sfc]:
+        for _index, sfcData in data.iterrows():
+            for vnf in vnfsInEGs[sfcData["sfc"]]:
                 if vnf in dataToCache:
                     dataToCache[vnf].append(sfcData["reqps"])
                 else:
@@ -153,88 +196,104 @@ class Scorer():
         self._calibrate = Calibrate()
         self._calibrate.predictAndCache(dataToCache)
 
-    def getSFCScores(self, data: "dict[str, dict[str, float, float]]", topology: Topology, egs: "list[EmbeddingGraph]", embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]", linkData: "dict[str, dict[str, float]]" ) -> "list[list[Union[str, float]]]":
+    def getSFCScores(
+        self,
+        data: pd.DataFrame,
+        topology: Topology,
+        egs: "list[EmbeddingGraph]",
+        embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]",
+        linkData: "dict[str, dict[str, float]]",
+    ) -> pd.DataFrame:
         """
         Gets the SFC scores.
 
         Parameters:
-            data (dict[str, dict[str, float, float]]): the data.
+            data pd.DataFrame: the data.
             topology (Topology): the topology.
             egs (list[EmbeddingGraph]): the Embedding Graphs.
             embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): the embedding data.
             linkData (dict[str, dict[str, float]]): the link data.
 
         Returns:
-            list[list[Union[str, float]]]: the SFC scores.
+            pd.DataFrame: the SFC scores.
         """
 
-        hostScores: "dict[str, ResourceDemand]" = self.getHostScores(data, topology, embeddingData)
-        linkScores: "dict[str, float]" = self.getLinkScores(data, topology, egs, linkData)
+        data["max_cpu"] = 0.0
+        data["link"] = 0.0
+        data = data.rename_axis("rowIndex").reset_index()
 
-        rows: "list[list[Union[str, float]]]" = []
+        for _time, groupedData in data.groupby("time"):
+            hostScores: "dict[str, ResourceDemand]" = self.getHostScores(
+                groupedData, topology, embeddingData
+            )
+            linkScores: "dict[str, float]" = self.getLinkScores(
+                groupedData, topology, egs, linkData
+            )
 
-        for sfc, sfcData in data.items():
-            totalCPUScore: float = 0
-            totalMemoryScore: float = 0
-            eg: EmbeddingGraph = [graph for graph in egs if graph["sfcID"] == sfc][0]
-            row: "list[Union[str, float]]" = []
-            hosts: "dict[str, ResourceDemand]" = {}
-            totalHostCPU: float = 0
-            totalHostMemory: float = 0
+            for sfcData in groupedData.itertuples():
+                totalCPUScore: float = 0
+                totalMemoryScore: float = 0
+                eg: EmbeddingGraph = [
+                    graph for graph in egs if graph["sfcID"] == sfcData.sfc
+                ][0]
+                hosts: "dict[str, ResourceDemand]" = {}
+                totalHostCPU: float = 0
+                totalHostMemory: float = 0
 
-            def parseVNF(vnf: VNF, depth: int) -> None:
-                """
-                Parses a VNF.
+                def parseVNF(vnf: VNF, depth: int) -> None:
+                    """
+                    Parses a VNF.
 
-                Parameters:
-                    vnf (VNF): the VNF.
-                    depth (int): the depth.
-                """
+                    Parameters:
+                        vnf (VNF): the VNF.
+                        depth (int): the depth.
+                    """
 
-                nonlocal totalCPUScore
-                nonlocal totalMemoryScore
-                nonlocal totalHostCPU
-                nonlocal totalHostMemory
+                    nonlocal totalCPUScore
+                    nonlocal totalMemoryScore
+                    nonlocal totalHostCPU
+                    nonlocal totalHostMemory
 
-                divisor: int = 2**(depth-1)
-                reqps: float = sfcData["reqps"] / divisor
-                demands: ResourceDemand = self._calibrate.getVNFResourceDemandForReqps(vnf["vnf"]["id"], reqps)
+                    divisor: int = 2 ** (depth - 1)
+                    reqps: float = sfcData.reqps / divisor
+                    demands: ResourceDemand = (
+                        self._calibrate.getVNFResourceDemandForReqps(
+                            vnf["vnf"]["id"], reqps
+                        )
+                    )
 
-                host: Host = [host for host in topology["hosts"] if host["id"] == vnf["host"]["id"]][0]
-                hostCPU: float = host["cpu"]
-                hostMemory: float = host["memory"]
+                    host: Host = [
+                        host
+                        for host in topology["hosts"]
+                        if host["id"] == vnf["host"]["id"]
+                    ][0]
+                    hostCPU: float = host["cpu"]
+                    hostMemory: float = host["memory"]
 
-                vnfCPU: float = demands["cpu"]
-                vnfMemory: float = demands["memory"]
+                    vnfCPU: float = demands["cpu"]
+                    vnfMemory: float = demands["memory"]
 
-                totalCPUScore += self._getScore(vnfCPU, hostCPU)
-                totalMemoryScore += self._getScore(vnfMemory, hostMemory)
+                    totalCPUScore += self._getScore(vnfCPU, hostCPU)
+                    totalMemoryScore += self._getScore(vnfMemory, hostMemory)
 
-                totalHostCPU += hostScores[vnf["host"]["id"]]["cpu"]
-                totalHostMemory += hostScores[vnf["host"]["id"]]["memory"]
+                    totalHostCPU += hostScores[vnf["host"]["id"]]["cpu"]
+                    totalHostMemory += hostScores[vnf["host"]["id"]]["memory"]
 
-                if vnf["host"]["id"] not in hosts:
-                    hosts.update({vnf["host"]["id"]: hostScores[vnf["host"]["id"]]})
+                    if vnf["host"]["id"] not in hosts:
+                        hosts.update({vnf["host"]["id"]: hostScores[vnf["host"]["id"]]})
 
-            traverseVNF(eg["vnfs"], parseVNF, shouldParseTerminal=False)
+                traverseVNF(eg["vnfs"], parseVNF, shouldParseTerminal=False)
 
-            row.append(sfc)
-            row.append(sfcData["reqps"])
-            row.append(sfcData["realReqps"])
-            row.append(totalCPUScore)
-            row.append(sum([host["cpu"] for host in hosts.values()])/len(hosts))
-            row.append(totalHostCPU)
-            row.append(max([host["cpu"] for host in hosts.values()]))
-            row.append(totalMemoryScore)
-            row.append(sum([host["memory"] for host in hosts.values()])/len(hosts))
-            row.append(totalHostMemory)
-            row.append(max([host["memory"] for host in hosts.values()]))
-            row.append(linkScores[sfc])
-            row.append(sfcData["latency"])
-            row.append(len(hosts))
-            rows.append(row)
+                data.loc[data["rowIndex"] == sfcData.rowIndex, "max_cpu"] = max(
+                    [host["cpu"] for host in hosts.values()]
+                )
+                data.loc[data["rowIndex"] == sfcData.rowIndex, "link"] = linkScores[
+                    sfcData.sfc
+                ]
 
-        return rows
+        data.drop(columns=["rowIndex"], inplace=True)
+        data.to_csv("data.csv")
+        return data
 
     def _getScore(self, demand: float, resource: float) -> float:
         """

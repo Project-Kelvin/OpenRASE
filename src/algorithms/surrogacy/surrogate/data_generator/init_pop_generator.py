@@ -65,9 +65,24 @@ def evaluate(
     maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
     if len(egs) > 0:
         # Validate EGs
-        data: "dict[str, dict[str, float]]" = {
-            eg["sfcID"]: {"reqps": maxReqps} for eg in egs
-        }
+        sfcIDs: "list[str]" = []
+        reqps: "list[float]" = []
+        for eg in egs:
+            sfcIDs.append(eg["sfcID"])
+            reqps.append(maxReqps)
+
+        data: pd.DataFrame = pd.DataFrame(
+            {
+                "generation": 0,
+                "individual": 0,
+                "time": 0,
+                "sfc": sfcIDs,
+                "reqps": reqps,
+                "real_reqps": 0,
+                "latency": 0,
+                "ar": acceptanceRatio,
+            }
+        )
 
         scorer.cacheData(data, egs)
         scores: "dict[str, ResourceDemand]" = scorer.getHostScores(

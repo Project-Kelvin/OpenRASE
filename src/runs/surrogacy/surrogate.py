@@ -56,7 +56,7 @@ def trainModel() -> None:
 @click.option(
     "--hchl", default=False, is_flag=True, help="High CPU usage. High link usage."
 )
-def generateData(_lcll: bool, lchl: bool, hcll: bool, hchl: bool) -> None:
+def generateData(lcll: bool, lchl: bool, hcll: bool, hchl: bool) -> None:
     """
     Generates data for the surrogate model.
 
