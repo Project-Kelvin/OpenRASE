@@ -292,7 +292,7 @@ class Scorer:
                 ]
 
         data.drop(columns=["rowIndex"], inplace=True)
-        data.to_csv("data.csv")
+
         return data
 
     def _getScore(self, demand: float, resource: float) -> float:
