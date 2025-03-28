@@ -76,7 +76,7 @@ def convertFGsToDF(fgs: "list[EmbeddingGraph]", topology: Topology) -> pd.DataFr
     return pd.DataFrame(data, columns=columns)
 
 
-def convertDFtoFGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: Topology) -> "Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]":
+def convertDFtoEGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: Topology) -> "Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]":
     """
     Generates the Embedding Graphs.
 

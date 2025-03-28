@@ -16,7 +16,7 @@ from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
 from algorithms.surrogacy.extract_weights import getWeightLength, getWeights
 from algorithms.surrogacy.link_embedding import EmbedLinks
-from algorithms.surrogacy.nn import convertDFtoFGs, convertFGsToDF, getConfidenceValues
+from algorithms.surrogacy.nn import convertDFtoEGs, convertFGsToDF, getConfidenceValues
 from algorithms.surrogacy.scorer import Scorer
 from constants.topology import SERVER, SFCC
 from mano.telemetry import Telemetry
@@ -371,7 +371,7 @@ def benchmarkLinks(headless: bool) -> None:
                     weights: (
                         "tuple[list[float], list[float], list[float], list[float]]"
                     ) = getWeights(individual, requests, topology)
-                    eGraphs, nodes, _ = convertDFtoFGs(
+                    eGraphs, nodes, _ = convertDFtoEGs(
                         getConfidenceValues(
                             convertFGsToDF(requests, topology), weights[0], weights[1]
                         ),

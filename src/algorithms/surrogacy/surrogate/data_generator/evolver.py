@@ -21,7 +21,7 @@ from algorithms.surrogacy.surrogate.data_generator.init_pop_generator import (
     getWeights,
 )
 from algorithms.surrogacy.link_embedding import EmbedLinks
-from algorithms.surrogacy.nn import convertDFtoFGs, convertFGsToDF, getConfidenceValues
+from algorithms.surrogacy.nn import convertDFtoEGs, convertFGsToDF, getConfidenceValues
 from algorithms.surrogacy.scorer import Scorer
 from models.calibrate import ResourceDemand
 from sfc.traffic_generator import TrafficGenerator
@@ -90,7 +90,7 @@ def evaluate(
     )
     df: pd.DataFrame = convertFGsToDF(copiedFGs, topology)
     newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
-    egs, nodes, embedData = convertDFtoFGs(newDF, copiedFGs, topology)
+    egs, nodes, embedData = convertDFtoEGs(newDF, copiedFGs, topology)
     if len(egs) > 0:
         embedLinks: EmbedLinks = EmbedLinks(topology, egs, weights[2], weights[3])
         start: float = default_timer()
@@ -287,8 +287,8 @@ def evolveWeights(
         None
     """
 
-    POP_SIZE: int = 1
-    NGEN: int = 1
+    POP_SIZE: int = 20
+    NGEN: int = 20
     CXPB: float = 1.0
     MUTPB: float = 0.8
     MAX_CPU_DEMAND: int = 1

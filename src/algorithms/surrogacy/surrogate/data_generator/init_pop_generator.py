@@ -14,7 +14,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from algorithms.surrogacy.extract_weights import getWeightLength, getWeights
-from algorithms.surrogacy.nn import convertDFtoFGs, convertFGsToDF, getConfidenceValues
+from algorithms.surrogacy.nn import convertDFtoEGs, convertFGsToDF, getConfidenceValues
 from algorithms.surrogacy.scorer import Scorer
 from utils.tui import TUI
 from models.calibrate import ResourceDemand
@@ -56,7 +56,7 @@ def evaluate(
     )
     df: pd.DataFrame = convertFGsToDF(copiedFGs, topology)
     newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
-    egs, _nodes, embedData = convertDFtoFGs(newDF, copiedFGs, topology)
+    egs, _nodes, embedData = convertDFtoEGs(newDF, copiedFGs, topology)
 
     penaltyScore: float = 50
     acceptanceRatio: float = len(egs) / len(fgs)
