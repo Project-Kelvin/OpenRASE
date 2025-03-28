@@ -76,7 +76,7 @@ def GADijkstraAlgorithm(topology: Topology, resourceDemands: "dict[str, Resource
 
     while gen <= NGEN:
         TUI.appendToSolverLog(f"Generation: {gen}")
-        offspring = algorithm(pop, toolbox, CXPB, MUTPB, topology, resourceDemands, fgrs)
+        offspring = algorithm(pop, toolbox, CXPB, MUTPB)
         for ind in offspring:
             ind.fitness.values = evaluation(ind, fgrs, gen, NGEN, sendEGs, deleteEGs, trafficDesign, trafficGenerator, topology, resourceDemands)
         pop[:] = toolbox.select(pop + offspring, k=NO_OF_INDIVIDUALS)
