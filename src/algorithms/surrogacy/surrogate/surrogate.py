@@ -58,6 +58,7 @@ highCpuHighLink2Path: str = os.path.join(
     "latency_hc_hl_2.csv",
 )
 
+MODEL_PATH: str = os.path.join(SURROGATE_MODELS_PATH, "surrogate.keras")
 
 def train() -> None:
     """
@@ -361,4 +362,21 @@ def train() -> None:
     plt.savefig(f"{artifactsPath}/simulated_latency_scatter.png")
     plt.clf()
 
-    model.save(f"{modelPath}/surrogate.keras")
+    model.save(MODEL_PATH)
+
+def predict(data: pd.DataFrame) -> pd.DataFrame:
+    """
+    Predicts the latency.
+
+    Parameters:
+        data (pd.DataFrame): the data.
+
+    Returns:
+        pd.DataFrame: the data with predicted latency.
+    """
+
+    model: tf.keras.Sequential = tf.keras.models.load_model(MODEL_PATH)
+    output: np.array = model.predict(data[features].values)
+    data = data.assign(PredictedLatency=output.flatten())
+
+    return data

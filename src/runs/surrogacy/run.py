@@ -29,29 +29,7 @@ from utils.tui import TUI
 config: Config = getConfig()
 configPath: str = f"{config['repoAbsolutePath']}/src/runs/surrogacy/configs"
 
-directory = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy"
-
-if not os.path.exists(directory):
-    os.makedirs(directory)
-
-# 6 1
-# 3 0.5
-# 6 0.2
-# 3 0.2
-topology: Topology = generateFatTreeTopology(4, 3, 0.2, 5120)
-logFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy/experiments.csv"
-latencyDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/surrogacy/latency_data.csv"
-
-def appendToLog(message: str) -> None:
-    """
-    Append to the log.
-
-    Parameters:
-        message (str): The message to append.
-    """
-
-    with open(logFilePath, "a", encoding="utf8") as log:
-        log.write(f"{message}\n")
+topology: Topology = generateFatTreeTopology(4, 6, 1, 5120)
 
 class FGR(FGRequestGenerator):
     """
@@ -62,7 +40,9 @@ class FGR(FGRequestGenerator):
         super().__init__(orchestrator)
         self._fgs: "list[EmbeddingGraph]" = []
 
-        with open(f"{configPath}/forwarding-graphs.json", "r", encoding="utf8") as fgFile:
+        with open(
+            f"{configPath}/forwarding-graphs.json", "r", encoding="utf8"
+        ) as fgFile:
             fgs: "list[EmbeddingGraph]" = json.load(fgFile)
             for fg in fgs[:2]:
                 self._fgs.append(copy.deepcopy(fg))
@@ -83,13 +63,19 @@ class FGR(FGRequestGenerator):
 
         self._orchestrator.sendRequests(self._fgs)
 
+
 class SFCSolver(Solver):
     """
     SFC Solver.
     """
 
-    def __init__(self, orchestrator: Orchestrator, trafficGenerator: TrafficGenerator) -> None:
+    def __init__(
+        self, orchestrator: Orchestrator, trafficGenerator: TrafficGenerator
+    ) -> None:
         super().__init__(orchestrator, trafficGenerator)
+        self._trafficDesign: "list[TrafficDesign]" = []
+        self._trafficType: bool = False
+        self._topology: Topology = None
 
     def setTrafficDesign(self, trafficDesign: "list[TrafficDesign]") -> None:
         """
@@ -122,18 +108,35 @@ class SFCSolver(Solver):
 
             self._topology: Topology = self._orchestrator.getTopology()
 
-            evolveWeights(requests, self._orchestrator.sendEmbeddingGraphs, self._orchestrator.deleteEmbeddingGraphs, self._trafficDesign, self._trafficGenerator, self._topology, self._trafficType)
-            TUI.appendToSolverLog(f"Finished experiment.")
+            evolveWeights(
+                requests,
+                self._orchestrator.sendEmbeddingGraphs,
+                self._orchestrator.deleteEmbeddingGraphs,
+                self._trafficDesign,
+                self._trafficGenerator,
+                self._topology,
+            )
+            TUI.appendToSolverLog("Finished experiment.")
             sleep(2)
         except Exception as e:
             TUI.appendToSolverLog(str(e), True)
 
         sleep(10)
-        #TUI.exit()
+
 
 @click.command()
-@click.option("--headless", default=False, is_flag=True, help="If set, the emulator would run in headless mode.")
-@click.option("--minimal", default=False, is_flag=True, help="If set, the emulator would use the minimal traffic design.")
+@click.option(
+    "--headless",
+    default=False,
+    is_flag=True,
+    help="If set, the emulator would run in headless mode.",
+)
+@click.option(
+    "--minimal",
+    default=False,
+    is_flag=True,
+    help="If set, the emulator would use the minimal traffic design.",
+)
 def run(headless: bool, minimal: bool) -> None:
     """
     Run the experiment.
@@ -144,19 +147,21 @@ def run(headless: bool, minimal: bool) -> None:
     """
 
     if minimal:
-        trafficDesign: "list[TrafficDesign]" = [generateTrafficDesign(
-            f"{getConfig()['repoAbsolutePath']}/src/runs/surrogacy/data/requests.csv",
-            0.1,
-            1,
-            True,
-        )]
+        trafficDesign: "list[TrafficDesign]" = [
+            generateTrafficDesign(
+                f"{getConfig()['repoAbsolutePath']}/src/runs/surrogacy/data/requests.csv",
+                0.1,
+                1,
+                True,
+            )
+        ]
 
     else:
         trafficDesign: "list[TrafficDesign]" = [
             generateTrafficDesign(
                 f"{getConfig()['repoAbsolutePath']}/src/runs/surrogacy/data/requests.csv",
                 1,
-                4
+                4,
             )
         ]
     sfcEm: SFCEmulator = SFCEmulator(FGR, SFCSolver, headless)
