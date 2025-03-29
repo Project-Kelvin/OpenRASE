@@ -418,10 +418,15 @@ class EmbedLinks:
                 connectingNode = branch[-1]
                 branch = []
             elif node == SERVER:
-                branch.append(node)
-                parsedNodes.append(branch[:])
-                parsedDivisors.append(currentDivisor)
-                branch = []
+                if connectingNode:
+                    parsedNodes.append([connectingNode, node])
+                    parsedDivisors.append(currentDivisor)
+                    connectingNode = None
+                else:
+                    branch.append(node)
+                    parsedNodes.append(branch[:])
+                    parsedDivisors.append(currentDivisor)
+                    branch = []
                 if len(roots) > 0:
                     lastRoot: "list[str]" = roots.pop()
                     currentDivisor = divisors.pop()
@@ -433,6 +438,7 @@ class EmbedLinks:
                     connectingNode = None
                 branch.append(node)
 
+        print(parsedNodes)
         return parsedNodes, parsedDivisors
 
     def getLinkData(self) -> "dict[str, dict[str, float]]":
@@ -470,7 +476,7 @@ class EmbedLinks:
                             continue
 
                         path = self._findPath(eg["sfcID"], nodeList[i], nodeList[i + 1])
-
+                        print(eg["sfcID"], nodeList[i], nodeList[i + 1], path)
                         for p in range(len(path) - 1):
                             if f"{path[p]}-{path[p + 1]}" in self._linkData:
                                 if eg["sfcID"] in self._linkData[f"{path[p]}-{path[p + 1]}"]:
