@@ -10,14 +10,14 @@ from typing import Any, Callable, Tuple
 import os
 import pandas as pd
 import numpy as np
-from shared.models.sfc_request import SFCRequest
-from algorithms.surrogacy.chain_composition import generateFGs
 from deap import base, creator, tools
 import tensorflow as tf
+from shared.models.sfc_request import SFCRequest
 from shared.models.traffic_design import TrafficDesign
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.utils.config import getConfig
+from algorithms.surrogacy.chain_composition import generateFGs
 from algorithms.surrogacy.extract_weights import getWeightLength, getWeights
 from algorithms.surrogacy.local_constants import (
     SURROGACY_PATH,
@@ -79,7 +79,14 @@ def buildEGs(
         topology (Topology): the topology.
 
     Returns:
-        Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]], EmbedLinks]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
+        Tuple[
+            list[EmbeddingGraph],
+            dict[str, list[str]],
+            dict[str, dict[str, list[Tuple[str, int]]]],
+            EmbedLinks
+        ]:
+        (the Embedding Graphs, hosts in the order they should be linked,
+        the embedding data containing the VNFs in hosts).
     """
 
     weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(

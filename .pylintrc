@@ -28,3 +28,7 @@ module-naming-style=snake_case
 variable-naming-style=camelCase
 
 max-line-length=120
+
+[MESSAGES CONTROL]
+# Allow Catching too general exception Exception
+disable=W0718
