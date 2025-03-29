@@ -145,7 +145,7 @@ class Calibrate:
             trainFeatures["reqps"],
             trainLabels,
             epochs=epochs,
-            verbose=1,
+            verbose=0,
             validation_split=0.2,
         )
         plt.plot(history.history["loss"], label="loss")
@@ -407,9 +407,9 @@ class Calibrate:
         memoryModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[1])
         latencyModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[2])
 
-        cpu: float = cpuModel.predict(np.array([reqps]))[0][0]
-        memory: float = memoryModel.predict(np.array([reqps]))[0][0]
-        latency: float = latencyModel.predict(np.array([reqps]))[0][0]
+        cpu: float = cpuModel.predict(np.array([reqps]), verbose=0)[0][0]
+        memory: float = memoryModel.predict(np.array([reqps]), verbose=0)[0][0]
+        latency: float = latencyModel.predict(np.array([reqps]), verbose=0)[0][0]
 
         return ResourceDemand(
             cpu=cpu if cpu > 0 else 0, memory=memory if memory > 0 else 0, latency=latency if latency > 0 else 0
@@ -433,9 +433,9 @@ class Calibrate:
         memoryModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[1])
         latencyModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[2])
 
-        cpu: float = np.array(cpuModel.predict(np.array(reqps))).flatten()
-        memory: float = memoryModel.predict(np.array(reqps)).flatten()
-        latency: float = latencyModel.predict(np.array(reqps)).flatten()
+        cpu: float = np.array(cpuModel.predict(np.array(reqps), verbose=0)).flatten()
+        memory: float = memoryModel.predict(np.array(reqps), verbose=0).flatten()
+        latency: float = latencyModel.predict(np.array(reqps), verbose=0).flatten()
 
         demands: "list[ResourceDemand]" = []
         for cpuPred, memoryPred, latencyPred in zip(cpu, memory, latency):

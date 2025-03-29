@@ -438,7 +438,6 @@ class EmbedLinks:
                     connectingNode = None
                 branch.append(node)
 
-        print(parsedNodes)
         return parsedNodes, parsedDivisors
 
     def getLinkData(self) -> "dict[str, dict[str, float]]":
@@ -476,7 +475,7 @@ class EmbedLinks:
                             continue
 
                         path = self._findPath(eg["sfcID"], nodeList[i], nodeList[i + 1])
-                        print(eg["sfcID"], nodeList[i], nodeList[i + 1], path)
+
                         for p in range(len(path) - 1):
                             if f"{path[p]}-{path[p + 1]}" in self._linkData:
                                 if eg["sfcID"] in self._linkData[f"{path[p]}-{path[p + 1]}"]:

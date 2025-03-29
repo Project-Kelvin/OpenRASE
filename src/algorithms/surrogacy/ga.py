@@ -551,12 +551,12 @@ def evolveWeights(
         None
     """
 
-    POP_SIZE: int = 200
+    POP_SIZE: int = 50
     NGEN: int = 100
     CXPB: float = 1.0
     MUTPB: float = 0.8
     MAX_MEMORY_DEMAND: int = 2
-    MIN_QUAL_IND: int = 2
+    MIN_QUAL_IND: int = 4
     MIN_AR: float = 0.5
     MAX_LATENCY: float = 500
 

@@ -53,7 +53,7 @@ class SFCR(SFCRequestGenerator):
 
         copiedSFCRs: "list[SFCRequest]" = []
         for index, sfcr in enumerate(self._sfcrs):
-            for i in range(0, 1):
+            for i in range(0, 8):
                 copiedSFCR: SFCRequest = copy.deepcopy(sfcr)
                 copiedSFCR["sfcrID"] = f"sfc{index}-{i}"
                 copiedSFCRs.append(copiedSFCR)

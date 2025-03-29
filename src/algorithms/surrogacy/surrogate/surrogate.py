@@ -376,7 +376,7 @@ def predict(data: pd.DataFrame) -> pd.DataFrame:
     """
 
     model: tf.keras.Sequential = tf.keras.models.load_model(MODEL_PATH)
-    output: np.array = model.predict(data[features].values)
+    output: np.array = model.predict(data[features].values, verbose=0)
     data = data.assign(PredictedLatency=output.flatten())
 
     return data
