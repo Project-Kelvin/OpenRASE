@@ -24,7 +24,7 @@ from algorithms.surrogacy.local_constants import (
     SURROGATE_PATH,
 )
 from algorithms.surrogacy.link_embedding import EmbedLinks
-from algorithms.surrogacy.nn import (
+from algorithms.surrogacy.vnf_embedding import (
     generateEGs,
 )
 from algorithms.surrogacy.scorer import Scorer

@@ -16,7 +16,7 @@ from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
 from algorithms.surrogacy.extract_weights import getWeightLength, getWeights
 from algorithms.surrogacy.link_embedding import EmbedLinks
-from algorithms.surrogacy.nn import convertDFtoEGs, convertFGsToDF, getConfidenceValues
+from algorithms.surrogacy.vnf_embedding import convertDFtoEGs, convertFGsToDF, getConfidenceValues
 from algorithms.surrogacy.scorer import Scorer
 from constants.topology import SERVER, SFCC
 from mano.telemetry import Telemetry

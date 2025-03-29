@@ -21,7 +21,7 @@ from algorithms.surrogacy.surrogate.data_generator.init_pop_generator import (
     getWeights,
 )
 from algorithms.surrogacy.link_embedding import EmbedLinks
-from algorithms.surrogacy.nn import convertDFtoEGs, convertFGsToDF, getConfidenceValues
+from algorithms.surrogacy.vnf_embedding import convertDFtoEGs, convertFGsToDF, getConfidenceValues
 from algorithms.surrogacy.scorer import Scorer
 from models.calibrate import ResourceDemand
 from sfc.traffic_generator import TrafficGenerator

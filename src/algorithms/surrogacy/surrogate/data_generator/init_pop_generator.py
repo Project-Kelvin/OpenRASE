@@ -14,7 +14,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from algorithms.surrogacy.extract_weights import getWeightLength, getWeights
-from algorithms.surrogacy.nn import convertDFtoEGs, convertFGsToDF, getConfidenceValues
+from algorithms.surrogacy.vnf_embedding import convertDFtoEGs, convertFGsToDF, getConfidenceValues
 from algorithms.surrogacy.scorer import Scorer
 from utils.tui import TUI
 from models.calibrate import ResourceDemand
