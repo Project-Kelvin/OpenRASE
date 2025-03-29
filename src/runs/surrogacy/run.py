@@ -8,7 +8,7 @@ from time import sleep
 from typing import Union
 
 import click
-from algorithms.surrogacy.ga import evolveWeights
+from algorithms.surrogacy.evolver import evolveWeights
 from mano.orchestrator import Orchestrator
 from packages.python.shared.models.config import Config
 from packages.python.shared.models.embedding_graph import EmbeddingGraph
