@@ -1,0 +1,14 @@
+[
+    {
+        "vnfs": ["waf", "lb"]
+    },
+    {
+        "vnfs": ["ha", "lb", "waf"]
+    },
+    {
+        "vnfs": ["ha", "tm", "lb", "waf"]
+    },
+    {
+        "vnfs": ["lb", "tm", "waf"]
+    }
+]

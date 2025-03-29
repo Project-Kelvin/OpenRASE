@@ -3,38 +3,60 @@ This defines the functions used to extract weight values from individuals.
 """
 
 from typing import Tuple
-from shared.models.embedding_graph import EmbeddingGraph
+from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.utils.config import getConfig
 
+def getCCWeights(sfcrs: "list[SFCRequest]") -> int:
+    """
+    Gets the number of CC weights.
 
-def getLinkWeight(fgs: "list[EmbeddingGraph]", topology: Topology) -> int:
+    Parameters:
+        sfcrs (list[SFCRequest]): the list of SFCRequests.
+
+    Returns:
+        int: the number of CC weights.
+    """
+
+    return len(sfcrs) + len(getConfig()["vnfs"]["names"])
+
+def getLinkWeight(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
     """
     Gets the number of link weights.
 
     Parameters:
-        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        sfcrs (list[SFCRequest]): the list of Embedding Graphs.
         topology (Topology): the topology.
 
     Returns:
         int: the number of link weights.
     """
 
-    return len(fgs) + 2 * (len(topology["hosts"]) + len(topology["switches"]) + 2)
+    return len(sfcrs) + 2 * (len(topology["hosts"]) + len(topology["switches"]) + 2)
 
-def getVNFWeight(fgs: "list[EmbeddingGraph]", topology: Topology) -> int:
+def getVNFWeight(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
     """
     Gets the number of VNF weights.
 
     Parameters:
-        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        sfcrs (list[SFCRequest]): the list of Embedding Graphs.
         topology (Topology): the topology.
 
     Returns:
         int: the number of VNF weights.
     """
 
-    return len(fgs) + len(getConfig()["vnfs"]["names"]) + len(topology["hosts"]) + 1
+    return len(sfcrs) + len(getConfig()["vnfs"]["names"]) + len(topology["hosts"]) + 1
+
+def getCCBias() -> int:
+    """
+    Gets the number of CC biases.
+
+    Returns:
+        int: the number of CC biases.
+    """
+
+    return 1
 
 def getLinkBias() -> int:
     """
@@ -56,12 +78,12 @@ def getVNFBias() -> int:
 
     return 1
 
-def getWeightLength(fgs: "list[EmbeddingGraph]", topology: Topology) -> int:
+def getWeightLength(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
     """
     Gets the number of weights.
 
     Parameters:
-        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        sfcrs (list[SFCRequest]): the list of Embedding Graphs.
         topology (Topology): the topology.
 
     Returns:
@@ -69,39 +91,47 @@ def getWeightLength(fgs: "list[EmbeddingGraph]", topology: Topology) -> int:
     """
 
     return (
-        getLinkWeight(fgs, topology)
-        + getVNFWeight(fgs, topology)
+        getCCWeights(sfcrs)
+        + getLinkWeight(sfcrs, topology)
+        + getVNFWeight(sfcrs, topology)
+        + getCCBias()
         + getLinkBias()
         + getVNFBias()
     )
 
 def getWeights(
-    individual: "list[float]", fgs: "list[EmbeddingGraph]", topology: Topology
+    individual: "list[float]", sfcrs: "list[SFCRequest]", topology: Topology
 ) -> "Tuple[list[float], list[float], list[float], list[float]]":
     """
     Gets the weights.
 
     Parameters:
         individual (list[float]): the individual.
-        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        sfcrs (list[SFCRequest]): the list of Embedding Graphs.
         topology (Topology): the topology.
 
     Returns:
         tuple[list[float], list[float], list[float], list[float]]: VNF weights, VNF bias, link weights, link bias.
     """
 
-    vnfWeights: int = getVNFWeight(fgs, topology)
-    linkWeights: int = getLinkWeight(fgs, topology)
+    ccWeights: int = getCCWeights(sfcrs)
+    vnfWeights: int = getVNFWeight(sfcrs, topology)
+    linkWeights: int = getLinkWeight(sfcrs, topology)
+    ccBias: int = getCCBias()
     vnfBias: int = getVNFBias()
     linkBias: int = getLinkBias()
 
-    vnfWeightUpper: int = vnfWeights
-    vnfBiasUpper: int = vnfWeights + vnfBias
-    linkWeightUpper: int = vnfWeights + vnfBias + linkWeights
-    linkBiasUpper: int = vnfWeights + vnfBias + linkWeights + linkBias
+    ccWeightUpper: int = ccWeights
+    ccBiasUpper: int = ccWeightUpper + ccBias
+    vnfWeightUpper: int = ccBiasUpper + vnfWeights
+    vnfBiasUpper: int = vnfWeightUpper + vnfBias
+    linkWeightUpper: int = vnfBiasUpper + linkWeights
+    linkBiasUpper: int = linkWeightUpper + linkBias
 
     return (
-        individual[0:vnfWeightUpper],
+        individual[0:ccWeightUpper],
+        individual[ccWeightUpper:ccBiasUpper],
+        individual[ccBiasUpper:vnfWeightUpper],
         individual[vnfWeightUpper:vnfBiasUpper],
         individual[vnfBiasUpper:linkWeightUpper],
         individual[linkWeightUpper:linkBiasUpper],

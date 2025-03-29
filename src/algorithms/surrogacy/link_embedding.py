@@ -462,7 +462,6 @@ class EmbedLinks:
 
             paths: "list[str]" = []
             sfcNodes, sfcDivisors = self.parseNodes(nodes[eg["sfcID"]])
-            start: float = default_timer()
 
             for nodeList, divisor in zip(sfcNodes, sfcDivisors):
                 for i in range(len(nodeList) - 1):
@@ -489,7 +488,6 @@ class EmbedLinks:
                                     eg["sfcID"]: 1/divisor
                                 }
 
-
                         if f"{nodeList[i]}-{nodeList[i + 1]}" in paths:
                             continue
 
@@ -505,8 +503,5 @@ class EmbedLinks:
                         "links": path[1:-1],
                         "divisor": divisor
                     })
-            end: float = default_timer()
-
-            TUI.appendToSolverLog(f"Link Embedding Time for EG {eg['sfcID']}: {end - start}s")
 
         return self._egs

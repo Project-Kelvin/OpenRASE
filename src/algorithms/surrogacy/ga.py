@@ -6,11 +6,12 @@ from copy import deepcopy
 from multiprocessing import Pool, cpu_count
 import random
 from time import sleep
-from timeit import default_timer
 from typing import Any, Callable, Tuple
 import os
 import pandas as pd
 import numpy as np
+from shared.models.sfc_request import SFCRequest
+from algorithms.surrogacy.chain_composition import generateFGs
 from deap import base, creator, tools
 import tensorflow as tf
 from shared.models.traffic_design import TrafficDesign
@@ -20,11 +21,12 @@ from shared.utils.config import getConfig
 from algorithms.surrogacy.extract_weights import getWeightLength, getWeights
 from algorithms.surrogacy.local_constants import (
     SURROGACY_PATH,
-    SURROGATE_DATA_PATH,
     SURROGATE_PATH,
 )
 from algorithms.surrogacy.link_embedding import EmbedLinks
-from algorithms.surrogacy.nn import convertDFtoEGs, convertFGsToDF, getConfidenceValues
+from algorithms.surrogacy.nn import (
+    generateEGs,
+)
 from algorithms.surrogacy.scorer import Scorer
 from algorithms.surrogacy.surrogate.surrogate import predict
 from models.calibrate import ResourceDemand
@@ -65,10 +67,47 @@ scorer: Scorer = Scorer()
 isFirstSetWritten: bool = False
 
 
+def buildEGs(
+    individual: "list[float]", sfcrs: "list[SFCRequest]", topology: Topology
+) -> "Tuple[list[EmbeddingGraph],dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]], EmbedLinks]":
+    """
+    Generates the Embedding Graphs.
+
+    Parameters:
+        individual (list[float]): the individual.
+        sfcrs (list[SFCRequest]): the list of SFCRequests.
+        topology (Topology): the topology.
+
+    Returns:
+        Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]], EmbedLinks]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
+    """
+
+    weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(
+        individual, sfcrs, topology
+    )
+
+    ccWeights: "list[float]" = weights[0]
+    ccBias: "list[float]" = weights[1]
+    vnfWeights: "list[float]" = weights[2]
+    vnfBias: "list[float]" = weights[3]
+    linkWeights: "list[float]" = weights[4]
+    linkBias: "list[float]" = weights[5]
+
+    fgs: "list[EmbeddingGraph]" = generateFGs(sfcrs, ccWeights, ccBias)
+    copiedFGs: "list[EmbeddingGraph]" = [deepcopy(fg) for fg in fgs]
+    egs, nodes, embedData = generateEGs(copiedFGs, topology, vnfWeights, vnfBias)
+    embedLinks: EmbedLinks = None
+    if len(egs) > 0:
+        embedLinks = EmbedLinks(topology, egs, linkWeights, linkBias)
+        egs = embedLinks.embedLinks(nodes)
+
+    return egs, nodes, embedData, embedLinks
+
+
 def evaluateOnEmulator(
     individualIndex: int,
     individual: "list[float]",
-    fgs: "list[EmbeddingGraph]",
+    sfcrs: "list[SFCRequest]",
     gen: int,
     ngen: int,
     sendEGs: "Callable[[list[EmbeddingGraph]], None]",
@@ -84,7 +123,7 @@ def evaluateOnEmulator(
     Parameters:
         index (int): individual index.
         individual (list[float]): the individual.
-        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        sfcrs (list[SFCRequest]): the list of Service Function Requests.
         gen (int): the generation.
         ngen (int): the number of generations.
         sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
@@ -100,28 +139,16 @@ def evaluateOnEmulator(
 
     global isFirstSetWritten
 
-    copiedFGs: "list[EmbeddingGraph]" = [deepcopy(fg) for fg in fgs]
-    weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(
-        individual, copiedFGs, topology
-    )
-    df: pd.DataFrame = convertFGsToDF(copiedFGs, topology)
-    newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
-    egs, nodes, embedData = convertDFtoEGs(newDF, copiedFGs, topology)
-    if len(egs) > 0:
-        embedLinks: EmbedLinks = EmbedLinks(topology, egs, weights[2], weights[3])
-        start: float = default_timer()
-        egs = embedLinks.embedLinks(nodes)
-        end: float = default_timer()
-        TUI.appendToSolverLog(f"Link Embedding Time for all EGs: {end - start}s")
+    egs, _nodes, embedData, embedLinks = buildEGs(individual, sfcrs, topology)
 
     penaltyLatency: float = 50000
-    acceptanceRatio: float = len(egs) / len(fgs)
+    acceptanceRatio: float = len(egs) / len(sfcrs)
     latency: int = 0
     penaltyRatio: float = gen / ngen
     maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
 
     TUI.appendToSolverLog(
-        f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}"
+        f"Acceptance Ratio: {len(egs)}/{len(sfcrs)} = {acceptanceRatio}"
     )
     if len(egs) > 0:
         sfcIDs: "list[str]" = []
@@ -270,7 +297,7 @@ def evaluateOnEmulator(
 def evaluateOnSurrogate(
     individualIndex: int,
     individual: "list[float]",
-    fgs: "list[EmbeddingGraph]",
+    sfcrs: "list[SFCRequest]",
     gen: int,
     ngen: int,
     trafficDesign: TrafficDesign,
@@ -283,7 +310,7 @@ def evaluateOnSurrogate(
     Parameters:
         index (int): individual index.
         individual (list[float]): the individual.
-        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        sfcrs (list[SFCRequest]): the list of Service Function Requests.
         gen (int): the generation.
         ngen (int): the number of generations.
         trafficDesign (TrafficDesign): the traffic design.
@@ -294,28 +321,16 @@ def evaluateOnSurrogate(
         tuple[float, float]: the fitness.
     """
 
-    copiedFGs: "list[EmbeddingGraph]" = [deepcopy(fg) for fg in fgs]
-    weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(
-        individual, copiedFGs, topology
-    )
-    df: pd.DataFrame = convertFGsToDF(copiedFGs, topology)
-    newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
-    egs, nodes, embedData = convertDFtoEGs(newDF, copiedFGs, topology)
-    if len(egs) > 0:
-        embedLinks: EmbedLinks = EmbedLinks(topology, egs, weights[2], weights[3])
-        start: float = default_timer()
-        egs = embedLinks.embedLinks(nodes)
-        end: float = default_timer()
-        TUI.appendToSolverLog(f"Link Embedding Time for all EGs: {end - start}s")
+    egs, _nodes, embedData, embedLinks = buildEGs(individual, sfcrs, topology)
 
     penaltyLatency: float = 50000
-    acceptanceRatio: float = len(egs) / len(fgs)
+    acceptanceRatio: float = len(egs) / len(sfcrs)
     latency: int = 0
     penaltyRatio: float = gen / ngen
     maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
 
     TUI.appendToSolverLog(
-        f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}"
+        f"Acceptance Ratio: {len(egs)}/{len(sfcrs)} = {acceptanceRatio}"
     )
 
     if len(egs) > 0:
@@ -405,7 +420,10 @@ def evaluateOnSurrogate(
 
     return acceptanceRatio, latency
 
-def crossover(toolbox: base.Toolbox, pop: "list[creator.Individual]", cxpb: float, mutpb: float) -> "list[creator.Individual]":
+
+def crossover(
+    toolbox: base.Toolbox, pop: "list[creator.Individual]", cxpb: float, mutpb: float
+) -> "list[creator.Individual]":
     """
     Crossover function.
 
@@ -484,6 +502,7 @@ def writeData(gen: int, ars: "list[float]", latencies: "list[float]") -> None:
             f"{gen}, {np.mean(ars)}, {max(ars)}, {min(ars)}, {np.mean(latencies)}, {max(latencies)}, {min(latencies)}\n"
         )
 
+
 def writePFs(gen: int, hof: tools.ParetoFront) -> None:
     """
     Writes the Pareto Fronts to the file.
@@ -508,8 +527,9 @@ def writePFs(gen: int, hof: tools.ParetoFront) -> None:
         ) as pfFile:
             pfFile.write(f"{gen}, {ind.fitness.values[1]}, {ind.fitness.values[0]}\n")
 
+
 def evolveWeights(
-    fgs: "list[EmbeddingGraph]",
+    sfcrs: "list[SFCRequest]",
     sendEGs: "Callable[[list[EmbeddingGraph]], None]",
     deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
     trafficDesign: TrafficDesign,
@@ -520,7 +540,7 @@ def evolveWeights(
     Evolves the weights of the Neural Network.
 
     Parameters:
-        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        sfcrs (list[SFCRequest]): the list of Service Function Chains.
         sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
         deleteEGs (Callable[[list[EmbeddingGraph]], None]): the function to delete the Embedding Graphs.
         trafficDesign (TrafficDesign): the traffic design.
@@ -553,7 +573,7 @@ def evolveWeights(
         tools.initRepeat,
         creator.Individual,
         toolbox.gene,
-        n=getWeightLength(fgs, topology),
+        n=getWeightLength(sfcrs, topology),
     )
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("crossover", tools.cxBlend, alpha=0.5)
@@ -568,7 +588,7 @@ def evolveWeights(
     results: tuple[float, float, float] = pool.starmap(
         evaluateOnSurrogate,
         [
-            (i, ind, fgs, gen, NGEN, trafficDesign, topology, MAX_MEMORY_DEMAND)
+            (i, ind, sfcrs, gen, NGEN, trafficDesign, topology, MAX_MEMORY_DEMAND)
             for i, ind in enumerate(pop)
         ],
     )
@@ -600,7 +620,7 @@ def evolveWeights(
         results: tuple[float, float, float] = pool.starmap(
             evaluateOnSurrogate,
             [
-                (i, ind, fgs, gen, NGEN, trafficDesign, topology, MAX_MEMORY_DEMAND)
+                (i, ind, sfcrs, gen, NGEN, trafficDesign, topology, MAX_MEMORY_DEMAND)
                 for i, ind in enumerate(offspring)
             ],
         )
@@ -622,10 +642,12 @@ def evolveWeights(
             if ind.fitness.values[0] >= MIN_AR and ind.fitness.values[1] <= MAX_LATENCY
         ]
 
-        minAR = min([ind.fitness.values[0] for ind in qualifiedIndividuals])
-        maxLatency = max([ind.fitness.values[1] for ind in qualifiedIndividuals])
+        minAR = min(ars)
+        maxLatency = max(latencies)
 
-        TUI.appendToSolverLog(f"Generation {gen}: Min AR: {minAR}, Max Latency: {maxLatency}")
+        TUI.appendToSolverLog(
+            f"Generation {gen}: Min AR: {minAR}, Max Latency: {maxLatency}"
+        )
 
         TUI.appendToSolverLog(
             f"Qualified Individuals: {len(qualifiedIndividuals)}/{MIN_QUAL_IND}"
@@ -633,8 +655,12 @@ def evolveWeights(
 
         gen = gen + 1
 
-    TUI.appendToSolverLog(f"Finished the evolution of weights using surrogate at generation {gen - 1}.")
-    TUI.appendToSolverLog(f"Number of qualified individuals: {len(qualifiedIndividuals)}")
+    TUI.appendToSolverLog(
+        f"Finished the evolution of weights using surrogate at generation {gen - 1}."
+    )
+    TUI.appendToSolverLog(
+        f"Number of qualified individuals: {len(qualifiedIndividuals)}"
+    )
 
     pop = qualifiedIndividuals
     emHof = tools.ParetoFront()
@@ -646,7 +672,7 @@ def evolveWeights(
         ind.fitness.values = evaluateOnEmulator(
             i,
             ind,
-            fgs,
+            sfcrs,
             gen,
             NGEN,
             sendEGs,
@@ -671,10 +697,12 @@ def evolveWeights(
         if ind.fitness.values[0] >= MIN_AR and ind.fitness.values[1] <= MAX_LATENCY
     ]
 
-    emMinAR = min([ind.fitness.values[0] for ind in emQualifiedIndividuals])
-    emMaxLatency = max([ind.fitness.values[1] for ind in emQualifiedIndividuals])
+    emMinAR = min(ars)
+    emMaxLatency = max(latencies)
 
-    TUI.appendToSolverLog(f"Generation {gen}: Min AR: {emMinAR}, Max Latency: {emMaxLatency}")
+    TUI.appendToSolverLog(
+        f"Generation {gen}: Min AR: {emMinAR}, Max Latency: {emMaxLatency}"
+    )
 
     gen = gen + 1
 
@@ -684,7 +712,7 @@ def evolveWeights(
             ind.fitness.values = evaluateOnEmulator(
                 i,
                 ind,
-                fgs,
+                sfcrs,
                 gen,
                 NGEN,
                 sendEGs,
@@ -709,9 +737,11 @@ def evolveWeights(
             if ind.fitness.values[0] >= MIN_AR and ind.fitness.values[1] <= MAX_LATENCY
         ]
 
-        emMinAR = min([ind.fitness.values[0] for ind in emQualifiedIndividuals])
-        emMaxLatency = max([ind.fitness.values[1] for ind in emQualifiedIndividuals])
+        emMinAR = min(ars)
+        emMaxLatency = max(latencies)
 
-        TUI.appendToSolverLog(f"Generation {gen}: Min AR: {emMinAR}, Max Latency: {emMaxLatency}")
+        TUI.appendToSolverLog(
+            f"Generation {gen}: Min AR: {emMinAR}, Max Latency: {emMaxLatency}"
+        )
 
         gen = gen + 1

@@ -1,10 +1,9 @@
 """
-This runs the Genetic Algorithm + Dijsktra Algorithm.
+This runs the Genetic Algorithm
 """
 
 import copy
 import json
-import os
 from time import sleep
 from typing import Union
 
@@ -17,8 +16,8 @@ from packages.python.shared.models.sfc_request import SFCRequest
 from packages.python.shared.models.topology import Topology
 from packages.python.shared.models.traffic_design import TrafficDesign
 from packages.python.shared.utils.config import getConfig
-from sfc.fg_request_generator import FGRequestGenerator
 from sfc.sfc_emulator import SFCEmulator
+from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
 from sfc.traffic_generator import TrafficGenerator
 from utils.topology import generateFatTreeTopology
@@ -31,37 +30,37 @@ configPath: str = f"{config['repoAbsolutePath']}/src/runs/surrogacy/configs"
 
 topology: Topology = generateFatTreeTopology(4, 6, 1, 5120)
 
-class FGR(FGRequestGenerator):
+class SFCR(SFCRequestGenerator):
     """
-    FG Request Generator.
+    SFC Request Generator.
     """
 
     def __init__(self, orchestrator: Orchestrator) -> None:
         super().__init__(orchestrator)
-        self._fgs: "list[EmbeddingGraph]" = []
+        self._sfcrs: "list[SFCRequest]" = []
 
         with open(
-            f"{configPath}/forwarding-graphs.json", "r", encoding="utf8"
-        ) as fgFile:
-            fgs: "list[EmbeddingGraph]" = json.load(fgFile)
-            for fg in fgs[:2]:
-                self._fgs.append(copy.deepcopy(fg))
+            f"{configPath}/sfcrs.json", "r", encoding="utf8"
+        ) as sfcrFile:
+            sfcrs: "list[SFCRequest]" = json.load(sfcrFile)
+            for sfcr in sfcrs:
+                self._sfcrs.append(copy.deepcopy(sfcr))
 
     def generateRequests(self) -> None:
         """
         Generate the requests.
         """
 
-        copiedFGs: "list[EmbeddingGraph]" = []
-        for index, fg in enumerate(self._fgs):
-            for i in range(0, 16):
-                copiedFG: EmbeddingGraph = copy.deepcopy(fg)
-                copiedFG["sfcrID"] = f"sfc{index}-{i}"
-                copiedFGs.append(copiedFG)
+        copiedSFCRs: "list[SFCRequest]" = []
+        for index, sfcr in enumerate(self._sfcrs):
+            for i in range(0, 1):
+                copiedSFCR: SFCRequest = copy.deepcopy(sfcr)
+                copiedSFCR["sfcrID"] = f"sfc{index}-{i}"
+                copiedSFCRs.append(copiedSFCR)
 
-        self._fgs = copiedFGs
+        self._sfcrs = copiedSFCRs
 
-        self._orchestrator.sendRequests(self._fgs)
+        self._orchestrator.sendRequests(self._sfcrs)
 
 
 class SFCSolver(Solver):
@@ -164,7 +163,7 @@ def run(headless: bool, minimal: bool) -> None:
                 4,
             )
         ]
-    sfcEm: SFCEmulator = SFCEmulator(FGR, SFCSolver, headless)
+    sfcEm: SFCEmulator = SFCEmulator(SFCR, SFCSolver, headless)
     sfcEm.getSolver().setTrafficDesign(trafficDesign)
     sfcEm.getSolver().setTrafficType(minimal)
     try:

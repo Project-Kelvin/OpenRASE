@@ -98,7 +98,6 @@ def convertDFtoEGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
     embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" = {}
 
     for index, fg in enumerate(fgs):
-        fg["sfcID"] = fg["sfcrID"] if "sfcrID" in fg else f"sfc{index}"
         nodes[fg["sfcID"]] = [SFCC]
         embeddingNotFound: "list[bool]" = [False]
         oldDepth: int = 1
@@ -221,3 +220,25 @@ def getConfidenceValues(data: pd.DataFrame, weights: "list[float]", bias: "list[
     copiedData = copiedData.assign(ConfidenceLevel=prediction)
 
     return copiedData
+
+def generateEGs(
+    fgs: "list[EmbeddingGraph]", topology: Topology, weights: "list[float]", bias: "list[float]"
+) -> Tuple["list[EmbeddingGraph]", dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]:
+    """
+    Generates the Embedding Graphs.
+
+    Parameters:
+        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        topology (Topology): the topology.
+        weights (list[float]): the weights.
+        bias (list[float]): the bias.
+
+    Returns:
+        Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
+    """
+
+    data: pd.DataFrame = convertFGsToDF(fgs, topology)
+    data = getConfidenceValues(data, weights, bias)
+    egs, nodes, embeddingData = convertDFtoEGs(data, fgs, topology)
+
+    return egs, nodes, embeddingData
