@@ -25,7 +25,7 @@ from sfc.sfc_emulator import SFCEmulator
 from sfc.solver import Solver
 from sfc.traffic_generator import TrafficGenerator
 from utils.topology import generateFatTreeTopology
-from utils.traffic_design import calculateTrafficDuration, generateTrafficDesign, getTrafficDesignRate
+from utils.traffic_design import calculateTrafficDuration, generateTrafficDesignFromFile, getTrafficDesignRate
 import click
 from utils.tui import TUI
 import os
@@ -452,7 +452,7 @@ def getTrafficDesign() -> None:
     Get the Traffic Design.
     """
 
-    design: TrafficDesign = generateTrafficDesign(
+    design: TrafficDesign = generateTrafficDesignFromFile(
         f"{getConfig()['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/data/requests.csv",
         0.20,
         1,

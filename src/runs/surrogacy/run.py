@@ -21,7 +21,7 @@ from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
 from sfc.traffic_generator import TrafficGenerator
 from utils.topology import generateFatTreeTopology
-from utils.traffic_design import generateTrafficDesign
+from utils.traffic_design import generateTrafficDesignFromFile
 from utils.tui import TUI
 
 
@@ -147,7 +147,7 @@ def run(headless: bool, minimal: bool) -> None:
 
     if minimal:
         trafficDesign: "list[TrafficDesign]" = [
-            generateTrafficDesign(
+            generateTrafficDesignFromFile(
                 f"{getConfig()['repoAbsolutePath']}/src/runs/surrogacy/data/requests.csv",
                 0.1,
                 1,
@@ -157,7 +157,7 @@ def run(headless: bool, minimal: bool) -> None:
 
     else:
         trafficDesign: "list[TrafficDesign]" = [
-            generateTrafficDesign(
+            generateTrafficDesignFromFile(
                 f"{getConfig()['repoAbsolutePath']}/src/runs/surrogacy/data/requests.csv",
                 1,
                 4,

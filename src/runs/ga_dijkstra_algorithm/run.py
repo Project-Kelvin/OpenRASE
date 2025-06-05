@@ -5,14 +5,15 @@ This runs the Genetic Algorithm + Dijsktra Algorithm.
 import copy
 import json
 import os
+import random
 from time import sleep
 from typing import Union
-
 import click
+import numpy as np
+import tensorflow as tf
 from algorithms.ga_dijkstra_algorithm.ga import GADijkstraAlgorithm
 from calibrate.calibrate import Calibrate
 from mano.orchestrator import Orchestrator
-from mano.vnf_manager import VNFManager
 from models.calibrate import ResourceDemand
 from packages.python.shared.models.config import Config
 from packages.python.shared.models.embedding_graph import EmbeddingGraph
@@ -25,8 +26,19 @@ from sfc.sfc_emulator import SFCEmulator
 from sfc.solver import Solver
 from sfc.traffic_generator import TrafficGenerator
 from utils.topology import generateFatTreeTopology
+from utils.traffic_design import generateTrafficDesignFromFile
 from utils.tui import TUI
 
+os.environ["PYTHONHASHSEED"] = "100"
+
+# Setting the seed for numpy-generated random numbers
+np.random.seed(100)
+
+# Setting the seed for python random numbers
+random.seed(100)
+
+# Setting the graph-level random seed.
+tf.random.set_seed(100)
 
 config: Config = getConfig()
 configPath: str = f"{config['repoAbsolutePath']}/src/runs/ga_dijkstra_algorithm/configs"
@@ -37,8 +49,7 @@ directory = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_alg
 if not os.path.exists(directory):
     os.makedirs(directory)
 
-topology: Topology = generateFatTreeTopology(4, 1000, 2, None)
-trafficDesign: "list[TrafficDesign]" = []
+topology: Topology = generateFatTreeTopology(4, 10, 1, 5120)
 logFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/experiments.csv"
 latencyDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/latency_data.csv"
 
@@ -53,8 +64,21 @@ def appendToLog(message: str) -> None:
     with open(logFilePath, "a", encoding="utf8") as log:
         log.write(f"{message}\n")
 
-with open(f"{configPath}/traffic-design.json", "r", encoding="utf8") as trafficFile:
-    trafficDesign = [json.load(trafficFile)]
+trafficDesign: "list[TrafficDesign]" = [
+    generateTrafficDesignFromFile(
+        os.path.join(
+            f"{getConfig()['repoAbsolutePath']}",
+            "src",
+            "runs",
+            "ga_dijkstra_algorithm",
+            "data",
+            "requests.csv",
+        ),
+        0.1,
+        1,
+        False,
+    )
+]
 
 class FGR(FGRequestGenerator):
     """
@@ -103,6 +127,7 @@ class SFCSolver(Solver):
         maxTarget: int = max(design, key=lambda x: x["target"])["target"]
 
         self._resourceDemands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(maxTarget)
+        self._topology: Topology = None
 
     def generateEmbeddingGraphs(self) -> None:
         try:
@@ -115,7 +140,7 @@ class SFCSolver(Solver):
             self._topology: Topology = self._orchestrator.getTopology()
 
             GADijkstraAlgorithm(self._topology, self._resourceDemands, requests, self._orchestrator.sendEmbeddingGraphs, self._orchestrator.deleteEmbeddingGraphs, trafficDesign, self._trafficGenerator)
-            TUI.appendToSolverLog(f"Finished experiment.")
+            TUI.appendToSolverLog("Finished experiment.")
             sleep(2)
         except Exception as e:
             TUI.appendToSolverLog(str(e), True)
