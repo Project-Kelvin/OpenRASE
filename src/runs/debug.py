@@ -25,7 +25,7 @@ from sfc.sfc_emulator import SFCEmulator
 from sfc.solver import Solver
 from sfc.traffic_generator import TrafficGenerator
 from utils.topology import generateFatTreeTopology
-from utils.traffic_design import calculateTrafficDuration, generateTrafficDesign
+from utils.traffic_design import calculateTrafficDuration, generateTrafficDesignFromFile
 import click
 from utils.tui import TUI
 import os
