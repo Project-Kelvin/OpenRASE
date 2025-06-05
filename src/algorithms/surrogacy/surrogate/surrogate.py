@@ -9,7 +9,7 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import matplotlib.pyplot as plt
-from algorithms.surrogacy.local_constants import (
+from algorithms.surrogacy.constants.surrogate import (
     SURROGACY_PATH,
     SURROGATE_DATA_PATH,
     SURROGATE_MODELS_PATH,
@@ -131,22 +131,22 @@ def train() -> None:
     highCpuHighLink2Data = clean(highCpuHighLink2Data)
 
     highCpuHighLinkTrainData: pd.DataFrame = highCpuHighLinkData.sample(
-        frac=0.8, random_state=0
+        frac=0.9, random_state=0
     )
     highCpuLowLinkTrainData: pd.DataFrame = highCpuLowLinkData.sample(
-        frac=0.8, random_state=0
+        frac=0.9, random_state=0
     )
     lowCpuHighLinkTrainData: pd.DataFrame = lowCpuHighLinkData.sample(
-        frac=0.8, random_state=0
+        frac=0.9, random_state=0
     )
     lowCpuLowLinkTrainData: pd.DataFrame = lowCpuLowLinkData.sample(
-        frac=0.8, random_state=0
+        frac=0.9, random_state=0
     )
     highCpuLowLink2TrainData: pd.DataFrame = highCpuLowLink2Data.sample(
-        frac=0.8, random_state=0
+        frac=0.9, random_state=0
     )
     highCpuHighLink2TrainData: pd.DataFrame = highCpuHighLink2Data.sample(
-        frac=0.8, random_state=0
+        frac=0.9, random_state=0
     )
 
     highCpuHighLinkTestData: pd.DataFrame = highCpuHighLinkData.drop(
@@ -188,11 +188,11 @@ def train() -> None:
         c=filteredData[OUTPUT],
         vmin=0,
         vmax=2750,
-        label="CPU vs. Link. Latency",
+        label="CPU Score, Link Score & Average Traffic Latency",
     )
-    fig.colorbar(points, label="Latency(ms)")
-    ax.set_xlabel("CPU")
-    ax.set_ylabel("Link")
+    fig.colorbar(points, label="AVerage Traffic Latency(ms)")
+    ax.set_xlabel("CPU Score")
+    ax.set_ylabel("Link Score")
     ax.legend()
     ax.grid(True)
     plt.savefig(f"{artifactsPath}/cpu_link_latency_scatter.png")
@@ -247,7 +247,7 @@ def train() -> None:
         loss="mse",
         metrics=[tf.keras.metrics.RootMeanSquaredError()],
     )
-    history: Any = model.fit(xTrain, yTrain, epochs=10000, verbose=1, validation_split=0.2)
+    history: Any = model.fit(xTrain, yTrain, epochs=800, verbose=1, validation_split=0.111)
     print(model.evaluate(xTest, yTest))
 
     plt.figure(1, (14, 6), dpi=300)
@@ -266,8 +266,8 @@ def train() -> None:
     testData = testData.sort_values(by=OUTPUT).reset_index(drop=True)
 
     plt.figure(2, (14, 6), dpi=300)
-    plt.scatter(testData.index, testData["PredictedLatency"], label="Predicted Latency")
-    plt.scatter(testData.index, testData[OUTPUT], label="Actual Latency")
+    plt.scatter(testData.index, testData["PredictedLatency"], label="Predicted Average Traffic Latency (ms)")
+    plt.scatter(testData.index, testData[OUTPUT], label="Actual Average Traffic Latency (ms)")
     plt.xlabel("Index")
     plt.ylabel("Latency")
     plt.legend()
@@ -285,7 +285,7 @@ def train() -> None:
         testData["link"],
         c="blue",
         marker="P",
-        label="Actual Latency",
+        label="Actual Average Traffic Latency (ms)",
     )
     ax.scatter(
         testData["PredictedLatency"],
@@ -293,12 +293,12 @@ def train() -> None:
         testData["link"],
         c="red",
         marker="*",
-        label="Predicted Latency",
+        label="Predicted Average Traffic Latency (ms)",
     )
     ax.legend()
-    ax.set_xlabel("Latency")
-    ax.set_ylabel("CPU")
-    ax.set_zlabel("Link")
+    ax.set_xlabel("Average Traffic Latency (ms)")
+    ax.set_ylabel("CPU Score")
+    ax.set_zlabel("Link Score")
     ax.grid(True)
     plt.savefig(f"{artifactsPath}/latency_vs_predicted_latency_scatter_3d.png")
     plt.clf()
@@ -310,13 +310,13 @@ def train() -> None:
         testData["max_cpu"],
         testData["link"],
         c=testData[OUTPUT],
-        label="Actual Latency",
+        label="Actual Average Traffic Latency (ms)",
         vmin=0,
         vmax=2750,
     )
-    fig.colorbar(points, label="Latency(ms)")
-    plt1.set_xlabel("CPU")
-    plt1.set_ylabel("Link")
+    fig.colorbar(points, label="Average Traffic Latency (ms)")
+    plt1.set_xlabel("CPU Score")
+    plt1.set_ylabel("Link Score")
     plt1.grid(True)
     plt1.legend()
 
@@ -324,13 +324,13 @@ def train() -> None:
         testData["max_cpu"],
         testData["link"],
         c=testData["PredictedLatency"],
-        label="Predicted Latency",
+        label="Predicted Average Traffic Latency (ms)",
         vmin=0,
         vmax=2750,
     )
-    fig.colorbar(points, label="Latency(ms)")
-    plt2.set_xlabel("CPU")
-    plt2.set_ylabel("Link")
+    fig.colorbar(points, label="Average Traffic Latency (ms)")
+    plt2.set_xlabel("CPU Score")
+    plt2.set_ylabel("Link Score")
     plt2.grid(True)
     plt2.legend()
 
@@ -351,20 +351,20 @@ def train() -> None:
         simData["max_cpu"],
         simData["link"],
         c=simData["PredictedLatency"],
-        label="Predicted Latency",
+        label="Predicted Average Traffic Latency of Simulated Scores",
         vmin=0,
         vmax=2750,
     )
-    fig.colorbar(points, label="Latency(ms)")
-    ax.set_xlabel("CPU")
-    ax.set_ylabel("Link")
+    fig.colorbar(points, label="Average Traffic Latency (ms)")
+    ax.set_xlabel("CPU Score")
+    ax.set_ylabel("Link Score")
     ax.grid(True)
     plt.savefig(f"{artifactsPath}/simulated_latency_scatter.png")
     plt.clf()
 
     model.save(MODEL_PATH)
 
-def predict(data: pd.DataFrame) -> pd.DataFrame:
+def predictLatency(data: pd.DataFrame) -> pd.DataFrame:
     """
     Predicts the latency.
 
@@ -375,8 +375,18 @@ def predict(data: pd.DataFrame) -> pd.DataFrame:
         pd.DataFrame: the data with predicted latency.
     """
 
-    model: tf.keras.Sequential = tf.keras.models.load_model(MODEL_PATH)
-    output: np.array = model.predict(data[features].values, verbose=0)
+    model: tf.keras.Sequential = getSurrogateModel()
+    output: np.array = model.predict(data[features], verbose=0)
     data = data.assign(PredictedLatency=output.flatten())
 
     return data
+
+def getSurrogateModel() -> tf.keras.Sequential:
+    """
+    Returns the model.
+
+    Returns:
+        tf.keras.Sequential: the model.
+    """
+
+    return tf.keras.models.load_model(MODEL_PATH)
