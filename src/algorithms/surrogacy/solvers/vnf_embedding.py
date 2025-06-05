@@ -5,7 +5,7 @@ This defines the Neural Network used for genetic encoding.
 import copy
 from typing import Tuple
 import pandas as pd
-from algorithms.surrogacy.local_constants import BRANCH
+from algorithms.surrogacy.constants.surrogate import BRANCH
 from constants.topology import SERVER, SFCC
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.topology import Topology
@@ -101,6 +101,7 @@ def convertDFtoEGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
         nodes[fg["sfcID"]] = [SFCC]
         embeddingNotFound: "list[bool]" = [False]
         oldDepth: int = 1
+
         def parseVNF(
             vnf: VNF, depth: int, embeddingNotFound, startIndex, endIndex) -> None:
             """

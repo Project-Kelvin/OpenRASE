@@ -6,7 +6,7 @@ from timeit import default_timer
 from typing import Tuple
 import networkx as nx
 import heapq
-from algorithms.surrogacy.local_constants import BRANCH
+from algorithms.surrogacy.constants.surrogate import BRANCH
 from constants.topology import SERVER, SFCC
 from shared.models.topology import Topology
 from shared.models.embedding_graph import EmbeddingGraph
@@ -361,7 +361,6 @@ class EmbedLinks:
                     currentNode = currentNode.parent
 
                 path.reverse()
-
 
                 return path
 
