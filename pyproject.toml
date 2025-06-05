@@ -34,6 +34,7 @@ textual = "^0.57.1"
 deap = "^1.4.1"
 networkx = {version = "3.2.1", extras = ["default"]}
 tensorflow = "2.18"
+polars = "^1.30.0"
 
 [build-system]
 requires = ["poetry-core"]
@@ -53,7 +54,5 @@ surrogacy = "runs.surrogacy.run:run"
 surrogate_train = "runs.surrogacy.surrogate:trainModel"
 surrogate_data_gen = "runs.surrogacy.surrogate:generateData"
 debug = "runs.debug:run"
-bm_cpu = "runs.surrogacy.benchmark:benchmarkCPU"
-bm_mem = "runs.surrogacy.benchmark:benchmarkMemory"
-bm_control = "runs.surrogacy.benchmark:benchmarkControl"
-bm_link = "runs.surrogacy.benchmark:benchmarkLinks"
+bm = "runs.surrogacy.toy:benchmark"
+hybrid = "runs.surrogacy.hybrid:run"
