@@ -5,8 +5,31 @@ This defines utils associated with traffic design.
 import numpy as np
 from shared.models.traffic_design import TrafficDesign
 
+def generateTrafficDesign(start: int, end: int, duration: int) -> "TrafficDesign":
+    """
+    Generate the traffic rate.
 
-def generateTrafficDesign(dataFile: str, scale: float = 1, hourDuration: float = 4, minimal: bool = False) -> "TrafficDesign":
+    Parameters:
+        start (int): the start rate.
+        end (int): the end rate.
+        duration (int): the duration.
+
+    Returns:
+        TrafficDesign: the traffic design with the rate.
+    """
+
+    rate: "TrafficDesign" = []
+
+    for i in range(duration):
+        req: int = start + (end - start) * i / duration
+        rate.append({
+            "target": req,
+            "duration": "1s"
+        })
+
+    return rate
+
+def generateTrafficDesignFromFile(dataFile: str, scale: float = 1, hourDuration: float = 4, minimal: bool = False) -> "TrafficDesign":
     """
     Generate the Traffic Design.
 
