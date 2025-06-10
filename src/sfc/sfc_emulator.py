@@ -93,6 +93,8 @@ class SFCEmulator(Subscriber):
         client.networks.prune()
         client.volumes.prune()
 
+        TUI.exit()
+
     def _wait(self) -> None:
         """
         Wait for all threads to finish.
