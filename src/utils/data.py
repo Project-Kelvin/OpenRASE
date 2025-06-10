@@ -4,6 +4,7 @@ This defines utils used for data manipulation.
 
 import pandas as pd
 from models.telemetry import HostData, SingleHostData
+import docker
 
 
 def hostDataToFrame(hostData: "list[HostData]") -> "pd.DataFrame":
@@ -38,7 +39,7 @@ def mergeHostAndTrafficData(
     reqpss: "list[float]" = []
     rowsToDelete: "list[int]" = []
     for index, row in hostData.iterrows():
-        startTime: int = int(row["startTime"]) * 1000000000 # to match Flux output
+        startTime: int = int(row["startTime"]) * 1000000000  # to match Flux output
         endTime: int = int(row["endTime"]) * 1000000000
         duration: int = int((endTime - startTime) / 1000000000)
 
@@ -61,3 +62,19 @@ def mergeHostAndTrafficData(
     hostData["duration"] = hostData["endTime"] - hostData["startTime"]
 
     return hostData
+
+
+def getAvailableCPUAndMemory() -> tuple[float, float]:
+    """
+    Returns the available CPU and memory in the host server.
+
+    Returns:
+        tuple[float, float]: Maximum CPU and memory usage.
+    """
+
+    client = docker.from_env()
+    info = client.info()
+    maxCPU = float(info.get("NCPU", 0))
+    maxMemory = float(info.get("MemTotal", 0)) / (1024 * 1024)  # Convert bytes to MB
+
+    return maxCPU, maxMemory

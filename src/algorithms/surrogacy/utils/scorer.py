@@ -11,6 +11,7 @@ from algorithms.models.embedding import EmbeddingData, LinkData
 from algorithms.surrogacy.models.traffic import TimeSFCRequests
 from algorithms.surrogacy.utils.demand_predictions import DemandPredictions
 from models.calibrate import ResourceDemand
+from utils.data import getAvailableCPUAndMemory
 from utils.embedding_graph import traverseVNF
 
 
@@ -40,6 +41,7 @@ class Scorer:
         """
 
         hostResourceData: "dict[str, ResourceDemand]" = {}
+        serverCPU: float = getAvailableCPUAndMemory()
         for host, sfcs in embeddingData.items():
             topoHost: Host = [h for h in topology["hosts"] if h["id"] == host][0]
             otherCPU: float = 0
@@ -60,8 +62,9 @@ class Scorer:
             hostResourceData[host] = ResourceDemand(cpu=otherCPU, memory=otherMemory)
             hostCPU: float = topoHost["cpu"]
             hostMemory: float = topoHost["memory"]
-            hostResourceData[host]["cpu"] = (
-                hostResourceData[host]["cpu"] / hostCPU if hostCPU is not None else 0
+            hostResourceData[host]["cpu"] = Scorer._getScore(
+                hostResourceData[host]["cpu"],
+                hostCPU if hostCPU is not None else serverCPU,
             )
             hostResourceData[host]["memory"] = (
                 hostResourceData[host]["memory"] / hostMemory
@@ -135,15 +138,13 @@ class Scorer:
         return linkScores
 
     @staticmethod
-    def addHostLinkScoresForSFC(
+    def getHostLinkScoresForEachSFC(
         time: int,
         sfc: str,
         sfcReqps: float,
         hostScores: "dict[str, ResourceDemand]",
         linkScores: "dict[str, float]",
         egs: "list[EmbeddingGraph]",
-        topology: Topology,
-        demandPredictor: DemandPredictions,
     ) -> np.array:
         """
         Adds the host and link scores for a specific SFC.
@@ -153,19 +154,13 @@ class Scorer:
             hostScores (dict[str, ResourceDemand]): the host scores.
             linkScores (dict[str, float]): the link scores.
             egs (list[EmbeddingGraph]): the Embedding Graphs.
-            topology (Topology): the topology.
-            demandPredictor (DemandPredictions): the demand predictor.
 
         Returns:
             np.array : A numpy array with CPU, memory and link scores for the specific SFC in teh specific time slot.
         """
 
-        totalCPUScore: float = 0
-        totalMemoryScore: float = 0
         eg: EmbeddingGraph = [graph for graph in egs if graph["sfcID"] == sfc][0]
         hosts: "dict[str, ResourceDemand]" = {}
-        totalHostCPU: float = 0
-        totalHostMemory: float = 0
 
         def parseVNF(vnf: VNF, depth: int) -> None:
             """
@@ -175,31 +170,6 @@ class Scorer:
                 vnf (VNF): the VNF.
                 depth (int): the depth.
             """
-
-            nonlocal totalCPUScore
-            nonlocal totalMemoryScore
-            nonlocal totalHostCPU
-            nonlocal totalHostMemory
-            nonlocal hosts
-
-            divisor: int = 2 ** (depth - 1)
-            reqps: float = sfcReqps / divisor
-            demands: ResourceDemand = demandPredictor.getDemand(vnf["vnf"]["id"], reqps)
-
-            host: Host = [
-                host for host in topology["hosts"] if host["id"] == vnf["host"]["id"]
-            ][0]
-            hostCPU: float = host["cpu"]
-            hostMemory: float = host["memory"]
-
-            vnfCPU: float = demands["cpu"]
-            vnfMemory: float = demands["memory"]
-
-            totalCPUScore += Scorer._getScore(vnfCPU, hostCPU)
-            totalMemoryScore += Scorer._getScore(vnfMemory, hostMemory)
-
-            totalHostCPU += hostScores[vnf["host"]["id"]]["cpu"]
-            totalHostMemory += hostScores[vnf["host"]["id"]]["memory"]
 
             if vnf["host"]["id"] not in hosts:
                 hosts.update({vnf["host"]["id"]: hostScores[vnf["host"]["id"]]})
@@ -227,12 +197,24 @@ class Scorer:
                 ("link", np.float64),
             ]
         )
-        newData: np.array = np.array([(int(time), str(sfc), float(sfcReqps), float(maxCPU), float(maxMemory), float(link))], dtype=dt)
+        newData: np.array = np.array(
+            [
+                (
+                    int(time),
+                    str(sfc),
+                    float(sfcReqps),
+                    float(maxCPU),
+                    float(maxMemory),
+                    float(link),
+                )
+            ],
+            dtype=dt,
+        )
 
         return newData
 
     @staticmethod
-    def addHostLinkScoresForEachTimeSlot(
+    def getHostLinkScoresForEachTimeSlot(
         time: int,
         timeData: dict[str, float],
         topology: Topology,
@@ -261,22 +243,13 @@ class Scorer:
 
         hostLinkScores: np.array = None
         for key, value in timeData.items():
-            hostLinkScore: np.array = Scorer.addHostLinkScoresForSFC(
-                time,
-                key,
-                value,
-                hostScores,
-                linkScores,
-                egs,
-                topology,
-                demandPredictor,
+            hostLinkScore: np.array = Scorer.getHostLinkScoresForEachSFC(
+                time, key, value, hostScores, linkScores, egs
             )
             if hostLinkScores is None:
                 hostLinkScores = hostLinkScore
             else:
-                hostLinkScores = np.concatenate(
-                    (hostLinkScores, hostLinkScore)
-                )
+                hostLinkScores = np.concatenate((hostLinkScores, hostLinkScore))
 
         return hostLinkScores
 
@@ -307,7 +280,7 @@ class Scorer:
         timeDataList: "list[pl.DataFrame]" = []
         outputData: np.array = None
         for time, timeData in enumerate(data):
-            timeSlotData: np.array = Scorer.addHostLinkScoresForEachTimeSlot(
+            timeSlotData: np.array = Scorer.getHostLinkScoresForEachTimeSlot(
                 time,
                 timeData,
                 topology,
@@ -319,9 +292,7 @@ class Scorer:
             if outputData is None:
                 outputData = timeSlotData
             else:
-                outputData = np.concatenate(
-                    (outputData, timeSlotData)
-                )
+                outputData = np.concatenate((outputData, timeSlotData))
 
         return outputData
 
