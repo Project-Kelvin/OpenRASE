@@ -32,3 +32,4 @@ max-line-length=120
 [MESSAGES CONTROL]
 # Allow Catching too general exception Exception
 disable=W0718
+disable=W0603
