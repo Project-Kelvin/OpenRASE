@@ -10,6 +10,7 @@ from typing import Callable, Tuple
 from dijkstar import Graph, find_path
 import pandas as pd
 from algorithms.surrogacy.constants.surrogate import BRANCH
+from calibrate.demand_predictor import DemandPredictor
 from constants.topology import SERVER, SFCC
 from deap import base
 from models.calibrate import ResourceDemand
@@ -22,7 +23,9 @@ from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
 
 
-def getVNFsfromFGRs(fgrs: "list[EmbeddingGraph]") -> "list[str]":
+demandPredictor: DemandPredictor = DemandPredictor()
+
+def getVNFsFromFGRs(fgrs: "list[EmbeddingGraph]") -> "list[str]":
     """
     Get the VNFs from the SFC Request.
 
@@ -33,42 +36,42 @@ def getVNFsfromFGRs(fgrs: "list[EmbeddingGraph]") -> "list[str]":
         list[str]: the VNFs.
     """
 
-    vnfs: "list[str]" = []
+    vnfs: "list[Tuple[str, int]]" = []
 
-    def parseVNF(vnf: VNF, _depth: int, vnfs: "list[str]") -> None:
+    def parseVNF(vnf: VNF, depth: int, vnfs: "list[str]") -> None:
         """
         Parse the VNF.
 
         Parameters:
             vnf (VNF): the VNF.
-            _depth (int): the depth.
+            depth (int): the depth.
 
         Returns:
             None
         """
 
-        vnfs.append(vnf["vnf"]["id"])
+        vnfs.append((vnf["vnf"]["id"], depth))
 
     for fgr in fgrs:
         traverseVNF(fgr["vnfs"], parseVNF, vnfs, shouldParseTerminal=False)
 
     return vnfs
 
-def validateIndividual(individual: "list[list[int]]", topo: Topology, resourceDemands: "dict[str, ResourceDemand]", fgrs: "list[EmbeddingGraph]") -> bool:
+def validateIndividual(individual: "list[list[int]]", topo: Topology, maxTarget: int, fgrs: "list[EmbeddingGraph]") -> bool:
     """
     Validate the individual.
 
     Parameters:
         individual (list[list[int]]): the individual to validate.
         topo (Topology): the topology.
-        resourceDemands (dict[str, ResourceDemand]): the resource demands.
+        maxTarget (int): the maximum target.
         fgrs (list[EmbeddingGraph]): the FG Requests.
 
     Returns:
         bool: True if the individual is valid, False otherwise.
     """
 
-    vnfs: "list[str]" = getVNFsfromFGRs(fgrs)
+    vnfs: "list[Tuple[str, int]]" = getVNFsFromFGRs(fgrs)
 
     for index, host in enumerate(topo["hosts"]):
         totalDemand: ResourceDemand = ResourceDemand(cpu=0, memory=0)
@@ -76,7 +79,7 @@ def validateIndividual(individual: "list[list[int]]", topo: Topology, resourceDe
             totalVNFs: int = 0
             if individual[indexVNF][index] == 1:
                 totalVNFs += 1
-                demand: ResourceDemand = resourceDemands[vnf]
+                demand: ResourceDemand = demandPredictor.getResourceDemandsOfVNF(vnf, maxTarget)
                 totalDemand["cpu"] += demand["cpu"]
                 totalDemand["memory"] += demand["memory"]
 
@@ -101,7 +104,7 @@ def generateRandomIndividual(container: list, topo: Topology, fgrs: "list[Embedd
 
     individual: "list[list[int]]" = container()
 
-    vnfs: "list[VNF]" = getVNFsfromFGRs(fgrs)
+    vnfs: "list[VNF]" = getVNFsFromFGRs(fgrs)
     noOfVNFs: int = len(vnfs)
     noOfHosts: int = len(topo["hosts"])
 
@@ -184,8 +187,9 @@ def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list
     nodes: "dict[str, list[str]]" = {}
     embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" = {}
     linkData: "dict[str, dict[str, float]]" = {}
+    copiedFGRs: "list[EmbeddingGraph]" = copy.deepcopy(fgrs)
 
-    for index, fgr in enumerate(fgrs):
+    for index, fgr in enumerate(copiedFGRs):
         vnfs: VNF = fgr["vnfs"]
         embeddingNotFound: "list[bool]" = [False]
         fgr["sfcID"] = fgr["sfcrID"] if "sfcrID" in fgr else f"sfc{index}"
@@ -325,7 +329,7 @@ def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list
 
     return egs, embeddingData, linkData
 
-def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology, resourceDemands: "dict[str, ResourceDemand]") -> "tuple[int]":
+def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology, maxTarget: int) -> "tuple[int]":
     """
     Evaluate the individual.
 
@@ -339,7 +343,7 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
         trafficDesign (TrafficDesign): The Traffic Design.
         trafficGenerator (TrafficGenerator): The Traffic Generator.
         topology (Topology): The Topology.
-        resourceDemands (dict(str, ResourceDemand)): The Resource Demands.
+        maxTarget (int): The maximum target.
 
     Returns:
         tuple[int]: the evaluation.
@@ -364,7 +368,7 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
         except ValueError:
             pass
 
-    isValid: bool = validateIndividual(individual, topology, resourceDemands, fgrs)
+    isValid: bool = validateIndividual(individual, topology, maxTarget, fgrs)
     if isValid and len(egs) > 0:
         sendEGs(egs)
 
