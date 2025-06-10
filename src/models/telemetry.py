@@ -2,12 +2,6 @@
 Defines models related to telemetry.
 """
 
-
-
-
-from typing import Union
-
-
 class VNFData(dict):
     """
     Represents the data of a VNF.

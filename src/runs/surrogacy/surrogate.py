@@ -14,7 +14,7 @@ from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
-from algorithms.surrogacy.local_constants import SURROGACY_PATH
+from algorithms.surrogacy.constants.surrogate import SURROGACY_PATH
 from algorithms.surrogacy.surrogate.data_generator.evolver import evolveWeights
 from algorithms.surrogacy.surrogate.surrogate import train
 from mano.orchestrator import Orchestrator
@@ -23,7 +23,7 @@ from sfc.sfc_emulator import SFCEmulator
 from sfc.solver import Solver
 from sfc.traffic_generator import TrafficGenerator
 from utils.topology import generateFatTreeTopology
-from utils.traffic_design import generateTrafficDesign
+from utils.traffic_design import generateTrafficDesignFromFile
 from utils.tui import TUI
 
 config: Config = getConfig()
@@ -56,6 +56,7 @@ def trainModel() -> None:
 @click.option(
     "--hchl", default=False, is_flag=True, help="High CPU usage. High link usage."
 )
+# pylint: disable=unused-argument
 def generateData(lcll: bool, lchl: bool, hcll: bool, hchl: bool) -> None:
     """
     Generates data for the surrogate model.
@@ -161,7 +162,7 @@ def generateData(lcll: bool, lchl: bool, hcll: bool, hchl: bool) -> None:
                 TUI.appendToSolverLog(str(e), True)
 
     trafficDesign: "list[TrafficDesign]" = [
-        generateTrafficDesign(
+        generateTrafficDesignFromFile(
             f"{getConfig()['repoAbsolutePath']}/src/runs/surrogacy/data/requests.csv",
             0.1,
             1,

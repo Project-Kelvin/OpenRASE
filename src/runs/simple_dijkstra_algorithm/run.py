@@ -15,7 +15,6 @@ from shared.models.config import Config
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
 from algorithms.simple_dijkstra_algorithm import SimpleDijkstraAlgorithm
-from calibrate.calibrate import Calibrate
 from mano.orchestrator import Orchestrator
 from models.calibrate import ResourceDemand
 from shared.models.embedding_graph import EmbeddingGraph
@@ -55,168 +54,17 @@ latencyDataFilePath: str = (
     f"{config['repoAbsolutePath']}/artifacts/experiments/simple_dijkstra_algorithm/latency_data.csv"
 )
 
-with open(logFilePath, "w", encoding="utf8") as log:
-    log.write("experiment,failed_fgs,accepted_fgs,execution_time,deployment_time\n")
+with open(logFilePath, "w", encoding="utf8") as logFile:
+    logFile.write("experiment,failed_fgs,accepted_fgs,execution_time,deployment_time\n")
 
-with open(hostDataFilePath, "w", encoding="utf8") as hostData:
-    hostData.write("experiment,host,cpu,memory,duration\n")
+with open(hostDataFilePath, "w", encoding="utf8") as hostDataFile:
+    hostDataFile.write("experiment,host,cpu,memory,duration\n")
 
 with open(latencyDataFilePath, "w", encoding="utf8") as latencyData:
     latencyData.write("experiment,sfc,requests,average_latency,duration\n")
 
-experiment: str = ""
-expName: str = ""
-
-
-@click.command()
-@click.option("--experiment", type=int, help="The experiment to run.")
-def run(experiment: int) -> None:
-    """
-    Run the Simple Dijkstra Algorithm.
-
-    Parameters:
-        experiment (int): The experiment to run.
-    """
-
-    def runExperiment(fgr: FGR, topology: Topology) -> None:
-        """
-        Run an experiment.
-
-        Parameters:
-            fgr (FGR): The FG Request Generator.
-            topology (Topology): The topology.
-        """
-
-        global experiment
-        global expName
-        sfcEm: SFCEmulator = SFCEmulator(fgr, SFCSolver)
-        sfcEm.startTest(topology, trafficDesign)
-        sfcEm.end()
-        experiment = ""
-        expName = ""
-
-    def experiment1() -> None:
-        """
-        Run Experiment 1.
-        """
-
-        # Experiment 1 - 4 SFCs 0.5
-        global experiment
-        global expName
-        expName = "one"
-        experiment = "SFCs:4-Topology:0.5"
-        runExperiment(FGR4SFC, topologyPointFive)
-
-    def experiment2() -> None:
-        """
-        Run Experiment 2.
-        """
-
-        # Experiment 2 - 8 SFCs 0.5
-        global experiment
-        global expName
-        expName = "two"
-        experiment = "SFCs:8-Topology:0.5"
-        runExperiment(FGR8SFC, topologyPointFive)
-
-    def experiment3() -> None:
-        """
-        Run Experiment 3.
-        """
-
-        # Experiment 3 - 32 SFCs 0.5
-        global experiment
-        global expName
-        expName = "three"
-        experiment = "SFCs:32-Topology:0.5"
-        runExperiment(FGR32SFC, topologyPointFive)
-
-    def experiment4() -> None:
-        """
-        Run Experiment 4.
-        """
-
-        # Experiment 4 - 16 SFCs 0.5
-        global experiment
-        global expName
-        expName = "four"
-        experiment = "SFCs:16-Topology:0.5"
-        runExperiment(FGR16SFC, topologyPointFive)
-
-    def experiment5() -> None:
-        """
-        Run Experiment 5.
-        """
-
-        # Experiment 5 - 4 SFCs 1
-        global experiment
-        global expName
-        expName = "five"
-        experiment = "SFCs:4-Topology:1"
-        runExperiment(FGR4SFC, topology1)
-
-    def experiment6() -> None:
-        """
-        Run Experiment 6.
-        """
-
-        # Experiment 6 - 8 SFCs 1
-        global experiment
-        global expName
-        expName = "six"
-        experiment = "SFCs:8-Topology:1"
-        runExperiment(FGR8SFC, topology1)
-
-    def experiment7() -> None:
-        """
-        Run Experiment 7.
-        """
-
-        # Experiment 7 - 32 SFCs 1
-        global experiment
-        global expName
-        expName = "seven"
-        experiment = "SFCs:32-Topology:1"
-        runExperiment(FGR32SFC, topology1)
-
-    def experiment8() -> None:
-        """
-        Run Experiment 8.
-        """
-
-        # Experiment 8 - 16 SFCs 1
-        global experiment
-        global expName
-        expName = "eight"
-        experiment = "SFCs:16-Topology:1"
-        runExperiment(FGR16SFC, topology1)
-
-    if experiment == 1:
-        experiment1()
-    elif experiment == 2:
-        experiment2()
-    elif experiment == 3:
-        experiment3()
-    elif experiment == 4:
-        experiment4()
-    elif experiment == 5:
-        experiment5()
-    elif experiment == 6:
-        experiment6()
-    elif experiment == 7:
-        experiment7()
-    elif experiment == 8:
-        experiment8()
-    else:
-        experiment1()
-        experiment2()
-        experiment3()
-        experiment4()
-        experiment5()
-        experiment6()
-        experiment7()
-        experiment8()
-
+experimentID: str = ""
+experimentName: str = ""
 
 def appendToLog(message: str) -> None:
     """
@@ -258,7 +106,7 @@ class FGR4SFC(FGR):
 
     def generateRequests(self) -> None:
         for index, fg in enumerate(self._fgs):
-            fg["sfcrID"] = f"sfc{index}-{expName}"
+            fg["sfcrID"] = f"sfc{index}-{experimentName}"
 
         self._orchestrator.sendRequests(self._fgs)
 
@@ -273,7 +121,7 @@ class FGR8SFC(FGR):
         for index, fg in enumerate(self._fgs):
             for i in range(0, 2):
                 copiedFG: EmbeddingGraph = copy.deepcopy(fg)
-                copiedFG["sfcrID"] = f"sfc{index}-{i}-{expName}"
+                copiedFG["sfcrID"] = f"sfc{index}-{i}-{experimentName}"
                 copiedFGs.append(copiedFG)
 
         self._fgs = copiedFGs
@@ -291,7 +139,7 @@ class FGR32SFC(FGR):
         for index, fg in enumerate(self._fgs):
             for i in range(0, 8):
                 copiedFG: EmbeddingGraph = copy.deepcopy(fg)
-                copiedFG["sfcrID"] = f"sfc{index}-{i}-{expName}"
+                copiedFG["sfcrID"] = f"sfc{index}-{i}-{experimentName}"
                 copiedFGs.append(copiedFG)
 
         self._fgs = copiedFGs
@@ -309,7 +157,7 @@ class FGR16SFC(FGR):
         for index, fg in enumerate(self._fgs):
             for i in range(0, 4):
                 copiedFG: EmbeddingGraph = copy.deepcopy(fg)
-                copiedFG["sfcrID"] = f"sfc{index}-{i}-{expName}"
+                copiedFG["sfcrID"] = f"sfc{index}-{i}-{experimentName}"
                 copiedFGs.append(copiedFG)
 
         self._fgs = copiedFGs
@@ -327,17 +175,7 @@ class SFCSolver(Solver):
     ) -> None:
         super().__init__(orchestrator, trafficGenerator)
         self._resourceDemands: "dict[str, ResourceDemand]" = None
-
-        calibrate = Calibrate()
-
-        trafficDesignPath = f"{configPath}/traffic-design.json"
-        with open(trafficDesignPath, "r", encoding="utf8") as traffic:
-            design = json.load(traffic)
-        maxTarget: int = max(design, key=lambda x: x["target"])["target"]
-
-        self._resourceDemands: "dict[str, ResourceDemand]" = (
-            calibrate.getResourceDemands(maxTarget)
-        )
+        self._topology: Topology = None
 
     def generateEmbeddingGraphs(self) -> None:
         try:
@@ -348,8 +186,12 @@ class SFCSolver(Solver):
                 requests.append(self._requests.get())
                 sleep(0.1)
             self._topology: Topology = self._orchestrator.getTopology()
+            trafficDesignPath = f"{configPath}/traffic-design.json"
+            with open(trafficDesignPath, "r", encoding="utf8") as traffic:
+                design = json.load(traffic)
+            maxTarget: int = max(design, key=lambda x: x["target"])["target"]
             sda = SimpleDijkstraAlgorithm(
-                requests, self._topology, self._resourceDemands
+                requests, self._topology, maxTarget
             )
             start: float = default_timer()
             fgs, failedFGs, _nodes = sda.run()
@@ -357,7 +199,7 @@ class SFCSolver(Solver):
             executionTime = end - start
 
             logRow: "list[str]" = []
-            logRow.append(experiment)
+            logRow.append(experimentID)
             TUI.appendToSolverLog(f"Failed FGs: {len(failedFGs)}")
             TUI.appendToSolverLog(f"Accepted FGs: {len(fgs)}")
             logRow.append(str(len(failedFGs)))
@@ -400,7 +242,7 @@ class SFCSolver(Solver):
 
                     for key, data in hostData.items():
                         hostRow: "list[str]" = []
-                        hostRow.append(experiment)
+                        hostRow.append(experimentID)
                         hostRow.append(key)
 
                         hostRow.append(str(data["cpuUsage"][0]))
@@ -414,12 +256,12 @@ class SFCSolver(Solver):
                         hostRow.append(str(duration))
                         with open(
                             hostDataFilePath, "a", encoding="utf8"
-                        ) as hostDataFile:
-                            hostDataFile.write(f"{','.join(hostRow)}\n")
+                        ) as hostDataLogFile:
+                            hostDataLogFile.write(f"{','.join(hostRow)}\n")
 
                     for key, data in trafficData.items():
                         row: "list[str]" = []
-                        row.append(experiment)
+                        row.append(experimentID)
                         row.append(key)
                         row.append(str(data["httpReqs"]))
                         row.append(str(data["averageLatency"]))
@@ -463,3 +305,154 @@ def getTrafficDesign() -> None:
         json.dump(design, traffic, indent=4)
 
     print(getTrafficDesignRate(design, [2]*(len(design) // 2)))
+
+
+@click.command()
+@click.option("--experiment", type=int, help="The experiment to run.")
+def run(experiment: int) -> None:
+    """
+    Run the Simple Dijkstra Algorithm.
+
+    Parameters:
+        experiment (int): The experiment to run.
+    """
+
+    def runExperiment(fgr: FGR, topology: Topology) -> None:
+        """
+        Run an experiment.
+
+        Parameters:
+            fgr (FGR): The FG Request Generator.
+            topology (Topology): The topology.
+        """
+
+        nonlocal experiment
+        global experimentName
+        sfcEm: SFCEmulator = SFCEmulator(fgr, SFCSolver)
+        sfcEm.startTest(topology, trafficDesign)
+        sfcEm.end()
+        experiment = ""
+        experimentName = ""
+
+    def experiment1() -> None:
+        """
+        Run Experiment 1.
+        """
+
+        # Experiment 1 - 4 SFCs 0.5
+        nonlocal experiment
+        global experimentName
+        experimentName = "one"
+        experiment = "SFCs:4-Topology:0.5"
+        runExperiment(FGR4SFC, topologyPointFive)
+
+    def experiment2() -> None:
+        """
+        Run Experiment 2.
+        """
+
+        # Experiment 2 - 8 SFCs 0.5
+        nonlocal experiment
+        global experimentName
+        experimentName = "two"
+        experiment = "SFCs:8-Topology:0.5"
+        runExperiment(FGR8SFC, topologyPointFive)
+
+    def experiment3() -> None:
+        """
+        Run Experiment 3.
+        """
+
+        # Experiment 3 - 32 SFCs 0.5
+        nonlocal experiment
+        global experimentName
+        experimentName = "three"
+        experiment = "SFCs:32-Topology:0.5"
+        runExperiment(FGR32SFC, topologyPointFive)
+
+    def experiment4() -> None:
+        """
+        Run Experiment 4.
+        """
+
+        # Experiment 4 - 16 SFCs 0.5
+        nonlocal experiment
+        global experimentName
+        experimentName = "four"
+        experiment = "SFCs:16-Topology:0.5"
+        runExperiment(FGR16SFC, topologyPointFive)
+
+    def experiment5() -> None:
+        """
+        Run Experiment 5.
+        """
+
+        # Experiment 5 - 4 SFCs 1
+        nonlocal experiment
+        global experimentName
+        experimentName = "five"
+        experiment = "SFCs:4-Topology:1"
+        runExperiment(FGR4SFC, topology1)
+
+    def experiment6() -> None:
+        """
+        Run Experiment 6.
+        """
+
+        # Experiment 6 - 8 SFCs 1
+        nonlocal experiment
+        global experimentName
+        experimentName = "six"
+        experiment = "SFCs:8-Topology:1"
+        runExperiment(FGR8SFC, topology1)
+
+    def experiment7() -> None:
+        """
+        Run Experiment 7.
+        """
+
+        # Experiment 7 - 32 SFCs 1
+        nonlocal experiment
+        global experimentName
+        experimentName = "seven"
+        experiment = "SFCs:32-Topology:1"
+        runExperiment(FGR32SFC, topology1)
+
+    def experiment8() -> None:
+        """
+        Run Experiment 8.
+        """
+
+        # Experiment 8 - 16 SFCs 1
+        nonlocal experiment
+        global experimentName
+
+        experimentName = "eight"
+        experiment = "SFCs:16-Topology:1"
+        runExperiment(FGR16SFC, topology1)
+
+    if experiment == 1:
+        experiment1()
+    elif experiment == 2:
+        experiment2()
+    elif experiment == 3:
+        experiment3()
+    elif experiment == 4:
+        experiment4()
+    elif experiment == 5:
+        experiment5()
+    elif experiment == 6:
+        experiment6()
+    elif experiment == 7:
+        experiment7()
+    elif experiment == 8:
+        experiment8()
+    else:
+        experiment1()
+        experiment2()
+        experiment3()
+        experiment4()
+        experiment5()
+        experiment6()
+        experiment7()
+        experiment8()

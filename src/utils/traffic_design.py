@@ -55,7 +55,7 @@ def generateTrafficDesignFromFile(dataFile: str, scale: float = 1, hourDuration:
             if minimal and lastReqps == numOfReqs:
                 continue
             lastReqps = numOfReqs
-            #Considering an hour is equal to `hourDuration` seconds
+            # Considering an hour is equal to `hourDuration` seconds
             rate: int = numOfReqs // hourDuration
 
             for _ in range(hourDuration):

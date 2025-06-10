@@ -7,14 +7,18 @@ import random
 from time import sleep
 import click
 import pandas as pd
+import polars as pl
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
-from algorithms.surrogacy.extract_weights import getWeightLength, getWeights
-from algorithms.surrogacy.link_embedding import EmbedLinks
-from algorithms.surrogacy.vnf_embedding import convertDFtoEGs, convertFGsToDF, getConfidenceValues
-from algorithms.surrogacy.utils.scorer import Scorer
+from algorithms.models.embedding import DecodedIndividual
+from algorithms.surrogacy.models.traffic import TimeSFCRequests
+from algorithms.surrogacy.utils.demand_predictions import DemandPredictions
+from algorithms.surrogacy.utils.extract_weights import getWeightLength, getWeights
+from algorithms.surrogacy.solvers.link_embedding import EmbedLinks
+from algorithms.surrogacy.solvers.vnf_embedding import convertDFtoEGs, convertFGsToDF, getConfidenceValues
+from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
@@ -61,6 +65,7 @@ linksDataPath: str = os.path.join(artifactsDir, "links.csv")
 @click.option("--cpu", is_flag=True, default=False, help="Run CPU benchmark.")
 @click.option("--memory", is_flag=True, default=False, help="Run memory benchmark.")
 @click.option("--links", is_flag=True, default=False, help="Run link benchmark.")
+# pylint: disable=unused-argument
 def benchmark(headless: bool, control: bool, cpu: bool, memory: bool, links: bool) -> None:
     """
     This function benchmarks link usage against latency.
@@ -98,9 +103,7 @@ def benchmark(headless: bool, control: bool, cpu: bool, memory: bool, links: boo
         generateTrafficDesign(0, 600, trafficDuration)
     ]
 
-    global fgs
-
-    class LinkSFCR(SFCRequestGenerator):
+    class ToySFCR(SFCRequestGenerator):
         """
         SFC Request Generator.
         """
@@ -113,7 +116,7 @@ def benchmark(headless: bool, control: bool, cpu: bool, memory: bool, links: boo
 
             self._orchestrator.sendRequests(egCopy)
 
-    class LinksSolver(Solver):
+    class ToySolver(Solver):
         """
         Class that defines the solver CPU benchmarking.
         """
@@ -123,6 +126,8 @@ def benchmark(headless: bool, control: bool, cpu: bool, memory: bool, links: boo
             This function generates the embedding graphs.
             """
 
+            demandPredictions: DemandPredictions = DemandPredictions()
+
             try:
                 while self._requests.empty():
                     pass
@@ -131,7 +136,7 @@ def benchmark(headless: bool, control: bool, cpu: bool, memory: bool, links: boo
                     requests.append(self._requests.get())
                     sleep(0.1)
 
-                finalData: pd.DataFrame = pd.DataFrame()
+                finalData: pl.DataFrame = None
                 for i in range(len(requests)):
                     requestsToDeploy: "list[EmbeddingGraph]" = requests[:i+1]
                     noOfGenes: int = getWeightLength(requests[0], topology)
@@ -139,6 +144,7 @@ def benchmark(headless: bool, control: bool, cpu: bool, memory: bool, links: boo
                     eGraphs: "list[EmbeddingGraph]" = []
                     embedData: "dict[str, dict[str, list[click.Tuple[str, int]]]]" = {}
                     weights: "tuple[list[float], list[float], list[float], list[float], list[float], list[float]]" = []
+                    hybridEvolution: HybridEvolution = HybridEvolution()
                     while len(eGraphs) != len(requestsToDeploy):
                         for _ in range(noOfGenes):
                             individual.append(random.uniform(-1, 1))
@@ -166,78 +172,27 @@ def benchmark(headless: bool, control: bool, cpu: bool, memory: bool, links: boo
                             f"{trafficDuration}s"
                         )
 
-                        trafficData["_time"] = trafficData["_time"] // 1000000000
-
-                        groupedTrafficData: pd.DataFrame = trafficData.groupby(
-                            ["_time", "sfcID"]
-                        ).agg(
-                            reqps=("_value", "count"),
-                            medianLatency=("_value", "median"),
+                        ar: int = len(finalEGs) / len(requestsToDeploy)
+                        decodedIndividual: DecodedIndividual = (0, finalEGs, embedData, embedLinks.getLinkData(), ar)
+                        hybridEvolution.cacheForOffline([decodedIndividual], trafficDesign, topology, 1)
+                        data: pl.DataFrame = hybridEvolution.generateScoresForRealTrafficData(
+                            decodedIndividual,
+                            trafficData,
+                            trafficDesign,
+                            topology
                         )
-
-                        simulatedReqps: "list[float]" = getTrafficDesignRate(
-                            trafficDesign[0],
-                            [1]
-                            * groupedTrafficData.index.get_level_values(0)
-                            .unique()
-                            .size,
-                        )
-
-                        index: int = 0
-                        time: "list[int]" = []
-                        sfcIDs: "list[str]" = []
-                        realReqps: "list[float]" = []
-                        latencies: "list[float]" = []
-                        reqps: "list[float]" = []
-                        for i, group in groupedTrafficData.groupby(level=0):
-                            for eg in finalEGs:
-                                time.append(i)
-                                sfcIDs.append(eg["sfcID"])
-                                realReqps.append(
-                                    group.loc[(i, eg["sfcID"])]["reqps"]
-                                    if eg["sfcID"] in group.index.get_level_values(1)
-                                    else 0
-                                )
-                                reqps.append(
-                                    simulatedReqps[index]
-                                    if index < len(simulatedReqps)
-                                    else simulatedReqps[-1]
-                                )
-                                latencies.append(
-                                    group.loc[(i, eg["sfcID"])]["medianLatency"]
-                                    if eg["sfcID"] in group.index.get_level_values(1)
-                                    else 0
-                                )
-                            index += 1
-                        data: pd.DataFrame = pd.DataFrame(
-                            {
-                                "generation": 1,
-                                "individual": 1,
-                                "time": time,
-                                "sfc": sfcIDs,
-                                "reqps": reqps,
-                                "real_reqps": realReqps,
-                                "latency": latencies,
-                                "ar": 1,
-                            }
-                        )
-                        scorer: Scorer = Scorer()
-                        data = scorer.getSFCScores(
-                            data, topology, finalEGs, embedData, embedLinks.getLinkData()
-                        )
-
-                        finalData = pd.concat([finalData, data])
+                        finalData = pd.concat([finalData, data]) if finalData is not None else data
                     except Exception as e:
                         TUI.appendToSolverLog(f"Error: {e}", True)
 
                     TUI.appendToSolverLog("Solver has finished.")
                     self._orchestrator.deleteEmbeddingGraphs(finalEGs)
                     sleep(5)
-                finalData.to_csv(os.path.join(artifactsDir, fileName), index=False)
+                finalData.write_csv(os.path.join(artifactsDir, fileName))
             except Exception as e:
                 TUI.appendToSolverLog(str(e), True)
             TUI.exit()
 
-    sfcEmulator: SFCEmulator = SFCEmulator(LinkSFCR, LinksSolver, headless)
+    sfcEmulator: SFCEmulator = SFCEmulator(ToySFCR, ToySolver, headless)
     sfcEmulator.startTest(topology, trafficDesign)
     sfcEmulator.end()

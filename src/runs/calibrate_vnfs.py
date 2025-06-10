@@ -5,9 +5,9 @@ This is used to calibrate the VNFs.
 import json
 import os
 from shared.utils.config import getConfig
-from calibrate.calibrate import Calibrate
+from calibrate.demand_predictor import DemandPredictor
 import click
-
+from calibrate.run_benchmark import Calibrate
 from models.calibrate import ResourceDemand
 
 @click.command()
@@ -40,7 +40,8 @@ def run(algorithm: str, vnf: str, metric: str, train: bool, epochs: int, headles
     with open(designFile, "r", encoding="utf8") as traffic:
         design = json.load(traffic)
     maxTarget: int = max(design, key=lambda x: x["target"])["target"]
-    resourceDemands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(maxTarget)
+    demandPredictor: DemandPredictor = DemandPredictor()
+    resourceDemands: "dict[str, ResourceDemand]" = demandPredictor.getResourceDemands(maxTarget)
     demandsDirectory = f"{getConfig()['repoAbsolutePath']}/artifacts/calibrations"
     if not os.path.exists(demandsDirectory):
         os.makedirs(demandsDirectory)

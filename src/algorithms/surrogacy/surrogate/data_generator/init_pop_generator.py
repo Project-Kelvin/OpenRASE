@@ -2,39 +2,35 @@
 This defines the GA that evolves teh weights of the Neural Network.
 """
 
-from copy import deepcopy
 import random
-from typing import Any, Tuple
 from multiprocessing import Pool, cpu_count
-import pandas as pd
+from typing import Any
 from deap import base, creator, tools
 import tensorflow as tf
 from shared.utils.config import getConfig
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
-from algorithms.surrogacy.extract_weights import getWeightLength, getWeights
-from algorithms.surrogacy.vnf_embedding import convertDFtoEGs, convertFGsToDF, getConfidenceValues
-from algorithms.surrogacy.scorer import Scorer
+from algorithms.models.embedding import DecodedIndividual
+from algorithms.surrogacy.hybrid_online_offline import decodePop
+from algorithms.surrogacy.utils.extract_weights import getWeightLength
+from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
+from algorithms.surrogacy.utils.scorer import Scorer
 from utils.tui import TUI
-from models.calibrate import ResourceDemand
 
 
 tf.get_logger().setLevel("ERROR")
 
-scorer: Scorer = Scorer()
-
 artifactDir: str = f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/surrogacy"
-
+hybridEvolution: HybridEvolution = HybridEvolution()
 
 def evaluate(
-    individual: "list[float]",
-    fgs: "list[EmbeddingGraph]",
+    decodedIndividual: DecodedIndividual,
     gen: int,
     ngen: int,
     trafficDesign: TrafficDesign,
-    topology: Topology,
-) -> "tuple[float, float, float]":
+    topology: Topology
+) -> "tuple[int, float, float, float]":
     """
     Evaluates the individual.
 
@@ -47,49 +43,16 @@ def evaluate(
         topology (Topology): the topology.
 
     Returns:
-        tuple[float, float, float]: the acceptance ratio, max CPU usage, max memory usage.
+        tuple[int, float, float, float]: the individual index, acceptance ratio, max CPU usage, max memory usage.
     """
 
-    copiedFGs: "list[EmbeddingGraph]" = [deepcopy(fg) for fg in fgs]
-    weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(
-        individual, copiedFGs, topology
-    )
-    df: pd.DataFrame = convertFGsToDF(copiedFGs, topology)
-    newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
-    egs, _nodes, embedData = convertDFtoEGs(newDF, copiedFGs, topology)
-
     penaltyScore: float = 50
-    acceptanceRatio: float = len(egs) / len(fgs)
     penalty: float = gen / ngen
 
-    maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
+    _index, egs, embedData, linkData, acceptanceRatio = decodedIndividual
+
     if len(egs) > 0:
-        # Validate EGs
-        sfcIDs: "list[str]" = []
-        reqps: "list[float]" = []
-        for eg in egs:
-            sfcIDs.append(eg["sfcID"])
-            reqps.append(maxReqps)
-
-        data: pd.DataFrame = pd.DataFrame(
-            {
-                "generation": 0,
-                "individual": 0,
-                "time": 0,
-                "sfc": sfcIDs,
-                "reqps": reqps,
-                "real_reqps": 0,
-                "latency": 0,
-                "ar": acceptanceRatio,
-            }
-        )
-
-        scorer.cacheData(data, egs)
-        scores: "dict[str, ResourceDemand]" = scorer.getHostScores(
-            data, topology, embedData
-        )
-        maxCPU: float = max([score["cpu"] for score in scores.values()])
-        maxMemory: float = max([score["memory"] for score in scores.values()])
+        maxCPU, maxMemory = hybridEvolution.getMaxCpuMemoryUsageOfHosts(egs, topology, embedData, trafficDesign)
 
         return acceptanceRatio, maxCPU, maxMemory
     else:
@@ -155,24 +118,26 @@ def evolveInitialWeights(
     pop: "list[creator.Individual]" = toolbox.population(n=POP_SIZE)
 
     gen: int = 1
+    decodedPop: "list[DecodedIndividual]" = decodePop(pop, topology, fgs)
+    hybridEvolution.cacheForOffline(decodedPop, trafficDesign, topology, gen)
     pool: Any = Pool(processes=cpu_count())
     results: tuple[float, float, float] = pool.starmap(
         evaluate,
         [
             (
                 ind,
-                fgs,
                 gen,
                 NGEN,
                 trafficDesign,
                 topology,
             )
-            for ind in pop
+            for i, ind in enumerate(decodedPop)
         ],
     )
 
-    for ind, result in zip(pop, results):
-        ind.fitness.values = result
+    for result in results:
+        ind: "creator.Individual" = pop[result[0]]
+        ind.fitness.values = (result[1], result[2])
 
     gen = gen + 1
     filteredPop: "list[creator.Individual]" = []
@@ -189,23 +154,28 @@ def evolveInitialWeights(
                 toolbox.mutate(mutant)
                 del mutant.fitness.values
 
+        decodedOffspring: "list[DecodedIndividual]" = decodePop(
+            offspring, topology, fgs
+        )
+        hybridEvolution.cacheForOffline(decodedOffspring, trafficDesign, topology, gen)
         pool: Any = Pool(processes=cpu_count())
         results: tuple[float, float, float] = pool.starmap(
             evaluate,
             [
                 (
                     ind,
-                    fgs,
                     gen,
                     NGEN,
                     trafficDesign,
                     topology,
                 )
-                for ind in offspring
+                for i, ind in enumerate(decodedOffspring)
             ],
         )
-        for ind, result in zip(offspring, results):
-            ind.fitness.values = result
+
+        for result in results:
+            ind: "creator.Individual" = pop[result[0]]
+            ind.fitness.values = (result[1], result[2])
 
         pop[:] = toolbox.select(pop + offspring, k=POP_SIZE)
         alpha: float = 1.0

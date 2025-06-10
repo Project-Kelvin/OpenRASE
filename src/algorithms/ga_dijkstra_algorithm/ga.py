@@ -12,12 +12,10 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.utils.config import getConfig
 from sfc.traffic_generator import TrafficGenerator
-from algorithms.ga_dijkstra_algorithm.utils import (
+from algorithms.ga_dijkstra_algorithm.ga_utils import (
     algorithm,
-    crossover,
     evaluation,
     generateRandomIndividual,
-    getVNFsfromFGRs,
     mutate,
 )
 from models.calibrate import ResourceDemand
@@ -44,7 +42,7 @@ with open(
 
 def GADijkstraAlgorithm(
     topology: Topology,
-    resourceDemands: "dict[str, ResourceDemand]",
+    maxTarget: int,
     fgrs: "list[EmbeddingGraph]",
     sendEGs: "Callable[[list[EmbeddingGraph]], None]",
     deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
@@ -56,7 +54,7 @@ def GADijkstraAlgorithm(
 
     Parameters:
         topology (Topology): the topology.
-        resourceDemands (dict[str, ResourceDemand]): the resource demands.
+        maxTarget (int): the maximum target.
         fgrs (list[EmbeddingGraph]): the FG Requests.
         sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
         trafficDesign (TrafficDesign): the traffic design.
@@ -96,7 +94,7 @@ def GADijkstraAlgorithm(
             trafficDesign,
             trafficGenerator,
             topology,
-            resourceDemands,
+            maxTarget,
         )
 
     ars = [ind.fitness.values[0] for ind in pop]
@@ -138,7 +136,7 @@ def GADijkstraAlgorithm(
                 trafficDesign,
                 trafficGenerator,
                 topology,
-                resourceDemands,
+                maxTarget,
             )
         pop[:] = toolbox.select(pop + offspring, k=NO_OF_INDIVIDUALS)
         hof.update(pop)

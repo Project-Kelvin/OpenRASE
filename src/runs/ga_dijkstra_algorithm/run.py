@@ -12,9 +12,7 @@ import click
 import numpy as np
 import tensorflow as tf
 from algorithms.ga_dijkstra_algorithm.ga import GADijkstraAlgorithm
-from calibrate.calibrate import Calibrate
 from mano.orchestrator import Orchestrator
-from models.calibrate import ResourceDemand
 from packages.python.shared.models.config import Config
 from packages.python.shared.models.embedding_graph import EmbeddingGraph
 from packages.python.shared.models.sfc_request import SFCRequest
@@ -75,7 +73,7 @@ trafficDesign: "list[TrafficDesign]" = [
             "requests.csv",
         ),
         0.1,
-        1,
+        4,
         False,
     )
 ]
@@ -117,16 +115,11 @@ class SFCSolver(Solver):
 
     def __init__(self, orchestrator: Orchestrator, trafficGenerator: TrafficGenerator) -> None:
         super().__init__(orchestrator, trafficGenerator)
-        self._resourceDemands: "dict[str, ResourceDemand]" = None
-
-        calibrate = Calibrate()
-
         trafficDesignPath = f"{configPath}/traffic-design.json"
         with open(trafficDesignPath, "r", encoding="utf8") as traffic:
             design = json.load(traffic)
-        maxTarget: int = max(design, key=lambda x: x["target"])["target"]
+        self._maxTarget: int = max(design, key=lambda x: x["target"])["target"]
 
-        self._resourceDemands: "dict[str, ResourceDemand]" = calibrate.getResourceDemands(maxTarget)
         self._topology: Topology = None
 
     def generateEmbeddingGraphs(self) -> None:
@@ -139,7 +132,7 @@ class SFCSolver(Solver):
                 sleep(0.1)
             self._topology: Topology = self._orchestrator.getTopology()
 
-            GADijkstraAlgorithm(self._topology, self._resourceDemands, requests, self._orchestrator.sendEmbeddingGraphs, self._orchestrator.deleteEmbeddingGraphs, trafficDesign, self._trafficGenerator)
+            GADijkstraAlgorithm(self._topology, self._maxTarget, requests, self._orchestrator.sendEmbeddingGraphs, self._orchestrator.deleteEmbeddingGraphs, trafficDesign, self._trafficGenerator)
             TUI.appendToSolverLog("Finished experiment.")
             sleep(2)
         except Exception as e:

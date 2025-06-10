@@ -2,30 +2,28 @@
 This defines the GA that evolves teh weights of the Neural Network.
 """
 
-from copy import deepcopy
 from math import floor
 import random
 from time import sleep
-from timeit import default_timer
-from typing import Callable, Tuple
 import os
+from typing import Callable
 import pandas as pd
+import polars as pl
 from deap import base, creator, tools
 from shared.models.traffic_design import TrafficDesign
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
-from algorithms.surrogacy.extract_weights import getWeightLength
-from algorithms.surrogacy.local_constants import SURROGACY_PATH, SURROGATE_DATA_PATH, SURROGATE_PATH
+from algorithms.models.embedding import DecodedIndividual
+from algorithms.surrogacy.utils.extract_weights import getWeightLength
+from algorithms.surrogacy.constants.surrogate import SURROGACY_PATH, SURROGATE_DATA_PATH, SURROGATE_PATH
+from algorithms.surrogacy.hybrid_online_offline import decodePop
 from algorithms.surrogacy.surrogate.data_generator.init_pop_generator import (
     evolveInitialWeights,
-    getWeights,
 )
-from algorithms.surrogacy.link_embedding import EmbedLinks
-from algorithms.surrogacy.vnf_embedding import convertDFtoEGs, convertFGsToDF, getConfidenceValues
-from algorithms.surrogacy.scorer import Scorer
-from models.calibrate import ResourceDemand
+from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
+from algorithms.surrogacy.utils.scorer import Scorer
 from sfc.traffic_generator import TrafficGenerator
-from utils.traffic_design import calculateTrafficDuration, getTrafficDesignRate
+from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI
 
 directory: str = SURROGACY_PATH
@@ -40,14 +38,11 @@ surrogateDataDirectory: str = SURROGATE_DATA_PATH
 if not os.path.exists(surrogateDataDirectory):
     os.makedirs(surrogateDataDirectory)
 
-scorer: Scorer = Scorer()
-
 isFirstSetWritten: bool = False
+hybridEvolution: "HybridEvolution" = HybridEvolution()
 
 def evaluate(
-    individualIndex: int,
-    individual: "list[float]",
-    fgs: "list[EmbeddingGraph]",
+    individual: DecodedIndividual,
     gen: int,
     ngen: int,
     sendEGs: "Callable[[list[EmbeddingGraph]], None]",
@@ -63,9 +58,7 @@ def evaluate(
     Evaluates the individual.
 
     Parameters:
-        index (int): individual index.
-        individual (list[float]): the individual.
-        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        individual (DecodedIndividual): the decoded individual.
         gen (int): the generation.
         ngen (int): the number of generations.
         sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
@@ -82,64 +75,19 @@ def evaluate(
     """
 
     global isFirstSetWritten
-
-    # Decode individual
-    copiedFGs: "list[EmbeddingGraph]" = [deepcopy(fg) for fg in fgs]
-    weights: "Tuple[list[float], list[float], list[float], list[float]]" = getWeights(
-        individual, copiedFGs, topology
-    )
-    df: pd.DataFrame = convertFGsToDF(copiedFGs, topology)
-    newDF: pd.DataFrame = getConfidenceValues(df, weights[0], weights[1])
-    egs, nodes, embedData = convertDFtoEGs(newDF, copiedFGs, topology)
-    if len(egs) > 0:
-        embedLinks: EmbedLinks = EmbedLinks(topology, egs, weights[2], weights[3])
-        start: float = default_timer()
-        egs = embedLinks.embedLinks(nodes)
-        end: float = default_timer()
-        TUI.appendToSolverLog(f"Link Embedding Time for all EGs: {end - start}s")
+    individualIndex, egs, embedData, linkData, acceptanceRatio = individual
 
     penaltyLatency: float = 50000
-    acceptanceRatio: float = len(egs) / len(fgs)
-    latency: int = 0
     penaltyWeight: float = gen / ngen
-    maxReqps: int = max(trafficDesign[0], key=lambda x: x["target"])["target"]
+    latency: int = 0
 
     TUI.appendToSolverLog(
-        f"Acceptance Ratio: {len(egs)}/{len(fgs)} = {acceptanceRatio}"
+        f"Acceptance Ratio: {acceptanceRatio}"
     )
 
     if len(egs) > 0:
-        # Check individual validity
-        sfcIDs: "list[str]" = []
-        reqps: "list[float]" = []
-        for eg in egs:
-            sfcIDs.append(eg["sfcID"])
-            reqps.append(maxReqps)
-
-        hostData: pd.DataFrame = pd.DataFrame(
-            {
-                "generation": 0,
-                "individual": 0,
-                "time": 0,
-                "sfc": sfcIDs,
-                "reqps": reqps,
-                "real_reqps": 0,
-                "latency": 0,
-                "ar": acceptanceRatio,
-            }
-        )
-        scorer.cacheData(hostData, egs)
-        scores: "dict[str, ResourceDemand]" = scorer.getHostScores(
-            hostData, topology, embedData
-        )
-        maxMemory: float = max([score["memory"] for score in scores.values()])
-        TUI.appendToSolverLog(f"Max Memory: {maxMemory}")
-
-        # Validate EGs
-        # The resource demand of deployed VNFs exceeds the resource capacity of at least 1 host.
-        # This leads to servers crashing.
-        # Penalty is applied to the latency and the egs are not deployed.
-        if maxMemory > maxMemoryDemand:
+        _maxCPU, maxMemory = hybridEvolution.getMaxCpuMemoryUsageOfHosts(egs, topology, embedData, trafficDesign, maxMemoryDemand)
+        if  maxMemory> maxMemoryDemand:
             TUI.appendToSolverLog(
                 f"Penalty because max Memory demand is {maxMemory}."
             )
@@ -171,80 +119,27 @@ def evaluate(
 
             return 0, penaltyLatency
 
-        trafficData["_time"] = trafficData["_time"] // 1000000000
-
-        groupedTrafficData: pd.DataFrame = trafficData.groupby(["_time", "sfcID"]).agg(
-            reqps=("_value", "count"),
-            medianLatency=("_value", "median"),
+        data: pl.DataFrame = hybridEvolution.generateScoresForRealTrafficData(
+            individual,
+            trafficData,
+            trafficDesign,
+            topology
         )
 
-        simulatedReqps: "list[float]" = getTrafficDesignRate(
-            trafficDesign[0],
-            [1] * groupedTrafficData.index.get_level_values(0).unique().size,
-        )
-
-        latency: float = 0
-
-        index: int = 0
-        time: "list[int]" = []
-        sfcIDs: "list[str]" = []
-        reqps: "list[float]" = []
-        realReqps: "list[float]" = []
-        latencies: "list[float]" = []
-        ars: "list[float]" = []
-        generation: "list[int]" = []
-        for i, group in groupedTrafficData.groupby(level=0):
-            for eg in egs:
-                generation.append(gen)
-                time.append(i)
-                sfcIDs.append(eg["sfcID"])
-                reqps.append(
-                    simulatedReqps[index]
-                    if index < len(simulatedReqps)
-                    else simulatedReqps[-1]
-                )
-                realReqps.append(
-                    group.loc[(i, eg["sfcID"])]["reqps"]
-                    if eg["sfcID"] in group.index.get_level_values(1)
-                    else 0
-                )
-                latencies.append(
-                    group.loc[(i, eg["sfcID"])]["medianLatency"]
-                    if eg["sfcID"] in group.index.get_level_values(1)
-                    else 0
-                )
-                ars.append(acceptanceRatio)
-            index += 1
-        data: pd.DataFrame = pd.DataFrame(
-            {
-                "generation": generation,
-                "individual": individualIndex,
-                "time": time,
-                "sfc": sfcIDs,
-                "reqps": reqps,
-                "real_reqps": realReqps,
-                "latency": latencies,
-                "ar": ars,
-            }
-        )
-
-        data = scorer.getSFCScores(
-            data, topology, egs, embedData, embedLinks.getLinkData()
-        )
-
-        data.to_csv(
-            f"{surrogateDataDirectory}/{fileName}",
-            mode="a" if isFirstSetWritten else "w",
-            header=not isFirstSetWritten,
-            index=False,
-            encoding="utf8",
-        )
+        with open(
+            f"{surrogateDirectory}/{fileName}",mode="a", encoding="utf8"
+        ) as scoreFile:
+            data.write_csv(
+                scoreFile,
+                include_header=not isFirstSetWritten,
+                separator=",",
+            )
 
         isFirstSetWritten = True
 
-        data["latency"] = data["latency"].replace(0, 1500)
+        data = data.with_columns(pl.when(pl.col("latency") == 0).then(1500).otherwise(pl.col("latency")).alias("latency"))
 
-        latency = data["latency"].mean()
+        latency = pl.Series(data.select("latency")).mean()
 
         TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
         deleteEGs(egs)
@@ -344,13 +239,11 @@ def evolveWeights(
     toolbox.register("select", tools.selNSGA2)
 
     pop: "list[creator.Individual]" = evolvedNewPop
-
+    decodedPop: "list[DecodedIndividual]" = decodePop(pop, topology, fgs)
     gen: int = 1
-    for i, ind in enumerate(pop):
+    for ind in decodedPop:
         ind.fitness.values = evaluate(
-            i,
             ind,
-            fgs,
             gen,
             NGEN,
             sendEGs,
@@ -380,11 +273,10 @@ def evolveWeights(
                 toolbox.mutate(mutant)
                 del mutant.fitness.values
 
-        for i, ind in enumerate(offspring):
+        decodedOffspring: "list[DecodedIndividual]" = decodePop(offspring, topology, fgs)
+        for ind in decodedOffspring:
             ind.fitness.values = evaluate(
-                i,
                 ind,
-                fgs,
                 gen,
                 NGEN,
                 sendEGs,

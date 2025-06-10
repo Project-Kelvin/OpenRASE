@@ -6,6 +6,7 @@ import copy
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.topology import Topology
 from dijkstar import Graph, find_path
+from calibrate.demand_predictor import DemandPredictor
 from constants.topology import SERVER, SFCC
 from models.calibrate import ResourceDemand
 from utils.embedding_graph import traverseVNF
@@ -16,22 +17,26 @@ class SimpleDijkstraAlgorithm():
     Class that implements the Simple Dijkstra's Algorithm.
     """
 
-
-    def __init__(self, fg: "list[EmbeddingGraph]", topology: Topology, vnfResourceDemands: "dict[str, ResourceDemand]") -> None:
+    def __init__(self, fg: "list[EmbeddingGraph]", topology: Topology, maxTarget: int) -> None:
         """
         Initialize the Simple Dijkstra's Algorithm.
+
+        Parameters:
+            fg (list[EmbeddingGraph]): the Forwarding Graphs.
+            topology (Topology): the topology.
+            maxTarget (int): the maximum target for the algorithm.
         """
 
         self._fgs: "list[EmbeddingGraph]" = fg
         self._topology: Topology = topology
         self._nodeResourceUsage: "dict[str, ResourceDemand]" = {}
         self._nodes: "dict[str, list[str]]" = {}
-        self._vnfResourceDemands: "dict[str, ResourceDemand]" = vnfResourceDemands
+        self._demandPredictor: DemandPredictor = DemandPredictor()
+        self._maxTarget: int = maxTarget
 
         for graph in self._fgs:
             graph["sfcID"] = graph["sfcrID"]
             self._nodes[graph["sfcID"]]= [SFCC]
-
 
     def _findNode(self, fg: EmbeddingGraph) -> "tuple[EmbeddingGraph, bool, dict[str, ResourceDemand]]":
         """
@@ -67,18 +72,15 @@ class SimpleDijkstraAlgorithm():
                 nodeResourceUsage: ResourceDemand = localNodeResourceUsage[node["id"]
                                                                             ] if node["id"] in localNodeResourceUsage else None
                 nodeCPU: float = nodeResourceUsage["cpu"] if nodeResourceUsage is not None else node["cpu"]
-                #nodeMemory: float = nodeResourceUsage["memory"] if nodeResourceUsage is not None else node["memory"]
-                resourceDemand: ResourceDemand = copy.deepcopy(self._vnfResourceDemands[vnf["vnf"]["id"]])
+                resourceDemand: ResourceDemand = (
+                    self._demandPredictor.getResourceDemandsOfVNF(
+                        vnf["vnf"]["id"], self._maxTarget / divisor
+                    )
+                )
 
-                if divisor > 1:
-                    fullResourceDemand: ResourceDemand = self._vnfResourceDemands[vnf["vnf"]["id"]]
-                    resourceDemand["cpu"] = fullResourceDemand["cpu"] / divisor
-                    #resourceDemand["memory"] = fullResourceDemand["memory"] / divisor
-
-                if resourceDemand["cpu"] <= nodeCPU: #and resourceDemand["memory"] <= nodeMemory:
+                if resourceDemand["cpu"] <= nodeCPU:
                     localNodeResourceUsage[node["id"]] = {
                         "cpu": nodeCPU - resourceDemand["cpu"],
-                        #"memory": nodeMemory - resourceDemand["memory"]
                     }
 
                     if self._nodes[eg["sfcID"]][-1] != node["id"]:

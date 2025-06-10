@@ -444,7 +444,7 @@ class EmbedLinks:
         Gets the link data.
 
         Returns:
-            dict[str, float]: the link data.
+            dict[str, dict[str, float]] : the link data.
         """
 
         return self._linkData
