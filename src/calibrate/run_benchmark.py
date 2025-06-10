@@ -23,6 +23,7 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 from pandas import DataFrame, Series
 from calibrate.benchmarking_models import vnfModels
+from calibrate.constants import CALIBRATION_DIR, MODEL_NAME
 from mano.telemetry import Telemetry
 from models.calibrate import ResourceDemand
 from models.telemetry import HostData
@@ -62,8 +63,8 @@ class Calibrate:
         """
 
         self._config: Config = getConfig()
-        self._calDir: str = f"{self._config['repoAbsolutePath']}/artifacts/calibrations"
-        self._modelName: str = "model.keras"
+        self._calDir: str = CALIBRATION_DIR
+        self._modelName: str = MODEL_NAME
         self._headers: "list[str]" = [
             "cpu",
             "memory",
@@ -71,7 +72,7 @@ class Calibrate:
             "reqps",
         ]
         self._cache: "dict[str, dict[str, ResourceDemand]]" = {}
-        self._models: "dict[str, dict[str, Any]]" = {}
+
 
         if not os.path.exists(
             f"{self._config['repoAbsolutePath']}/artifacts/calibrations"
@@ -355,7 +356,6 @@ class Calibrate:
             else:
                 self._trainModel(self._headers[0], vnf, epochs)  # cpu
                 self._trainModel(self._headers[1], vnf, epochs)  # memory
-                self._trainModel(self._headers[2], vnf, epochs)  # latency
 
             em.end()
         else:
@@ -364,94 +364,6 @@ class Calibrate:
             else:
                 self._trainModel(self._headers[0], vnf, epochs)  # cpu
                 self._trainModel(self._headers[1], vnf, epochs)  # memory
-                self._trainModel(self._headers[2], vnf, epochs)  # latency
-
-    def _getVNFResourceDemandModel(self, vnf: str, metric: str) -> Any:
-        """
-        Get the resource demand model of the given metric and VNF.
-
-        Parameters:
-            vnf (str): The VNF to get the resource demand model for.
-            metric (str): The metric to get the resource demand model for.
-
-        Returns:
-            Any: The resource demand model.
-        """
-
-        if vnf not in self._models or metric not in self._models[vnf]:
-            modelPath: str = f"{self._calDir}/{vnf}/{metric}_{self._modelName}"
-            model: Any = tf.keras.models.load_model(modelPath)
-
-            if vnf in self._models:
-                self._models[vnf][metric] = model
-            else:
-                self._models[vnf] = {metric: model}
-
-            return tf.keras.models.load_model(modelPath)
-        else:
-            return self._models[vnf][metric]
-
-    def _getVNFResourceDemands(self, vnf: str, reqps: float) -> ResourceDemand:
-        """
-        Get the resource demands of the VNF.
-
-        Parameters:
-            vnf (str): The VNF to get the resource demands for.
-            reqps (float): The requests per second.
-
-        Returns:
-            ResourceDemand: The resource demands.
-        """
-
-        cpuModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[0])
-        memoryModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[1])
-        latencyModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[2])
-
-        cpu: float = cpuModel.predict(np.array([reqps]), verbose=0)[0][0]
-        memory: float = memoryModel.predict(np.array([reqps]), verbose=0)[0][0]
-        latency: float = latencyModel.predict(np.array([reqps]), verbose=0)[0][0]
-
-        return ResourceDemand(
-            cpu=cpu if cpu > 0 else 0, memory=memory if memory > 0 else 0, latency=latency if latency > 0 else 0
-        )
-
-    def _getVNFResourceDemandsForRequests(
-        self, vnf: str, reqps: "list[float]"
-    ) -> ResourceDemand:
-        """
-        Get the resource demands of the VNF.
-
-        Parameters:
-            vnf (str): The VNF to get the resource demands for.
-            reqps (list[float]): The requests per second.
-
-        Returns:
-            ResourceDemand: The resource demands.
-        """
-
-        cpuModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[0])
-        memoryModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[1])
-        latencyModel: Any = self._getVNFResourceDemandModel(vnf, self._headers[2])
-
-        cpu: float = np.array(cpuModel.predict(np.array(reqps), verbose=0)).flatten()
-        memory: float = memoryModel.predict(np.array(reqps), verbose=0).flatten()
-        latency: float = latencyModel.predict(np.array(reqps), verbose=0).flatten()
-
-        demands: "list[ResourceDemand]" = []
-        for cpuPred, memoryPred, latencyPred in zip(cpu, memory, latency):
-            cpu = cpuPred
-            memory = memoryPred
-            latency = latencyPred
-
-            demands.append(
-                ResourceDemand(
-                    cpu=cpu if cpu > 0 else 0,
-                    memory=memory if memory > 0 else 0,
-                    latency=latency if latency > 0 else 0,
-                )
-            )
-
-        return demands
 
     def calibrateVNFs(
         self,
@@ -483,81 +395,3 @@ class Calibrate:
                 self._calibrateVNF(
                     vnf, trafficDesignFile, metric, headless, train, epochs
                 )
-
-    def getResourceDemands(self, reqps: float) -> "dict[str, ResourceDemand]":
-        """
-        Get the resource demands of the VNFs.
-
-        Parameters:
-            reqps (float): The requests per second.
-
-        Returns:
-            dict[str, ResourceDemand]: The resource demands of each vnf.
-        """
-
-        demands: "dict[str, ResourceDemand]" = {}
-        for vnf in self._config["vnfs"]["names"]:
-            demands[vnf] = self._getVNFResourceDemands(vnf, reqps)
-
-        return demands
-
-    def predictAndCache(self, data: "dict[str, list[float]]", maxDepth=3) -> None:
-        """
-        Predict on the data and cache the results.
-
-        Parameters:
-            data (dict[str, list[float]]): The data to predict on and cache.
-            maxDepth (int): The maximum depth of the VNFs.
-        """
-
-        uncached: "dict[str, list[float]]" = {}
-
-        for vnf, reqps in data.items():
-            requests = []
-            requests.extend(reqps)
-
-            for req in reqps:
-                for i in range(2, maxDepth + 1):
-                    requests.append(int(req / (2 ** (i - 1))))
-            requests.append(0)
-            if vnf in self._cache:
-                for req in requests:
-                    intReq: int = int(req)
-                    if str(intReq) not in self._cache[vnf]:
-                        if vnf in uncached:
-                            uncached[vnf].append(intReq)
-                        else:
-                            uncached[vnf] = [intReq]
-            else:
-                uncached[vnf] = requests
-        for vnf, reqps in uncached.items():
-            demands: "list[ResourceDemand]" = self._getVNFResourceDemandsForRequests(
-                vnf, reqps
-            )
-            for req, demand in zip(reqps, demands):
-                if vnf in self._cache:
-                    self._cache[vnf][str(req)] = demand
-                else:
-                    self._cache[vnf] = {str(req): demand}
-
-    def getVNFResourceDemandForReqps(self, vnf, reqps: float) -> ResourceDemand:
-        """
-        Get the resource demands of the VNF for the given requests per second.
-
-        Parameters:
-            vnf (str): The VNF to get the resource demands for.
-            reqps (float): The requests per second.
-
-        Returns:
-            ResourceDemand: The resource demands.
-        """
-
-        if vnf not in self._cache or str(int(reqps)) not in self._cache[vnf]:
-            demand: ResourceDemand = self._getVNFResourceDemands(vnf, reqps)
-            if vnf in self._cache:
-                self._cache[vnf][str(int(reqps))] = demand
-            else:
-                self._cache[vnf] = {str(int(reqps)): demand}
-            return demand
-
-        return self._cache[vnf][str(int(reqps))]
