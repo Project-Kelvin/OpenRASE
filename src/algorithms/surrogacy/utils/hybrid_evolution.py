@@ -485,7 +485,7 @@ class HybridEvolution:
             )
             latency = penaltyLatency * penalty if len(egs) > 0 else penaltyLatency
 
-        return (individual[0], acceptanceRatio, latency)
+        return (individual[0], acceptanceRatio, round(latency))
 
     @staticmethod
     def evaluationOnEmulator(
@@ -589,7 +589,7 @@ class HybridEvolution:
 
         TUI.appendToSolverLog(f"Latency: {latency}ms")
 
-        return (acceptanceRatio, latency)
+        return (acceptanceRatio, round(latency))
 
     @staticmethod
     def generateScoresForRealTrafficData(
