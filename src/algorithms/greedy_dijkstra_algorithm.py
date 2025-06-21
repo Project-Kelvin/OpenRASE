@@ -12,7 +12,7 @@ from models.calibrate import ResourceDemand
 from utils.embedding_graph import traverseVNF
 
 
-class SimpleDijkstraAlgorithm():
+class GreedyDijkstraAlgorithm():
     """
     Class that implements the Simple Dijkstra's Algorithm.
     """

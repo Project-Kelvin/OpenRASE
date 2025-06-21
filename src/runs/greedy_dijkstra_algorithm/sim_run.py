@@ -8,7 +8,7 @@ from shared.models.config import Config
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.utils.config import getConfig
-from algorithms.simple_dijkstra_algorithm import SimpleDijkstraAlgorithm
+from algorithms.greedy_dijkstra_algorithm import GreedyDijkstraAlgorithm
 from utils.topology import generateFatTreeTopology
 
 config: Config = getConfig()
@@ -34,7 +34,7 @@ def run():
             for _i in range (1):
                 fg["sfcrID"] = f"sfc{i}{_i}"
                 requests.append(copy.deepcopy(fg))
-    sda = SimpleDijkstraAlgorithm(requests, topology, maxTarget)
+    sda = GreedyDijkstraAlgorithm(requests, topology, maxTarget)
     fgs, failedFGs, nodeResources = sda.run()
     print(nodeResources)
     print(f"Acceptance Ratio: {len(fgs) / (len(fgs) + len(failedFGs)) * 100:.2f}%")

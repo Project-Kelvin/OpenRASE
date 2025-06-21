@@ -14,7 +14,7 @@ from shared.models.sfc_request import SFCRequest
 from shared.models.config import Config
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
-from algorithms.simple_dijkstra_algorithm import SimpleDijkstraAlgorithm
+from algorithms.greedy_dijkstra_algorithm import GreedyDijkstraAlgorithm
 from mano.orchestrator import Orchestrator
 from models.calibrate import ResourceDemand
 from shared.models.embedding_graph import EmbeddingGraph
@@ -190,7 +190,7 @@ class SFCSolver(Solver):
             with open(trafficDesignPath, "r", encoding="utf8") as traffic:
                 design = json.load(traffic)
             maxTarget: int = max(design, key=lambda x: x["target"])["target"]
-            sda = SimpleDijkstraAlgorithm(
+            sda = GreedyDijkstraAlgorithm(
                 requests, self._topology, maxTarget
             )
             start: float = default_timer()
