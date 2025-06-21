@@ -240,33 +240,24 @@ def hybridSolver(
     populationEG: "list[DecodedIndividual]" = decodePop(pop, topology, fgrs)
     HybridEvolution.cacheForOffline(populationEG, trafficDesign, topology, gen)
     TUI.appendToSolverLog("Population demand and traffic latency cached.")
-    for ind in populationEG:
-        index, ar, latency = HybridEvolution.evaluationOnSurrogate(
-            ind,
-            gen,
-            NGEN,
-            topology,
-            trafficDesign,
-            MAX_MEMORY_DEMAND,
-        )
-        pop[index].fitness.values = (ar, latency)
-    # with ProcessPoolExecutor() as executor:
-    #     futures = [
-    #         executor.submit(
-    #             HybridEvolution.evaluationOnSurrogate,
-    #             ind,
-    #             gen,
-    #             NGEN,
-    #             topology,
-    #             trafficDesign,
-    #             MAX_MEMORY_DEMAND,
-    #         )
-    #         for ind in populationEG
-    #     ]
-    #     for future in as_completed(futures):
-    #         result: "tuple[int, float, float]" = future.result()
-    #         ind: "creator.Individual" = pop[result[0]]
-    #         ind.fitness.values = (result[1], result[2])
+
+    with ProcessPoolExecutor() as executor:
+        futures = [
+            executor.submit(
+                HybridEvolution.evaluationOnSurrogate,
+                ind,
+                gen,
+                NGEN,
+                topology,
+                trafficDesign,
+                MAX_MEMORY_DEMAND,
+            )
+            for ind in populationEG
+        ]
+        for future in as_completed(futures):
+            result: "tuple[int, float, float]" = future.result()
+            ind: "creator.Individual" = pop[result[0]]
+            ind.fitness.values = (result[1], result[2])
 
     endTime: int = timeit.default_timer()
     print("First generation time: ", endTime - startTime)
