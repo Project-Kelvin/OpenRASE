@@ -29,7 +29,7 @@ def generateTrafficDesign(start: int, end: int, duration: int) -> "TrafficDesign
 
     return rate
 
-def generateTrafficDesignFromFile(dataFile: str, scale: float = 1, hourDuration: float = 4, minimal: bool = False) -> "TrafficDesign":
+def generateTrafficDesignFromFile(dataFile: str, scale: float = 1, hourDuration: float = 4, minimal: bool = False, type2: bool = False) -> "TrafficDesign":
     """
     Generate the Traffic Design.
 
@@ -46,7 +46,7 @@ def generateTrafficDesignFromFile(dataFile: str, scale: float = 1, hourDuration:
     design: TrafficDesign = []
 
     with open(dataFile, "r", encoding="utf8") as file:
-        _header = file.readline()  # Read and discard the header
+        _header = file.readline() # Read and discard the header
         lastReqps: int = 0
         for line in file:
             numOfReqs: int = int(line)
@@ -63,6 +63,14 @@ def generateTrafficDesignFromFile(dataFile: str, scale: float = 1, hourDuration:
                     "target": rate,
                     "duration": "1s"
                 })
+
+    if type2:
+        midPoint: int = len(design) // 2
+        firstHalf: TrafficDesign = design[:midPoint]
+        secondHalf: TrafficDesign = design[midPoint:]
+        newDesign: TrafficDesign = secondHalf + firstHalf
+
+        return newDesign
 
     return design
 
