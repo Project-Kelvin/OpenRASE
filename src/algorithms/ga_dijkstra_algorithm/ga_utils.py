@@ -9,12 +9,14 @@ from time import sleep
 from typing import Callable, Tuple
 from dijkstar import Graph, find_path
 import pandas as pd
+from algorithms.models.embedding import DecodedIndividual
 from algorithms.surrogacy.constants.surrogate import BRANCH
+from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
 from calibrate.demand_predictor import DemandPredictor
 from constants.topology import SERVER, SFCC
 from deap import base
 from models.calibrate import ResourceDemand
-from shared.models.embedding_graph import VNF, EmbeddingGraph
+from shared.models.embedding_graph import VNF, EmbeddingGraph, EmbeddingGraphs
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from sfc.traffic_generator import TrafficGenerator
@@ -24,6 +26,7 @@ from utils.tui import TUI
 
 
 demandPredictor: DemandPredictor = DemandPredictor()
+
 
 def getVNFsFromFGRs(fgrs: "list[EmbeddingGraph]") -> "list[str]":
     """
@@ -57,39 +60,10 @@ def getVNFsFromFGRs(fgrs: "list[EmbeddingGraph]") -> "list[str]":
 
     return vnfs
 
-def validateIndividual(individual: "list[list[int]]", topo: Topology, maxTarget: int, fgrs: "list[EmbeddingGraph]") -> bool:
-    """
-    Validate the individual.
 
-    Parameters:
-        individual (list[list[int]]): the individual to validate.
-        topo (Topology): the topology.
-        maxTarget (int): the maximum target.
-        fgrs (list[EmbeddingGraph]): the FG Requests.
-
-    Returns:
-        bool: True if the individual is valid, False otherwise.
-    """
-
-    vnfs: "list[Tuple[str, int]]" = getVNFsFromFGRs(fgrs)
-
-    for index, host in enumerate(topo["hosts"]):
-        totalDemand: ResourceDemand = ResourceDemand(cpu=0, memory=0)
-        for indexVNF, vnf in enumerate(vnfs):
-            totalVNFs: int = 0
-            if individual[indexVNF][index] == 1:
-                totalVNFs += 1
-                demand: ResourceDemand = demandPredictor.getResourceDemandsOfVNF(vnf, maxTarget)
-                totalDemand["cpu"] += demand["cpu"]
-                totalDemand["memory"] += demand["memory"]
-
-
-        if totalDemand["memory"] > 2 * host["memory"]:
-            return False
-
-    return True
-
-def generateRandomIndividual(container: list, topo: Topology, fgrs: "list[EmbeddingGraph]") -> "list[list[int]]":
+def generateRandomIndividual(
+    container: list, topo: Topology, fgrs: "list[EmbeddingGraph]"
+) -> "list[list[int]]":
     """
     Generate a random individual.
 
@@ -110,8 +84,8 @@ def generateRandomIndividual(container: list, topo: Topology, fgrs: "list[Embedd
 
     for _ in range(noOfVNFs):
         item: "list[int]" = [0] * noOfHosts
-        if random.random() >= 0.05:
-            item[random.randint(0, noOfHosts-1)] = 1
+        if random.random() >= 0.1:
+            item[random.randint(0, noOfHosts - 1)] = 1
         individual.append(item)
 
     return individual
@@ -169,7 +143,9 @@ def parseNodes(nodes: "list[str]") -> "Tuple[list[list[str]], list[int]]":
     return parsedNodes, parsedDivisors
 
 
-def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", topology: Topology)-> "Tuple[list[EmbeddingGraph], dict[str, dict[str, list[Tuple[str, int]]]]]":
+def convertIndividualToEmbeddingGraph(
+    individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", topology: Topology
+) -> "Tuple[list[EmbeddingGraph], dict[str, dict[str, list[Tuple[str, int]]]]]":
     """
     Convert individual to an embedding graph.
 
@@ -196,7 +172,9 @@ def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list
         nodes[fgr["sfcID"]] = [SFCC]
         oldDepth: int = 1
 
-        def parseVNF(vnf: VNF, depth: int, embeddingNotFound: "list[bool]", offset: "list[int]") -> None:
+        def parseVNF(
+            vnf: VNF, depth: int, embeddingNotFound: "list[bool]", offset: "list[int]"
+        ) -> None:
             """
             Parse the VNF.
 
@@ -229,9 +207,7 @@ def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list
 
             else:
                 try:
-                    vnf["host"] = {
-                        "id": f"h{individual[offset[0]].index(1) + 1}"
-                    }
+                    vnf["host"] = {"id": f"h{individual[offset[0]].index(1) + 1}"}
                     # pylint: disable=cell-var-from-loop
                     if nodes[fgr["sfcID"]][-1] != vnf["host"]["id"]:
                         # pylint: disable=cell-var-from-loop
@@ -240,9 +216,13 @@ def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list
 
                     if vnf["host"]["id"] in embeddingData:
                         if fgr["sfcID"] in embeddingData[vnf["host"]["id"]]:
-                            embeddingData[vnf["host"]["id"]][fgr["sfcID"]].append([vnf["vnf"]["id"], depth])
+                            embeddingData[vnf["host"]["id"]][fgr["sfcID"]].append(
+                                [vnf["vnf"]["id"], depth]
+                            )
                         else:
-                            embeddingData[vnf["host"]["id"]][fgr["sfcID"]] = [[vnf["vnf"]["id"], depth]]
+                            embeddingData[vnf["host"]["id"]][fgr["sfcID"]] = [
+                                [vnf["vnf"]["id"], depth]
+                            ]
                     else:
                         embeddingData[vnf["host"]["id"]] = {
                             fgr["sfcID"]: [[vnf["vnf"]["id"], depth]]
@@ -264,10 +244,8 @@ def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list
                 eg["links"] = []
 
             for link in topology["links"]:
-                graph.add_edge(
-                    link["source"], link["destination"], link["bandwidth"])
-                graph.add_edge(
-                    link["destination"], link["source"], link["bandwidth"])
+                graph.add_edge(link["source"], link["destination"], link["bandwidth"])
+                graph.add_edge(link["destination"], link["source"], link["bandwidth"])
 
             sfcNodes, sfcDivisors = parseNodes(nodes[eg["sfcID"]])
 
@@ -311,30 +289,43 @@ def convertIndividualToEmbeddingGraph(individual: "list[list[int]]", fgrs: "list
                                     linkData[f"{path.nodes[p + 1]}-{path.nodes[p]}"][
                                         eg["sfcID"]
                                     ] = (1 / divisor)
-                                linkData[f"{path.nodes[p + 1]}-{path.nodes[p]}"][eg["sfcID"]] += (
-                                    1 / divisor
-                                )
+                                linkData[f"{path.nodes[p + 1]}-{path.nodes[p]}"][
+                                    eg["sfcID"]
+                                ] += (1 / divisor)
                             else:
                                 linkData[f"{path.nodes[p]}-{path.nodes[p + 1]}"] = {
                                     eg["sfcID"]: 1 / divisor
                                 }
-                        eg["links"].append({
-                            "source": {"id": path.nodes[0]},
-                            "destination": {"id": path.nodes[-1]},
-                            "links": path.nodes[1:-1],
-                            "divisor": divisor,
-                        })
+                        eg["links"].append(
+                            {
+                                "source": {"id": path.nodes[0]},
+                                "destination": {"id": path.nodes[-1]},
+                                "links": path.nodes[1:-1],
+                                "divisor": divisor,
+                            }
+                        )
 
             egs.append(eg)
 
     return egs, embeddingData, linkData
 
-def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen: int, ngen: int, sendEGs: "Callable[[list[EmbeddingGraph]], None]", deleteEGs: "Callable[[list[EmbeddingGraph]], None]", trafficDesign: TrafficDesign, trafficGenerator: TrafficGenerator, topology: Topology, maxTarget: int) -> "tuple[int]":
+
+def evaluation(
+    individual: DecodedIndividual,
+    fgrs: "list[EmbeddingGraph]",
+    gen: int,
+    ngen: int,
+    sendEGs: "Callable[[list[EmbeddingGraph]], None]",
+    deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
+    trafficDesign: TrafficDesign,
+    trafficGenerator: TrafficGenerator,
+    topology: Topology
+) -> "tuple[int]":
     """
     Evaluate the individual.
 
     Parameters:
-        individual (list[list[int]]): the individual to evaluate.
+        individual (DecodedIndividual): the individual to evaluate.
         fgrs (list[EmbeddingGraph]): The SFC Requests.
         gen (int): the generation.
         ngen (int): the number of generations.
@@ -349,26 +340,16 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
         tuple[int]: the evaluation.
     """
 
-    if hasattr(individual.fitness, "values") and len(individual.fitness.values) > 0:
-        TUI.appendToSolverLog("Individual already evaluated.")
-
-        return individual.fitness.values
-
-    egs: EmbeddingGraph = convertIndividualToEmbeddingGraph(individual, fgrs, topology)[0]
-
-    acceptanceRatio: float = len(egs) / len(fgrs)
-    TUI.appendToSolverLog(f"Acceptance Ratio: {len(egs)}/{len(fgrs)} = {acceptanceRatio}")
-    hosts = []
+    egs: "list[EmbeddingGraph]" = individual[1]
+    acceptanceRatio: float = individual[4]
+    TUI.appendToSolverLog(
+        f"Acceptance Ratio: {len(egs)}/{len(fgrs)} = {acceptanceRatio}"
+    )
     penaltyLatency: int = 50000
 
-    for vnf in individual:
-        try:
-            host = vnf.index(1)
-            hosts.append(host)
-        except ValueError:
-            pass
-
-    isValid: bool = validateIndividual(individual, topology, maxTarget, fgrs)
+    isValid: bool = not HybridEvolution.doesExceedMemoryLimit(
+        egs, topology, individual[2], trafficDesign, 2
+    )
     if isValid and len(egs) > 0:
         sendEGs(egs)
 
@@ -378,8 +359,7 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
         sleep(duration)
         TUI.appendToSolverLog(f"Done waiting for {duration}s.")
 
-        trafficData: pd.DataFrame = trafficGenerator.getData(
-                        f"{duration:.0f}s")
+        trafficData: pd.DataFrame = trafficGenerator.getData(f"{duration:.0f}s")
 
         latency: float = 0
 
@@ -394,7 +374,9 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
         else:
             trafficData["_time"] = trafficData["_time"] // 1000000000
 
-            groupedTrafficData: pd.DataFrame = trafficData.groupby(["_time", "sfcID"]).agg(
+            groupedTrafficData: pd.DataFrame = trafficData.groupby(
+                ["_time", "sfcID"]
+            ).agg(
                 reqps=("_value", "count"),
                 medianLatency=("_value", "median"),
             )
@@ -404,7 +386,7 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
         TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
         deleteEGs(egs)
     else:
-        penalty: float = gen/ngen
+        penalty: float = gen / ngen
         acceptanceRatio = acceptanceRatio - penalty if len(egs) > 0 else acceptanceRatio
         latency = penaltyLatency * penalty if len(egs) > 0 else penaltyLatency
 
@@ -413,7 +395,7 @@ def evaluation(individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", gen:
 
     TUI.appendToSolverLog(f"Latency: {latency}ms")
 
-    return (acceptanceRatio, latency)
+    return (acceptanceRatio, round(latency))
 
 
 def mutate(individual: "list[list[int]]", indpb: float) -> "list[list[int]]":
@@ -443,7 +425,10 @@ def mutate(individual: "list[list[int]]", indpb: float) -> "list[list[int]]":
 
     return mutatedIndividual
 
-def algorithm(pop: "list[list[list[int]]]", toolbox: base.Toolbox, CXPB: float, MUTPB: float) -> "list[list[list[int]]]":
+
+def algorithm(
+    pop: "list[list[list[int]]]", toolbox: base.Toolbox, CXPB: float, MUTPB: float
+) -> "list[list[list[int]]]":
     """
     Run the algorithm.
 
@@ -476,7 +461,9 @@ def algorithm(pop: "list[list[list[int]]]", toolbox: base.Toolbox, CXPB: float, 
     return offspring
 
 
-def crossover(ind1: "list[list[int]]", ind2: "list[list[int]]") -> "tuple[list[list[int]], list[list[int]]]":
+def crossover(
+    ind1: "list[list[int]]", ind2: "list[list[int]]"
+) -> "tuple[list[list[int]], list[list[int]]]":
     """
     Crossover the individuals.
 
@@ -491,8 +478,8 @@ def crossover(ind1: "list[list[int]]", ind2: "list[list[int]]") -> "tuple[list[l
     noOfVNFs: int = len(ind1)
     noOfHosts: int = len(ind1[0])
 
-    xCutPoint: int = random.randint(1, noOfHosts-2)
-    yCutPoint: int = random.randint(1, noOfVNFs-2)
+    xCutPoint: int = random.randint(1, noOfHosts - 2)
+    yCutPoint: int = random.randint(1, noOfVNFs - 2)
 
     ind1Quads: "list[list[list[int]]]" = []
     ind2Quads: "list[list[list[int]]]" = []
@@ -528,7 +515,9 @@ def crossover(ind1: "list[list[int]]", ind2: "list[list[int]]") -> "tuple[list[l
     quads.remove(swapQ1)
     swapQ2: int = random.choice(quads)
 
-    def fixMultiDeployment(ind1Q: "list[list[int]]", ind2Q: "list[list[int]]") -> "tuple[list[list[int]], list[list[int]]]":
+    def fixMultiDeployment(
+        ind1Q: "list[list[int]]", ind2Q: "list[list[int]]"
+    ) -> "tuple[list[list[int]], list[list[int]]]":
         """
         Fix the multi deployment.
 
@@ -559,19 +548,18 @@ def crossover(ind1: "list[list[int]]", ind2: "list[list[int]]") -> "tuple[list[l
                         vnf1[vnf1.index(1)] = 0
 
     if swapQ1 % 2 == 0:
-        fixMultiDeployment(ind1Quads[swapQ1], ind2Quads[swapQ1+1])
-        fixMultiDeployment(ind1Quads[swapQ1+1], ind2Quads[swapQ1])
+        fixMultiDeployment(ind1Quads[swapQ1], ind2Quads[swapQ1 + 1])
+        fixMultiDeployment(ind1Quads[swapQ1 + 1], ind2Quads[swapQ1])
     else:
-        fixMultiDeployment(ind1Quads[swapQ1], ind2Quads[swapQ1-1])
-        fixMultiDeployment(ind1Quads[swapQ1-1], ind2Quads[swapQ1])
+        fixMultiDeployment(ind1Quads[swapQ1], ind2Quads[swapQ1 - 1])
+        fixMultiDeployment(ind1Quads[swapQ1 - 1], ind2Quads[swapQ1])
 
     if swapQ2 % 2 == 0:
-        fixMultiDeployment(ind1Quads[swapQ2], ind2Quads[swapQ2+1])
-        fixMultiDeployment(ind1Quads[swapQ2+1], ind2Quads[swapQ2])
+        fixMultiDeployment(ind1Quads[swapQ2], ind2Quads[swapQ2 + 1])
+        fixMultiDeployment(ind1Quads[swapQ2 + 1], ind2Quads[swapQ2])
     else:
-        fixMultiDeployment(ind1Quads[swapQ2], ind2Quads[swapQ2-1])
-        fixMultiDeployment(ind1Quads[swapQ2-1], ind2Quads[swapQ2])
-
+        fixMultiDeployment(ind1Quads[swapQ2], ind2Quads[swapQ2 - 1])
+        fixMultiDeployment(ind1Quads[swapQ2 - 1], ind2Quads[swapQ2])
 
     tempQ1 = ind1Quads[swapQ1]
     ind1Quads[swapQ1] = ind2Quads[swapQ1]
@@ -584,11 +572,44 @@ def crossover(ind1: "list[list[int]]", ind2: "list[list[int]]") -> "tuple[list[l
     off1ySlice1: "list[list[int]]" = ind1Quads[0] + ind1Quads[2]
     off1ySlice2: "list[list[int]]" = ind1Quads[1] + ind1Quads[3]
 
-    off1: "list[list[int]]" = [vnf1 + vnf2 for vnf1, vnf2 in zip(off1ySlice1, off1ySlice2)]
+    off1: "list[list[int]]" = [
+        vnf1 + vnf2 for vnf1, vnf2 in zip(off1ySlice1, off1ySlice2)
+    ]
 
     off2ySlice1: "list[list[int]]" = ind2Quads[0] + ind2Quads[2]
     off2ySlice2: "list[list[int]]" = ind2Quads[1] + ind2Quads[3]
 
-    off2: "list[list[int]]" = [vnf1 + vnf2 for vnf1, vnf2 in zip(off2ySlice1, off2ySlice2)]
+    off2: "list[list[int]]" = [
+        vnf1 + vnf2 for vnf1, vnf2 in zip(off2ySlice1, off2ySlice2)
+    ]
 
     return off1, off2
+
+
+def decodePop(
+    pop: "list[list[list[int]]]", topology: Topology, fgrs: "list[EmbeddingGraph]"
+) -> "list[DecodedIndividual]":
+    """
+    Generate Embedding Graphs from the population.
+
+    Parameters:
+        pop (list[creator.Individual]): the population.
+        topology (Topology): the topology.
+        fgrs (list[EmbeddingGraph]): the Forwarding Graph Requests.
+
+    Returns:
+        list[IndividualEG]: A list containing EGs, embedding data, link data and acceptance ratio.
+    """
+
+    populationEG: "list[DecodedIndividual]" = []
+
+    for index, individual in enumerate(pop):
+        egs, embeddingData, linkData = convertIndividualToEmbeddingGraph(
+            individual, fgrs, topology
+        )
+
+        acceptanceRatio: float = len(egs) / len(fgrs)
+
+        populationEG.append((index, egs, embeddingData, linkData, acceptanceRatio))
+
+    return populationEG

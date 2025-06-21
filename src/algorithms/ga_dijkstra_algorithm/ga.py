@@ -11,9 +11,12 @@ from shared.models.traffic_design import TrafficDesign
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.utils.config import getConfig
+from algorithms.models.embedding import DecodedIndividual
+from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
 from sfc.traffic_generator import TrafficGenerator
 from algorithms.ga_dijkstra_algorithm.ga_utils import (
     algorithm,
+    decodePop,
     evaluation,
     generateRandomIndividual,
     mutate,
@@ -42,7 +45,6 @@ with open(
 
 def GADijkstraAlgorithm(
     topology: Topology,
-    maxTarget: int,
     fgrs: "list[EmbeddingGraph]",
     sendEGs: "Callable[[list[EmbeddingGraph]], None]",
     deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
@@ -54,7 +56,6 @@ def GADijkstraAlgorithm(
 
     Parameters:
         topology (Topology): the topology.
-        maxTarget (int): the maximum target.
         fgrs (list[EmbeddingGraph]): the FG Requests.
         sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
         trafficDesign (TrafficDesign): the traffic design.
@@ -83,8 +84,11 @@ def GADijkstraAlgorithm(
 
     CXPB, MUTPB, NGEN = 1.0, 1.0, 10
 
-    for ind in pop:
-        ind.fitness.values = evaluation(
+    decodedPop: "list[DecodedIndividual]" = decodePop(pop, topology, fgrs)
+    HybridEvolution.cacheForOnline(decodedPop, trafficDesign)
+    for ind in decodedPop:
+        individual: "creator.Individual" = pop[ind[0]]
+        individual.fitness.values = evaluation(
             ind,
             fgrs,
             gen,
@@ -94,7 +98,6 @@ def GADijkstraAlgorithm(
             trafficDesign,
             trafficGenerator,
             topology,
-            maxTarget,
         )
 
     ars = [ind.fitness.values[0] for ind in pop]
@@ -125,8 +128,13 @@ def GADijkstraAlgorithm(
     while gen <= NGEN:
         TUI.appendToSolverLog(f"Generation: {gen}")
         offspring = algorithm(pop, toolbox, CXPB, MUTPB)
-        for ind in offspring:
-            ind.fitness.values = evaluation(
+        decodedOffspring: "list[DecodedIndividual]" = decodePop(
+            offspring, topology, fgrs
+        )
+        HybridEvolution.cacheForOnline(decodedOffspring, trafficDesign)
+        for ind in decodedOffspring:
+            individual: "creator.Individual" = offspring[ind[0]]
+            individual.fitness.values = evaluation(
                 ind,
                 fgrs,
                 gen,
@@ -136,7 +144,6 @@ def GADijkstraAlgorithm(
                 trafficDesign,
                 trafficGenerator,
                 topology,
-                maxTarget,
             )
         pop[:] = toolbox.select(pop + offspring, k=NO_OF_INDIVIDUALS)
         hof.update(pop)
