@@ -41,7 +41,7 @@ class Scorer:
         """
 
         hostResourceData: "dict[str, ResourceDemand]" = {}
-        serverCPU: float = getAvailableCPUAndMemory()
+        serverCPU, serverMemory = getAvailableCPUAndMemory()
         for host, sfcs in embeddingData.items():
             topoHost: Host = [h for h in topology["hosts"] if h["id"] == host][0]
             otherCPU: float = 0
@@ -69,7 +69,7 @@ class Scorer:
             hostResourceData[host]["memory"] = (
                 hostResourceData[host]["memory"] / hostMemory
                 if hostMemory is not None
-                else 0
+                else serverMemory
             )
 
         return hostResourceData
