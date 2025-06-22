@@ -1,5 +1,5 @@
 """
-This runs the Genetic Algorithm + Dijsktra Algorithm.
+This runs the Genetic Algorithm + Dijkstra Algorithm.
 """
 
 import copy
@@ -38,18 +38,29 @@ random.seed(100)
 # Setting the graph-level random seed.
 tf.random.set_seed(100)
 
+LINK_BANDWIDTH: int = 10
+NO_OF_CPUS: int = 2
+MEMORY: int = 5120
+TRAFFIC_SCALE: float = 0.1
+TRAFFIC_PATTERN: bool = False
+NO_OF_COPIES: int = 8
+
 config: Config = getConfig()
 configPath: str = f"{config['repoAbsolutePath']}/src/runs/ga_dijkstra_algorithm/configs"
-
 
 directory = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm"
 
 if not os.path.exists(directory):
     os.makedirs(directory)
 
-topology: Topology = generateFatTreeTopology(4, 10, 1, 5120)
-logFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/experiments.csv"
-latencyDataFilePath: str = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/latency_data.csv"
+topology: Topology = generateFatTreeTopology(4, LINK_BANDWIDTH, NO_OF_CPUS, MEMORY)
+logFilePath: str = (
+    f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/experiments.csv"
+)
+latencyDataFilePath: str = (
+    f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/latency_data.csv"
+)
+
 
 def appendToLog(message: str) -> None:
     """
@@ -62,6 +73,7 @@ def appendToLog(message: str) -> None:
     with open(logFilePath, "a", encoding="utf8") as log:
         log.write(f"{message}\n")
 
+
 trafficDesign: "list[TrafficDesign]" = [
     generateTrafficDesignFromFile(
         os.path.join(
@@ -72,11 +84,13 @@ trafficDesign: "list[TrafficDesign]" = [
             "data",
             "requests.csv",
         ),
-        0.1,
+        TRAFFIC_SCALE,
         4,
         False,
+        TRAFFIC_PATTERN,
     )
 ]
+
 
 class FGR(FGRequestGenerator):
     """
@@ -87,7 +101,9 @@ class FGR(FGRequestGenerator):
         super().__init__(orchestrator)
         self._fgs: "list[EmbeddingGraph]" = []
 
-        with open(f"{configPath}/forwarding-graphs.json", "r", encoding="utf8") as fgFile:
+        with open(
+            f"{configPath}/forwarding-graphs.json", "r", encoding="utf8"
+        ) as fgFile:
             fgs: "list[EmbeddingGraph]" = json.load(fgFile)
             for fg in fgs:
                 self._fgs.append(copy.deepcopy(fg))
@@ -99,7 +115,7 @@ class FGR(FGRequestGenerator):
 
         copiedFGs: "list[EmbeddingGraph]" = []
         for index, fg in enumerate(self._fgs):
-            for i in range(0, 8):
+            for i in range(0, NO_OF_COPIES):
                 copiedFG: EmbeddingGraph = copy.deepcopy(fg)
                 copiedFG["sfcrID"] = f"sfc{index}-{i}"
                 copiedFGs.append(copiedFG)
@@ -108,18 +124,16 @@ class FGR(FGRequestGenerator):
 
         self._orchestrator.sendRequests(self._fgs)
 
+
 class SFCSolver(Solver):
     """
     SFC Solver.
     """
 
-    def __init__(self, orchestrator: Orchestrator, trafficGenerator: TrafficGenerator) -> None:
+    def __init__(
+        self, orchestrator: Orchestrator, trafficGenerator: TrafficGenerator
+    ) -> None:
         super().__init__(orchestrator, trafficGenerator)
-        trafficDesignPath = f"{configPath}/traffic-design.json"
-        with open(trafficDesignPath, "r", encoding="utf8") as traffic:
-            design = json.load(traffic)
-        self._maxTarget: int = max(design, key=lambda x: x["target"])["target"]
-
         self._topology: Topology = None
 
     def generateEmbeddingGraphs(self) -> None:
@@ -132,17 +146,30 @@ class SFCSolver(Solver):
                 sleep(0.1)
             self._topology: Topology = self._orchestrator.getTopology()
 
-            GADijkstraAlgorithm(self._topology, self._maxTarget, requests, self._orchestrator.sendEmbeddingGraphs, self._orchestrator.deleteEmbeddingGraphs, trafficDesign, self._trafficGenerator)
+            GADijkstraAlgorithm(
+                self._topology,
+                requests,
+                self._orchestrator.sendEmbeddingGraphs,
+                self._orchestrator.deleteEmbeddingGraphs,
+                trafficDesign,
+                self._trafficGenerator,
+            )
             TUI.appendToSolverLog("Finished experiment.")
             sleep(2)
         except Exception as e:
             TUI.appendToSolverLog(str(e), True)
 
         sleep(10)
-        #TUI.exit()
+        # TUI.exit()
+
 
 @click.command()
-@click.option("--headless", default=False, is_flag=True, help="If set, the emulator would run in headless mode.")
+@click.option(
+    "--headless",
+    default=False,
+    is_flag=True,
+    help="If set, the emulator would run in headless mode.",
+)
 def run(headless: bool) -> None:
     """
     Run the experiment.
