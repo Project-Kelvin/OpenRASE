@@ -223,7 +223,7 @@ def evolveWeights(
 
     decodedPop: "list[creator.Individual]" = decodePop(pop, topology, sfcrs)
     hybridEvolution.cacheForOffline(
-        decodedPop, trafficDesign, topology, gen
+        decodedPop, trafficDesign, topology, gen, isAvgOnly=True
     )
     pool: Any = Pool(processes=cpu_count())
     results: tuple[float, float, float] = pool.starmap(
@@ -262,7 +262,7 @@ def evolveWeights(
             offspring, topology, sfcrs
         )
         hybridEvolution.cacheForOffline(
-            decodedOffspring, trafficDesign, topology, gen
+            decodedOffspring, trafficDesign, topology, gen, isAvgOnly=True
         )
         results: tuple[float, float, float] = pool.starmap(
             hybridEvolution.evaluationOnSurrogate,

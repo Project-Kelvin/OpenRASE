@@ -54,6 +54,7 @@ class HybridEvolution:
     def _generateTrafficData(
         egs: "list[EmbeddingGraph]",
         trafficDesign: "list[TrafficDesign]",
+        isAvgOnly: bool = False,
         isMaxOnly: bool = False,
     ) -> TimeSFCRequests:
         """
@@ -62,6 +63,7 @@ class HybridEvolution:
         Parameters:
             egs (list[EmbeddingGraph]): List of embedding graphs.
             trafficDesign (list[TrafficDesign]): Traffic design to use for generating traffic data.
+            isAvgOnly (bool): If True, only generate average traffic data.
             isMaxOnly (bool): If True, only generate data for the maximum traffic design.
 
         Returns:
@@ -80,13 +82,19 @@ class HybridEvolution:
             return memoryData
         else:
             duration: int = calculateTrafficDuration(trafficDesign[0])
-            simulationData: pl.DataFrame = pl.DataFrame()
+            simulationData: TimeSFCRequests = []
             simTrafficDesign: "list[float]" = getTrafficDesignRate(
                 trafficDesign[0], [1] * duration
             )
-            simulationData: TimeSFCRequests = [
-                {eg["sfcID"]: reqps for eg in egs} for reqps in simTrafficDesign
-            ]
+
+            if isAvgOnly:
+                simulationData = [
+                    {eg["sfcID"]: np.mean(simTrafficDesign) for eg in egs}
+                ]
+            else:
+                simulationData = [
+                    {eg["sfcID"]: reqps for eg in egs} for reqps in simTrafficDesign
+                ]
 
             return simulationData + memoryData
 
@@ -113,6 +121,7 @@ class HybridEvolution:
         pop: "list[DecodedIndividual]",
         trafficDesign: "list[TrafficDesign]",
         isMemoryOnly: bool = False,
+        isAvgOnly: bool = False,
     ) -> None:
         """
         Cache the demand for score generation.
@@ -122,6 +131,7 @@ class HybridEvolution:
             trafficDesign (list[TrafficDesign]): Traffic design to use for checking memory limits.
             acceptanceRatio (float): The acceptance ratio for the scores.
             isMemoryOnly (bool): If True, only cache memory demands, otherwise cache both memory and traffic demands.
+            isAvgOnly (bool): If True, only generate average traffic data.
 
         Returns:
             None
@@ -137,7 +147,7 @@ class HybridEvolution:
         )
         if not isMemoryOnly:
             simulationData: TimeSFCRequests = HybridEvolution._generateTrafficData(
-                egs, trafficDesign, isMaxOnly=False
+                egs, trafficDesign, isMaxOnly=False, isAvgOnly=isAvgOnly
             )
 
             demandData: TimeSFCRequests = simulationData + memoryData
@@ -215,6 +225,7 @@ class HybridEvolution:
         topology: Topology,
         embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]",
         linkData: "dict[str, dict[str, float]]",
+        isAvgOnly: bool = False,
     ) -> np.array:
         """
         Generate scores for the given traffic design and embedding graphs.
@@ -227,13 +238,14 @@ class HybridEvolution:
             topology (Topology): The topology to use for generating scores.
             embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): Embedding data containing VNF and depth information.
             linkData (dict[str, dict[str, float]]): Link data containing link capacities.
+            isAvgOnly (bool): If True, only generate average scores.
 
         Returns:
             np.array: A numpy array containing the generated scores.
         """
 
         simulationData: pl.DataFrame = HybridEvolution._generateTrafficData(
-            egs, trafficDesign, isMaxOnly=False
+            egs, trafficDesign, isMaxOnly=False, isAvgOnly=isAvgOnly
         )
 
         scores: np.array = Scorer.getSFCScores(
@@ -281,6 +293,7 @@ class HybridEvolution:
                 topology,
                 embeddingData,
                 linkData,
+                isAvgOnly=True,
             )
         except Exception as e:
             TUI.appendToSolverLog(f"Error generating scores: {e}")
@@ -356,9 +369,7 @@ class HybridEvolution:
             axis=1,
         )
 
-        data: np.array = HybridEvolution._surrogateModel.predict(
-            inputData, verbose=0
-        )
+        data: np.array = HybridEvolution._surrogateModel.predict(inputData, verbose=0)
 
         scores[:]["latency"] = data[:, 0]
 
@@ -390,7 +401,9 @@ class HybridEvolution:
         if HybridEvolution._latencyPrediction is None:
             return None
 
-        mask = (HybridEvolution._latencyPrediction[:]["generation"] == gen) & (HybridEvolution._latencyPrediction[:]["individual"] == ind)
+        mask = (HybridEvolution._latencyPrediction[:]["generation"] == gen) & (
+            HybridEvolution._latencyPrediction[:]["individual"] == ind
+        )
         rows = HybridEvolution._latencyPrediction[mask]
 
         return rows[0]["latency"] if rows.shape[0] > 0 else 0.0
@@ -401,6 +414,7 @@ class HybridEvolution:
         trafficDesign: "list[TrafficDesign]",
         topology: Topology,
         gen: int,
+        isAvgOnly: bool = False
     ) -> None:
         """
         Evaluate the offline performance of the population.
@@ -410,12 +424,13 @@ class HybridEvolution:
             trafficDesign (list[TrafficDesign]): The traffic design to use for evaluation.
             topology (Topology): The topology to use for evaluation.
             gen (int): The generation number.
+            isAvgOnly (bool): If True, only generate average traffic data.
 
         Returns:
             None
         """
 
-        HybridEvolution._cacheDemand(pop, trafficDesign)
+        HybridEvolution._cacheDemand(pop, trafficDesign, isAvgOnly=isAvgOnly)
         HybridEvolution._predictLatency(pop, trafficDesign, gen, topology)
 
     @staticmethod

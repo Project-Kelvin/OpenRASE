@@ -119,7 +119,7 @@ def evolveInitialWeights(
 
     gen: int = 1
     decodedPop: "list[DecodedIndividual]" = decodePop(pop, topology, fgs)
-    hybridEvolution.cacheForOffline(decodedPop, trafficDesign, topology, gen)
+    hybridEvolution.cacheForOnline(decodedPop, trafficDesign)
     pool: Any = Pool(processes=cpu_count())
     results: tuple[float, float, float] = pool.starmap(
         evaluate,
@@ -157,7 +157,7 @@ def evolveInitialWeights(
         decodedOffspring: "list[DecodedIndividual]" = decodePop(
             offspring, topology, fgs
         )
-        hybridEvolution.cacheForOffline(decodedOffspring, trafficDesign, topology, gen)
+        hybridEvolution.cacheForOnline(decodedOffspring, trafficDesign)
         pool: Any = Pool(processes=cpu_count())
         results: tuple[float, float, float] = pool.starmap(
             evaluate,

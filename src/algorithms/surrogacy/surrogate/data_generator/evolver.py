@@ -75,7 +75,7 @@ def evaluate(
     """
 
     global isFirstSetWritten
-    individualIndex, egs, embedData, linkData, acceptanceRatio = individual
+    _individualIndex, egs, embedData, _linkData, acceptanceRatio = individual
 
     penaltyLatency: float = 50000
     penaltyWeight: float = gen / ngen
@@ -119,6 +119,12 @@ def evaluate(
 
             return 0, penaltyLatency
 
+        hybridEvolution.cacheForOffline(
+            [individual],
+            trafficDesign,
+            topology,
+            gen
+        )
         data: pl.DataFrame = hybridEvolution.generateScoresForRealTrafficData(
             individual,
             trafficData,

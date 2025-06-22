@@ -238,7 +238,7 @@ def hybridSolver(
     gen: int = 1
     startTime: int = timeit.default_timer()
     populationEG: "list[DecodedIndividual]" = decodePop(pop, topology, fgrs)
-    HybridEvolution.cacheForOffline(populationEG, trafficDesign, topology, gen)
+    HybridEvolution.cacheForOffline(populationEG, trafficDesign, topology, gen, isAvgOnly=True)
     TUI.appendToSolverLog("Population demand and traffic latency cached.")
 
     with ProcessPoolExecutor() as executor:
@@ -285,7 +285,9 @@ def hybridSolver(
 
         populationEG: "list[DecodedIndividual]" = decodePop(offspring, topology, fgrs)
         startTime: int = timeit.default_timer()
-        HybridEvolution.cacheForOffline(populationEG, trafficDesign, topology, gen)
+        HybridEvolution.cacheForOffline(
+            populationEG, trafficDesign, topology, gen, isAvgOnly=True
+        )
 
         with ProcessPoolExecutor() as executor:
             futures = [
