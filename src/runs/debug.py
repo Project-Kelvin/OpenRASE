@@ -13,7 +13,7 @@ from utils.topology import generateFatTreeTopology
 
 
 config: Config = getConfig()
-configPath: str = f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/configs"
+configPath: str = f"{config['repoAbsolutePath']}/src/runs/greedy_dijkstra_algorithm/configs"
 
 topology: Topology = generateFatTreeTopology(4, 1000, 2, None)
 trafficDesignPath = f"{configPath}/traffic-design.json"
