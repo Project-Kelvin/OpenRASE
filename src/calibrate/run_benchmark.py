@@ -37,17 +37,6 @@ from constants.topology import SERVER, SFCC
 
 EPOCHS: int = 200
 
-os.environ["PYTHONHASHSEED"] = "100"
-
-# Setting the seed for numpy-generated random numbers
-np.random.seed(100)
-
-# Setting the seed for python random numbers
-random.seed(100)
-
-# Setting the graph-level random seed.
-tf.random.set_seed(100)
-
 
 class Calibrate:
     """

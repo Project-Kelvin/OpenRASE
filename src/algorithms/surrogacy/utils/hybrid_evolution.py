@@ -29,17 +29,6 @@ from utils.traffic_design import (
 )
 from utils.tui import TUI
 
-os.environ["PYTHONHASHSEED"] = "100"
-
-# Setting the seed for numpy-generated random numbers
-np.random.seed(100)
-
-# Setting the seed for python random numbers
-random.seed(100)
-
-# Setting the graph-level random seed.
-tf.random.set_seed(100)
-
 
 class HybridEvolution:
     """
@@ -137,6 +126,8 @@ class HybridEvolution:
             None
         """
 
+        startTime: float = timeit.default_timer()
+
         egs: "list[EmbeddingGraph]" = copy.deepcopy(HybridEvolution._combineEGs(pop))
 
         for i, eg in enumerate(egs):
@@ -155,6 +146,12 @@ class HybridEvolution:
             HybridEvolution._demandPredictions.cacheResourceDemands(egs, demandData)
         else:
             HybridEvolution._demandPredictions.cacheResourceDemands(egs, memoryData)
+
+        endTime: float = timeit.default_timer()
+
+        TUI.appendToSolverLog(
+            f"Cached demands for {len(egs)} embedding graphs in {endTime - startTime:.2f} seconds."
+        )
 
     @staticmethod
     def getMaxCpuMemoryUsageOfHosts(
@@ -299,19 +296,23 @@ class HybridEvolution:
             TUI.appendToSolverLog(f"Error generating scores: {e}")
             return pl.DataFrame()
 
-        mean_link = np.mean(scores[:]["link"])
+        mean_max_link = np.mean(scores[:]["max_link_score"])
+        mean_total_link = np.mean(scores[:]["total_link_score"])
+        mean_total_delay = np.mean(scores[:]["total_delay"])
         mean_cpu = np.mean(scores[:]["max_cpu"])
 
         dt = np.dtype(
             [
                 ("generation", np.int32),
                 ("individual", np.int32),
-                ("mean_link", np.float64),
+                ("mean_max_link", np.float64),
+                ("mean_total_link", np.float64),
+                ("mean_total_delay", np.float64),
                 ("mean_cpu", np.float64),
                 ("latency", np.float64),
             ]
         )
-        return np.array([(gen, individualIndex, mean_link, mean_cpu, 0.0)], dtype=dt)
+        return np.array([(gen, individualIndex, mean_max_link, mean_total_link, mean_total_delay, mean_cpu, 0.0)], dtype=dt)
 
     @staticmethod
     def _predictLatency(
@@ -363,7 +364,7 @@ class HybridEvolution:
 
         inputData: np.array = np.concatenate(
             (
-                scores[:]["mean_link"].reshape(-1, 1),
+                scores[:]["mean_max_link"].reshape(-1, 1),
                 scores[:]["mean_cpu"].reshape(-1, 1),
             ),
             axis=1,
@@ -372,13 +373,9 @@ class HybridEvolution:
         data: np.array = HybridEvolution._surrogateModel.predict(inputData, verbose=0)
 
         scores[:]["latency"] = data[:, 0]
+        scores[:]["latency"] = scores[:]["latency"] + scores[:]["mean_total_delay"]
 
-        if HybridEvolution._latencyPrediction is None:
-            HybridEvolution._latencyPrediction = scores
-        else:
-            HybridEvolution._latencyPrediction = np.concatenate(
-                (HybridEvolution._latencyPrediction, scores)
-            )
+        HybridEvolution._latencyPrediction = scores
 
         end: float = timeit.default_timer()
         TUI.appendToSolverLog(
@@ -432,6 +429,24 @@ class HybridEvolution:
 
         HybridEvolution._cacheDemand(pop, trafficDesign, isAvgOnly=isAvgOnly)
         HybridEvolution._predictLatency(pop, trafficDesign, gen, topology)
+
+    @staticmethod
+    def saveCachedLatency(filePath: str) -> None:
+        """
+        Save the cached latency predictions to a file.
+
+        Parameters:
+            filePath (str): The path to the file where the latency predictions will be saved.
+
+        Returns:
+            None
+        """
+
+        if HybridEvolution._latencyPrediction is not None:
+            np.savetxt(filePath, HybridEvolution._latencyPrediction, delimiter=",", fmt="%.2f", header="generation,individual,mean_max_link,mean_total_link,mean_total_delay,mean_cpu,latency")
+            TUI.appendToSolverLog(f"Saved cached latency predictions to {filePath}.")
+        else:
+            TUI.appendToSolverLog("No cached latency predictions to save.")
 
     @staticmethod
     def cacheForOnline(
@@ -494,11 +509,7 @@ class HybridEvolution:
 
             latency: float = HybridEvolution.getPredictedLatency(gen, individual[0])
         else:
-            penalty: float = gen / ngen
-            acceptanceRatio = (
-                acceptanceRatio - penalty if len(egs) > 0 else acceptanceRatio
-            )
-            latency = penaltyLatency * penalty if len(egs) > 0 else penaltyLatency
+            latency = penaltyLatency
 
         return (individual[0], acceptanceRatio, round(latency))
 
@@ -594,13 +605,7 @@ class HybridEvolution:
             TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
             deleteEGs(individual[1])
         else:
-            penalty: float = gen / ngen
-            acceptanceRatio = (
-                acceptanceRatio - penalty if len(individual[1]) > 0 else acceptanceRatio
-            )
-            latency = (
-                penaltyLatency * penalty if len(individual[1]) > 0 else penaltyLatency
-            )
+            latency = penaltyLatency
 
         TUI.appendToSolverLog(f"Latency: {latency}ms")
 
@@ -612,6 +617,7 @@ class HybridEvolution:
         trafficData: pd.DataFrame,
         trafficDesign: "list[TrafficDesign]",
         topology: Topology,
+        gen: int = 0,
     ) -> pl.DataFrame:
         """
         Generate scores for the real traffic data.
@@ -620,8 +626,8 @@ class HybridEvolution:
             ind (DecodedIndividual): The decoded individual to evaluate.
             trafficData (pd.DataFrame): The traffic data to generate scores for.
             trafficDesign (list[TrafficDesign]): The traffic design to use for generating scores.
-            gen (int): The generation number.
             topology (Topology): The topology to use for generating scores.
+            gen (int): The generation number (default is 0).
 
         Returns:
             pl.DataFrame: A DataFrame containing the generated scores.
@@ -644,7 +650,9 @@ class HybridEvolution:
         scores = pl.DataFrame(scores)
 
         scores = scores.with_columns(
-            pl.lit(1).alias("ar"),
+            pl.lit(gen).alias("generation"),
+            pl.lit(ind[0]).alias("individual"),
+            pl.lit(ind[4]).alias("ar"),
             pl.lit(0.0).alias("real_reqps"),
             pl.lit(0.0).alias("latency"),
         )

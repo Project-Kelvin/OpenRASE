@@ -2,23 +2,8 @@
 This defines the models to calibrate the VNFs.
 """
 
-import os
 from typing import Any
 import tensorflow as tf
-import numpy as np
-import random
-
-os.environ["PYTHONHASHSEED"] = "100"
-
-# Setting the seed for numpy-generated random numbers
-np.random.seed(100)
-
-# Setting the seed for python random numbers
-random.seed(100)
-
-# Setting the graph-level random seed.
-tf.random.set_seed(100)
-
 
 wafCPU: "list[Any]" = [
     tf.keras.layers.Dense(
