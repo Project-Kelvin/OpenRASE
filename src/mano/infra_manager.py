@@ -145,6 +145,7 @@ class InfraManager:
                     self._net.get(link["source"]),
                     self._net.get(link["destination"]),
                     bw=link["bandwidth"] if "bandwidth" in link else None,
+                    delay=f"{link['delay']}ms" if "delay" in link else None,
                     cls=TCLink,
                 )
 

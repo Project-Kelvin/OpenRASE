@@ -7,15 +7,19 @@ from shared.models.topology import Host, Link, Switch, Topology
 from constants.topology import SERVER, SFCC
 
 
-def generateFatTreeTopology(k: int, bandwidth: int, cpu: int, memory: int) -> Topology:
+def generateFatTreeTopology(k: int, bandwidth: int, cpu: int, memory: int, delay: int = None) -> Topology:
     """
     Generate a Fat Tree Topology.
 
     Parameters:
         k (int): the number of ports in a switch. Should be an even number.
-        bandwidth (int): the bandwidth of the links.
+        bandwidth (int): the bandwidth of the links in Mbit/s.
         cpu (int): the CPU of the hosts.
         memory (int): the memory of the hosts.
+        delay (int): the delay of the links in ms.
+
+    Returns:
+        Topology: the generated Fat Tree Topology.
     """
 
     if k % 2 != 0:
@@ -64,12 +68,12 @@ def generateFatTreeTopology(k: int, bandwidth: int, cpu: int, memory: int) -> To
         for i, aggr in enumerate(pod["aggr"]):
             for edge in pod["edge"]:
                 links.append(
-                    Link(source=aggr["id"], destination=edge["id"], bandwidth=bandwidth)
+                    Link(source=aggr["id"], destination=edge["id"], bandwidth=bandwidth, delay=delay)
                 )
 
             for sw in coreSwitches[i * aggrSwLinkNo: (i+1) * aggrSwLinkNo]:
                 links.append(
-                    Link(source=sw["id"], destination=aggr["id"], bandwidth=bandwidth)
+                    Link(source=sw["id"], destination=aggr["id"], bandwidth=bandwidth, delay=delay)
                 )
 
     return Topology(hosts=hosts, switches=coreSwitches + aggrSwitches + edgeSwitches, links=links)

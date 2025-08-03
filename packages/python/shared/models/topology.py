@@ -37,6 +37,7 @@ class Link(dict):
     source: str
     destination: str
     bandwidth: int
+    delay: int
 
 
 class Topology(dict):
