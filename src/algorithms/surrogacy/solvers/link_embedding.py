@@ -8,12 +8,13 @@ import networkx as nx
 import heapq
 from algorithms.surrogacy.constants.surrogate import BRANCH
 from constants.topology import SERVER, SFCC
-from shared.models.topology import Topology
+from shared.models.topology import Link, Topology
 from shared.models.embedding_graph import EmbeddingGraph
 import tensorflow as tf
 import numpy as np
 from utils.tui import TUI
 import pandas as pd
+
 
 class HotCode:
     """
@@ -144,12 +145,19 @@ class Node:
     def __eq__(self, name):
         return self.name == name
 
+
 class EmbedLinks:
     """
     This defines the logic used to embed links.
     """
 
-    def __init__(self, topology: Topology, egs: "list[EmbeddingGraph]", weights: "list[float]", bias: "list[float]")  -> None:
+    def __init__(
+        self,
+        topology: Topology,
+        egs: "list[EmbeddingGraph]",
+        weights: "list[float]",
+        bias: "list[float]",
+    ) -> None:
         """
         Initializes the link embedding.
 
@@ -185,7 +193,11 @@ class EmbedLinks:
             bool: True if the node is a host, False otherwise.
         """
 
-        return node in [host["id"] for host in self._topology["hosts"]] or node == SFCC or node == SERVER
+        return (
+            node in [host["id"] for host in self._topology["hosts"]]
+            or node == SFCC
+            or node == SERVER
+        )
 
     def _constructDF(self) -> pd.DataFrame:
         """
@@ -212,7 +224,10 @@ class EmbedLinks:
             for host in hosts:
                 if f"{switch}_{host}" not in linkIndices:
                     linkIndices.append(f"{switch}_{host}")
-                    links.append(self._hotCode.getNodeCode(switch) + self._hotCode.getNodeCode(host))
+                    links.append(
+                        self._hotCode.getNodeCode(switch)
+                        + self._hotCode.getNodeCode(host)
+                    )
 
         rows: "list[list[int]]" = []
         indices: "list[str]" = []
@@ -226,12 +241,24 @@ class EmbedLinks:
 
         columns: "list[str]" = []
         columns.extend([f"SFC{i}" for i in range(len(self._egs))])
-        columns.extend([f"Source{i}" for i in range(len(self._topology["hosts"]) + len(self._topology["switches"]) + 2)])
-        columns.extend([f"Destination{i}" for i in range(len(self._topology["hosts"]) + len(self._topology["switches"]) + 2)])
-
+        columns.extend(
+            [
+                f"Source{i}"
+                for i in range(
+                    len(self._topology["hosts"]) + len(self._topology["switches"]) + 2
+                )
+            ]
+        )
+        columns.extend(
+            [
+                f"Destination{i}"
+                for i in range(
+                    len(self._topology["hosts"]) + len(self._topology["switches"]) + 2
+                )
+            ]
+        )
 
         return pd.DataFrame(rows, columns=columns, index=indices)
-
 
     def _constructGraph(self) -> nx.Graph:
         """
@@ -247,10 +274,8 @@ class EmbedLinks:
         graph: nx.Graph = nx.Graph()
 
         for link in self._topology["links"]:
-            graph.add_edge(
-                link["source"], link["destination"])
-            graph.add_edge(
-                link["destination"], link["source"])
+            graph.add_edge(link["source"], link["destination"])
+            graph.add_edge(link["destination"], link["source"])
 
         return graph
 
@@ -262,7 +287,9 @@ class EmbedLinks:
             None
         """
 
-        nodeLength: int = len(self._topology["hosts"]) + len(self._topology["switches"]) + 2
+        nodeLength: int = (
+            len(self._topology["hosts"]) + len(self._topology["switches"]) + 2
+        )
         sfcLength: int = len(self._egs)
 
         self._hotCode.addNode(SFCC, nodeLength)
@@ -288,10 +315,12 @@ class EmbedLinks:
         data: pd.DataFrame = self._constructDF()
         layers: "list[int]" = [len(data.columns), 1]
 
-        model = tf.keras.Sequential([
-            tf.keras.Input(shape=(layers[0], )),
-            tf.keras.layers.Dense(layers[1], activation="relu"),
-        ])
+        model = tf.keras.Sequential(
+            [
+                tf.keras.Input(shape=(layers[0],)),
+                tf.keras.layers.Dense(layers[1], activation="relu"),
+            ]
+        )
 
         index: int = 0
         wStartIndex: int = 0
@@ -300,10 +329,16 @@ class EmbedLinks:
         bEndIndex: int = layers[index + 1]
         for layer in model.layers:
             if isinstance(layer, tf.keras.layers.Dense):
-                layer.set_weights([
-                    np.array(self._weights[wStartIndex:wEndIndex]).reshape(layers[index], layers[index + 1]),
-                    np.array(self._bias[bStartIndex:bEndIndex]).reshape(layers[index + 1])
-                ])
+                layer.set_weights(
+                    [
+                        np.array(self._weights[wStartIndex:wEndIndex]).reshape(
+                            layers[index], layers[index + 1]
+                        ),
+                        np.array(self._bias[bStartIndex:bEndIndex]).reshape(
+                            layers[index + 1]
+                        ),
+                    ]
+                )
                 index += 1
                 if index < len(layers) - 1:
                     wStartIndex = wEndIndex
@@ -372,17 +407,24 @@ class EmbedLinks:
                         node.hCost = 0
                     else:
                         node.hCost = self._getHeuristicCost(
-                            sfcID,
-                            neighbor,
-                            destination)
+                            sfcID, neighbor, destination
+                        )
                     node.parent = currentNode
                     node.totalCost = currentNode.totalCost + self._getHeuristicCost(
-                        sfcID,
-                        currentNode.name,
-                        neighbor
+                        sfcID, currentNode.name, neighbor
                     )
 
-                    if len([closedSetNode for closedSetNode in closedSet if closedSetNode.name == neighbor and node.totalCost >= closedSetNode.totalCost]) == 0:
+                    if (
+                        len(
+                            [
+                                closedSetNode
+                                for closedSetNode in closedSet
+                                if closedSetNode.name == neighbor
+                                and node.totalCost >= closedSetNode.totalCost
+                            ]
+                        )
+                        == 0
+                    ):
                         heapq.heappush(openSet, node)
 
             index += 1
@@ -460,52 +502,97 @@ class EmbedLinks:
             list[EmbeddingGraph]: the EGs.
         """
 
+        paths: "dict[str, list[str]]" = {}
+
         for eg in self._egs:
             if "links" not in eg:
                 eg["links"] = []
 
-            paths: "list[str]" = []
             sfcNodes, sfcDivisors = self.parseNodes(nodes[eg["sfcID"]])
 
             for nodeList, divisor in zip(sfcNodes, sfcDivisors):
                 for i in range(len(nodeList) - 1):
-                    try:
-                        if nodeList[i] == nodeList[i + 1]:
-                            continue
-
-                        path = self._findPath(eg["sfcID"], nodeList[i], nodeList[i + 1])
-
-                        for p in range(len(path) - 1):
-                            if f"{path[p]}-{path[p + 1]}" in self._linkData:
-                                if eg["sfcID"] in self._linkData[f"{path[p]}-{path[p + 1]}"]:
-                                    self._linkData[f"{path[p]}-{path[p + 1]}"][eg["sfcID"]] += 1/divisor
-                                else:
-                                    self._linkData[f"{path[p]}-{path[p + 1]}"][eg["sfcID"]] = 1/divisor
-                            elif f"{path[p + 1]}-{path[p]}" in self._linkData:
-                                if eg["sfcID"] in self._linkData[f"{path[p + 1]}-{path[p]}"]:
-                                    self._linkData[f"{path[p + 1]}-{path[p]}"][eg["sfcID"]] += 1/divisor
-                                else:
-                                    self._linkData[f"{path[p + 1]}-{path[p]}"][eg["sfcID"]] = 1/divisor
-                                self._linkData[f"{path[p + 1]}-{path[p]}"][eg["sfcID"]] += 1/divisor
-                            else:
-                                self._linkData[f"{path[p]}-{path[p + 1]}"] = {
-                                    eg["sfcID"]: 1/divisor
-                                }
-
-                        if f"{nodeList[i]}-{nodeList[i + 1]}" in paths:
-                            continue
-
-                        paths.append(f"{nodeList[i]}-{nodeList[i + 1]}")
-
-                    except Exception as e:
-                        TUI.appendToSolverLog(f"Error: {e}", True)
+                    if nodeList[i] == nodeList[i + 1]:
                         continue
 
-                    eg["links"].append({
-                        "source": {"id": path[0]},
-                        "destination": {"id": path[-1]},
-                        "links": path[1:-1],
-                        "divisor": divisor
-                    })
+                    srcDst: str = f"{nodeList[i]}-{nodeList[i + 1]}"
+                    dstSrc: str = f"{nodeList[i + 1]}-{nodeList[i]}"
+
+                    if srcDst not in paths and dstSrc not in paths:
+                        try:
+                            path = self._findPath(
+                                eg["sfcID"], nodeList[i], nodeList[i + 1]
+                            )
+                            paths[srcDst] = path
+                        except Exception as e:
+                            TUI.appendToSolverLog(f"Error: {e}", True)
+                            continue
+
+                        eg["links"].append(
+                            {
+                                "source": {"id": path[0]},
+                                "destination": {"id": path[-1]},
+                                "links": path[1:-1],
+                            }
+                        )
+
+                    path = paths[srcDst] if srcDst in paths else paths[dstSrc]
+
+                    for p in range(len(path) - 1):
+                        link: Link = [
+                            topoLink
+                            for topoLink in self._topology["links"]
+                            if (
+                                topoLink["source"] == path.nodes[p]
+                                and topoLink["destination"] == path.nodes[p + 1]
+                            )
+                            or (
+                                topoLink["source"] == path.nodes[p + 1]
+                                and topoLink["destination"] == path.nodes[p]
+                            )
+                        ][0]
+                        linkDelay: float = (
+                            (link["delay"] / divisor)
+                            if "delay" in link and link["delay"] is not None
+                            else 0
+                        )
+                        if f"{path[p]}-{path[p + 1]}" in self._linkData:
+                            if (
+                                eg["sfcID"]
+                                in self._linkData[f"{path[p]}-{path[p + 1]}"]
+                            ):
+                                pathData = tuple[float, float] = self._linkData[
+                                    f"{path[p]}-{path[p + 1]}"
+                                ][eg["sfcID"]]
+                                divisors: float = pathData[0] + 1 / divisor
+                                delay: float = pathData[1] + linkDelay
+                                self._linkData[f"{path[p]}-{path[p + 1]}"][
+                                    eg["sfcID"]
+                                ] = (divisors, delay)
+                            else:
+                                self._linkData[f"{path[p]}-{path[p + 1]}"][
+                                    eg["sfcID"]
+                                ] = (1 / divisor, linkDelay)
+                        elif f"{path[p + 1]}-{path[p]}" in self._linkData:
+                            if (
+                                eg["sfcID"]
+                                in self._linkData[f"{path[p + 1]}-{path[p]}"]
+                            ):
+                                pathData: tuple[float, float] = self._linkData[
+                                    f"{path[p + 1]}-{path[p]}"
+                                ][eg["sfcID"]]
+                                divisors: float = pathData[0] + 1 / divisor
+                                delay: float = pathData[1] + linkDelay
+                                self._linkData[f"{path[p + 1]}-{path[p]}"][
+                                    eg["sfcID"]
+                                ] = (divisors, delay)
+                            else:
+                                self._linkData[f"{path[p + 1]}-{path[p]}"][
+                                    eg["sfcID"]
+                                ] = (1 / divisor, linkDelay)
+                        else:
+                            self._linkData[f"{path[p]}-{path[p + 1]}"] = {
+                                eg["sfcID"]: (1 / divisor, linkDelay)
+                            }
 
         return self._egs

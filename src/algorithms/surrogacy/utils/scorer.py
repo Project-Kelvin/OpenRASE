@@ -6,7 +6,7 @@ from typing import Tuple
 import numpy as np
 import polars as pl
 from shared.models.embedding_graph import VNF, EmbeddingGraph
-from shared.models.topology import Host, Topology
+from shared.models.topology import Host, Link, Topology
 from algorithms.models.embedding import EmbeddingData, LinkData
 from algorithms.surrogacy.models.traffic import TimeSFCRequests
 from algorithms.surrogacy.utils.demand_predictions import DemandPredictions
@@ -66,10 +66,9 @@ class Scorer:
                 hostResourceData[host]["cpu"],
                 hostCPU if hostCPU is not None else serverCPU,
             )
-            hostResourceData[host]["memory"] = (
-                hostResourceData[host]["memory"] / hostMemory
-                if hostMemory is not None
-                else serverMemory
+            hostResourceData[host]["memory"] = Scorer._getScore(
+                hostResourceData[host]["memory"],
+                hostMemory if hostMemory is not None else serverMemory
             )
 
         return hostResourceData
@@ -79,7 +78,7 @@ class Scorer:
         data: dict[str, float],
         topology: Topology,
         egs: "list[EmbeddingGraph]",
-        linkData: "dict[str, dict[str, float]]",
+        linkData: "dict[str, dict[str, tuple[float, float, int ]]]",
     ) -> "dict[str, float]":
         """
         Gets the link scores.
@@ -91,17 +90,19 @@ class Scorer:
             linkData (dict[str, dict[str, float]]): the link data.
 
         Returns:
-            dict[str, float]: the link scores.
+            dict[str, tuple[float, float, int ]]: the link scores.
         """
 
-        linkScores: "dict[str, float]" = {}
+        linkScoresData: "dict[str, tuple[float, float, int ]]" = {}
         for eg in egs:
             totalLinkScore: float = 0.0
+            linkScores: list[float] = []
+            totalDelay: int = 0
+            checkedLinks: set[str] = set()
             for egLink in eg["links"]:
                 links: "list[str]" = [egLink["source"]["id"]]
                 links.extend(egLink["links"])
                 links.append(egLink["destination"]["id"])
-                reqps: float = data[eg["sfcID"]] if eg["sfcID"] in data else 0
 
                 for linkIndex in range(len(links) - 1):
                     source: str = links[linkIndex]
@@ -109,33 +110,52 @@ class Scorer:
 
                     totalRequests: int = 0
 
-                    if f"{source}-{destination}" in linkData:
-                        for _key, factor in linkData[f"{source}-{destination}"].items():
-                            totalRequests += factor * reqps
-                    elif f"{destination}-{source}" in linkData:
-                        for _key, factor in linkData[f"{destination}-{source}"].items():
-                            totalRequests += factor * reqps
-
-                    bandwidth: float = [
-                        link["bandwidth"]
-                        for link in topology["links"]
+                    link: Link = [
+                        topoLink
+                        for topoLink in topology["links"]
                         if (
-                            link["source"] == source
-                            and link["destination"] == destination
+                            topoLink["source"] == source
+                            and topoLink["destination"] == destination
                         )
                         or (
-                            link["source"] == destination
-                            and link["destination"] == source
+                            topoLink["source"] == destination
+                            and topoLink["destination"] == source
                         )
                     ][0]
 
+                    if f"{source}-{destination}" in linkData:
+                        if f"{source}-{destination}" in checkedLinks:
+                            continue
+                        checkedLinks.add(f"{source}-{destination}")
+                        for key, pathData in linkData[f"{source}-{destination}"].items():
+                            reqps: float = (
+                                data[key] if key in data else 0
+                            )
+                            totalRequests += pathData[0] * reqps
+
+                            if key == eg["sfcID"]:
+                                totalDelay += pathData[1]
+                    elif f"{destination}-{source}" in linkData:
+                        if f"{destination}-{source}" in checkedLinks:
+                            continue
+                        checkedLinks.add(f"{destination}-{source}")
+                        for key, pathData in linkData[f"{destination}-{source}"].items():
+                            reqps: float = (
+                                data[key] if key in data else 0
+                            )
+                            totalRequests += pathData[0] * reqps
+
+                            if key == eg["sfcID"]:
+                                totalDelay += pathData[1]
+
+                    bandwidth: float = link["bandwidth"] if "bandwidth" in link else 1.0
                     linkScore: float = Scorer._getLinkScore(totalRequests, bandwidth)
-
                     totalLinkScore += linkScore
+                    linkScores.append(linkScore)
 
-            linkScores[eg["sfcID"]] = totalLinkScore
+            linkScoresData[eg["sfcID"]] = (totalLinkScore, max(linkScores), (2 * totalDelay))
 
-        return linkScores
+        return linkScoresData
 
     @staticmethod
     def getHostLinkScoresForEachSFC(
@@ -183,8 +203,15 @@ class Scorer:
         maxMemory: float = (
             max([host["memory"] for host in hosts.values()]) if len(hosts) > 0 else 0.0
         )
-        link: float = (
-            linkScores[sfc] if linkScores is not None and sfc in linkScores else 0.0
+
+        totalLinkScore: float = (
+            linkScores[sfc][0] if linkScores is not None and sfc in linkScores else 0.0
+        )
+        maxLinkScore: float = (
+            linkScores[sfc][1] if linkScores is not None and sfc in linkScores else 0.0
+        )
+        totalDelay: int = (
+            linkScores[sfc][2] if linkScores is not None and sfc in linkScores else 0
         )
 
         dt = np.dtype(
@@ -194,7 +221,9 @@ class Scorer:
                 ("reqps", np.float64),
                 ("max_cpu", np.float64),
                 ("max_memory", np.float64),
-                ("link", np.float64),
+                ("total_link_score", np.float64),
+                ("max_link_score", np.float64),
+                ("total_delay", np.int32),
             ]
         )
         newData: np.array = np.array(
@@ -205,7 +234,9 @@ class Scorer:
                     float(sfcReqps),
                     float(maxCPU),
                     float(maxMemory),
-                    float(link),
+                    float(totalLinkScore),
+                    float(maxLinkScore),
+                    int(totalDelay)
                 )
             ],
             dtype=dt,
@@ -237,10 +268,9 @@ class Scorer:
         hostScores: "dict[str, ResourceDemand]" = Scorer.getHostScores(
             timeData, topology, embeddingData, demandPredictor
         )
-        linkScores: "dict[str, float]" = Scorer.getLinkScores(
+        linkScores: "dict[str, tuple[float, float, int ]]" = Scorer.getLinkScores(
             timeData, topology, egs, linkData
         )
-
         hostLinkScores: np.array = None
         for key, value in timeData.items():
             hostLinkScore: np.array = Scorer.getHostLinkScoresForEachSFC(
@@ -277,7 +307,6 @@ class Scorer:
             np.array: the SFC scores (time, SFC ID, reqps, max CPU, max memory, link score).
         """
 
-        timeDataList: "list[pl.DataFrame]" = []
         outputData: np.array = None
         for time, timeData in enumerate(data):
             timeSlotData: np.array = Scorer.getHostLinkScoresForEachTimeSlot(

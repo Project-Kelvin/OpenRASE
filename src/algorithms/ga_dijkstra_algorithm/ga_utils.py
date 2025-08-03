@@ -7,9 +7,10 @@ import copy
 import random
 from time import sleep
 from typing import Callable, Tuple
+from uuid import uuid4
 from dijkstar import Graph, find_path
 import pandas as pd
-from algorithms.models.embedding import DecodedIndividual
+from algorithms.models.embedding import DecodedIndividual, EmbeddingData, LinkData
 from algorithms.surrogacy.constants.surrogate import BRANCH
 from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
 from calibrate.demand_predictor import DemandPredictor
@@ -17,7 +18,7 @@ from constants.topology import SERVER, SFCC
 from deap import base
 from models.calibrate import ResourceDemand
 from shared.models.embedding_graph import VNF, EmbeddingGraph, EmbeddingGraphs
-from shared.models.topology import Topology
+from shared.models.topology import Link, Topology
 from shared.models.traffic_design import TrafficDesign
 from sfc.traffic_generator import TrafficGenerator
 from utils.embedding_graph import traverseVNF
@@ -62,7 +63,7 @@ def getVNFsFromFGRs(fgrs: "list[EmbeddingGraph]") -> "list[str]":
 
 
 def generateRandomIndividual(
-    container: list, topo: Topology, fgrs: "list[EmbeddingGraph]"
+    container: list, topo: Topology, fgrs: "list[EmbeddingGraph]", alpha: float = 0.1
 ) -> "list[list[int]]":
     """
     Generate a random individual.
@@ -71,6 +72,7 @@ def generateRandomIndividual(
         container (list): the container.
         topo (Topology): the topology.
         fgrs (EmbeddingGraph): the FG Request.
+        alpha (float): the probability of a VNF being deployed on a host.
 
     Returns:
        list[list[int]]: the random individual.
@@ -84,10 +86,11 @@ def generateRandomIndividual(
 
     for _ in range(noOfVNFs):
         item: "list[int]" = [0] * noOfHosts
-        if random.random() >= 0.1:
+        if random.random() >= alpha:
             item[random.randint(0, noOfHosts - 1)] = 1
         individual.append(item)
 
+    individual.id = uuid4()
     return individual
 
 
@@ -145,7 +148,7 @@ def parseNodes(nodes: "list[str]") -> "Tuple[list[list[str]], list[int]]":
 
 def convertIndividualToEmbeddingGraph(
     individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", topology: Topology
-) -> "Tuple[list[EmbeddingGraph], dict[str, dict[str, list[Tuple[str, int]]]]]":
+) -> "Tuple[list[EmbeddingGraph], EmbeddingData, LinkData]":
     """
     Convert individual to an embedding graph.
 
@@ -155,14 +158,14 @@ def convertIndividualToEmbeddingGraph(
         topology (Topology): The Topology.
 
     Returns:
-        tuple[list[EmbeddingGraph], dict[str, dict[str, list[Tuple[str, int]]]]]: the embedding graph and the embedding data.
+        tuple[list[EmbeddingGraph], EmbeddingData, LinkData]: the embedding graph, the embedding data and the link data.
     """
 
     egs: "list[EmbeddingGraph]" = []
     offset: "list[int]" = [0]
     nodes: "dict[str, list[str]]" = {}
-    embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" = {}
-    linkData: "dict[str, dict[str, float]]" = {}
+    embeddingData: EmbeddingData = {}
+    linkData: LinkData = {}
     copiedFGRs: "list[EmbeddingGraph]" = copy.deepcopy(fgrs)
 
     for index, fgr in enumerate(copiedFGRs):
@@ -231,79 +234,100 @@ def convertIndividualToEmbeddingGraph(
                     embeddingNotFound[0] = True
 
         traverseVNF(vnfs, parseVNF, embeddingNotFound, offset)
-
         if not embeddingNotFound[0]:
             if "sfcrID" in fgr:
                 del fgr["sfcrID"]
 
             graph = Graph()
-            nodePair: "list[str]" = []
+            paths: "dict[str, list[str]]" = {}
             eg: EmbeddingGraph = copy.deepcopy(fgr)
 
             if "links" not in eg:
                 eg["links"] = []
 
             for link in topology["links"]:
-                graph.add_edge(link["source"], link["destination"], link["bandwidth"])
-                graph.add_edge(link["destination"], link["source"], link["bandwidth"])
+                graph.add_edge(link["source"], link["destination"], link["bandwidth"] if "bandwidth" in link and link["bandwidth"] is not None else 1)
+                graph.add_edge(link["destination"], link["source"], link["bandwidth"] if "bandwidth" in link and link["bandwidth"] is not None else 1)
 
             sfcNodes, sfcDivisors = parseNodes(nodes[eg["sfcID"]])
-
             for nodeList, divisor in zip(sfcNodes, sfcDivisors):
                 for i in range(len(nodeList) - 1):
                     if nodeList[i] == nodeList[i + 1]:
                         continue
                     srcDst: str = f"{nodeList[i]}-{nodeList[i + 1]}"
                     dstSrc: str = f"{nodeList[i + 1]}-{nodeList[i]}"
-                    if srcDst not in nodePair and dstSrc not in nodePair:
-                        nodePair.append(srcDst)
-                        nodePair.append(dstSrc)
+                    if srcDst not in paths and dstSrc not in paths:
                         try:
                             path = find_path(graph, nodeList[i], nodeList[i + 1])
+                            paths.update({srcDst: path.nodes})
                         except Exception as e:
                             TUI.appendToSolverLog(f"Error: {e}")
                             continue
 
-                        for p in range(len(path.nodes) - 1):
-                            if f"{path.nodes[p]}-{path.nodes[p + 1]}" in linkData:
-                                if (
-                                    eg["sfcID"]
-                                    in linkData[f"{path.nodes[p]}-{path.nodes[p + 1]}"]
-                                ):
-                                    linkData[f"{path.nodes[p]}-{path.nodes[p + 1]}"][
-                                        eg["sfcID"]
-                                    ] += (1 / divisor)
-                                else:
-                                    linkData[f"{path.nodes[p]}-{path.nodes[p + 1]}"][
-                                        eg["sfcID"]
-                                    ] = (1 / divisor)
-                            elif f"{path.nodes[p + 1]}-{path.nodes[p]}" in linkData:
-                                if (
-                                    eg["sfcID"]
-                                    in linkData[f"{path.nodes[p + 1]}-{path.nodes[p]}"]
-                                ):
-                                    linkData[f"{path.nodes[p + 1]}-{path.nodes[p]}"][
-                                        eg["sfcID"]
-                                    ] += (1 / divisor)
-                                else:
-                                    linkData[f"{path.nodes[p + 1]}-{path.nodes[p]}"][
-                                        eg["sfcID"]
-                                    ] = (1 / divisor)
-                                linkData[f"{path.nodes[p + 1]}-{path.nodes[p]}"][
-                                    eg["sfcID"]
-                                ] += (1 / divisor)
-                            else:
-                                linkData[f"{path.nodes[p]}-{path.nodes[p + 1]}"] = {
-                                    eg["sfcID"]: 1 / divisor
-                                }
                         eg["links"].append(
                             {
                                 "source": {"id": path.nodes[0]},
                                 "destination": {"id": path.nodes[-1]},
                                 "links": path.nodes[1:-1],
-                                "divisor": divisor,
                             }
                         )
+                    path = paths[srcDst] if srcDst in paths else paths[dstSrc]
+                    for p in range(len(path) - 1):
+                        link: Link = [
+                            topoLink
+                            for topoLink in topology["links"]
+                            if (
+                                topoLink["source"] == path[p]
+                                and topoLink["destination"] == path[p + 1]
+                            )
+                            or (
+                                topoLink["source"] == path[p + 1]
+                                and topoLink["destination"] == path[p]
+                            )
+                        ][0]
+                        linkDelay: float = (
+                            (link["delay"] / divisor)
+                            if "delay" in link and link["delay"] is not None
+                            else 0
+                        )
+                        if f"{path[p]}-{path[p + 1]}" in linkData:
+                            if (
+                                eg["sfcID"]
+                                in linkData[f"{path[p]}-{path[p + 1]}"]
+                            ):
+                                pathData: tuple[float, float] = linkData[
+                                    f"{path[p]}-{path[p + 1]}"
+                                ][eg["sfcID"]]
+                                divisors = pathData[0] + (1 / divisor)
+                                delay = pathData[1] + linkDelay
+                                linkData[f"{path[p]}-{path[p + 1]}"][
+                                    eg["sfcID"]
+                                ] = (divisors, delay)
+                            else:
+                                linkData[f"{path[p]}-{path[p + 1]}"][
+                                    eg["sfcID"]
+                                ] = ((1 / divisor), linkDelay)
+                        elif f"{path[p + 1]}-{path[p]}" in linkData:
+                            if (
+                                eg["sfcID"]
+                                in linkData[f"{path[p + 1]}-{path[p]}"]
+                            ):
+                                pathData: tuple[float, float] = linkData[
+                                    f"{path[p + 1]}-{path[p]}"
+                                ][eg["sfcID"]]
+                                divisors = pathData[0] + (1 / divisor)
+                                delay = pathData[1] + linkDelay
+                                linkData[f"{path[p + 1]}-{path[p]}"][
+                                    eg["sfcID"]
+                                ] = (divisors, delay)
+                            else:
+                                linkData[f"{path[p + 1]}-{path[p]}"][
+                                    eg["sfcID"]
+                                ] = (1 / divisor, linkDelay)
+                        else:
+                            linkData[f"{path[p]}-{path[p + 1]}"] = {
+                                eg["sfcID"]: (1 / divisor, linkDelay)
+                            }
 
             egs.append(eg)
 
