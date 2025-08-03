@@ -7,7 +7,7 @@ import json
 import os
 import random
 from time import sleep
-from typing import Union
+from typing import Any, Union
 import click
 import numpy as np
 import tensorflow as tf
@@ -27,16 +27,6 @@ from utils.topology import generateFatTreeTopology
 from utils.traffic_design import generateTrafficDesignFromFile
 from utils.tui import TUI
 
-os.environ["PYTHONHASHSEED"] = "100"
-
-# Setting the seed for numpy-generated random numbers
-np.random.seed(100)
-
-# Setting the seed for python random numbers
-random.seed(100)
-
-# Setting the graph-level random seed.
-tf.random.set_seed(100)
 
 LINK_BANDWIDTH: int = 10
 NO_OF_CPUS: int = 2
@@ -53,115 +43,12 @@ directory = f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_alg
 if not os.path.exists(directory):
     os.makedirs(directory)
 
-topology: Topology = generateFatTreeTopology(4, LINK_BANDWIDTH, NO_OF_CPUS, MEMORY)
 logFilePath: str = (
     f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/experiments.csv"
 )
 latencyDataFilePath: str = (
     f"{config['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/latency_data.csv"
 )
-
-
-def appendToLog(message: str) -> None:
-    """
-    Append to the log.
-
-    Parameters:
-        message (str): The message to append.
-    """
-
-    with open(logFilePath, "a", encoding="utf8") as log:
-        log.write(f"{message}\n")
-
-
-trafficDesign: "list[TrafficDesign]" = [
-    generateTrafficDesignFromFile(
-        os.path.join(
-            f"{getConfig()['repoAbsolutePath']}",
-            "src",
-            "runs",
-            "ga_dijkstra_algorithm",
-            "data",
-            "requests.csv",
-        ),
-        TRAFFIC_SCALE,
-        4,
-        False,
-        TRAFFIC_PATTERN,
-    )
-]
-
-
-class FGR(FGRequestGenerator):
-    """
-    FG Request Generator.
-    """
-
-    def __init__(self, orchestrator: Orchestrator) -> None:
-        super().__init__(orchestrator)
-        self._fgs: "list[EmbeddingGraph]" = []
-
-        with open(
-            f"{configPath}/forwarding-graphs.json", "r", encoding="utf8"
-        ) as fgFile:
-            fgs: "list[EmbeddingGraph]" = json.load(fgFile)
-            for fg in fgs:
-                self._fgs.append(copy.deepcopy(fg))
-
-    def generateRequests(self) -> None:
-        """
-        Generate the requests.
-        """
-
-        copiedFGs: "list[EmbeddingGraph]" = []
-        for index, fg in enumerate(self._fgs):
-            for i in range(0, NO_OF_COPIES):
-                copiedFG: EmbeddingGraph = copy.deepcopy(fg)
-                copiedFG["sfcrID"] = f"sfc{index}-{i}"
-                copiedFGs.append(copiedFG)
-
-        self._fgs = copiedFGs
-
-        self._orchestrator.sendRequests(self._fgs)
-
-
-class SFCSolver(Solver):
-    """
-    SFC Solver.
-    """
-
-    def __init__(
-        self, orchestrator: Orchestrator, trafficGenerator: TrafficGenerator
-    ) -> None:
-        super().__init__(orchestrator, trafficGenerator)
-        self._topology: Topology = None
-
-    def generateEmbeddingGraphs(self) -> None:
-        try:
-            while self._requests.empty():
-                pass
-            requests: "list[Union[FGR, SFCRequest]]" = []
-            while not self._requests.empty():
-                requests.append(self._requests.get())
-                sleep(0.1)
-            self._topology: Topology = self._orchestrator.getTopology()
-
-            GADijkstraAlgorithm(
-                self._topology,
-                requests,
-                self._orchestrator.sendEmbeddingGraphs,
-                self._orchestrator.deleteEmbeddingGraphs,
-                trafficDesign,
-                self._trafficGenerator,
-            )
-            TUI.appendToSolverLog("Finished experiment.")
-            sleep(2)
-        except Exception as e:
-            TUI.appendToSolverLog(str(e), True)
-
-        sleep(10)
-        # TUI.exit()
-
 
 @click.command()
 @click.option(
@@ -178,9 +65,110 @@ def run(headless: bool) -> None:
         headless (bool): Whether to run the emulator in headless mode.
     """
 
-    sfcEm: SFCEmulator = SFCEmulator(FGR, SFCSolver, headless)
-    try:
-        sfcEm.startTest(topology, trafficDesign)
-    except Exception as e:
-        TUI.appendToSolverLog(str(e), True)
-    sfcEm.end()
+    experiments: list[tuple[Any]] = [
+        (8, 0.1, False, 10, 2),
+        (8, 0.1, False, 10, 1),
+        (8, 0.1, False, 5, 2),
+        (8, 0.2, False, 10, 2),
+        (8, 0.1, True, 10, 2),
+        (16, 0.1, False, 10, 2),
+    ]
+
+    for experiment in experiments:
+        topology: Topology = generateFatTreeTopology(
+            4, experiment[3], experiment[4], MEMORY, 1
+        )
+
+        trafficDesign: "list[TrafficDesign]" = [
+            generateTrafficDesignFromFile(
+                os.path.join(
+                    f"{getConfig()['repoAbsolutePath']}",
+                    "src",
+                    "runs",
+                    "ga_dijkstra_algorithm",
+                    "data",
+                    "requests.csv",
+                ),
+                experiment[1],
+                4,
+                False,
+                experiment[2],
+            )
+        ]
+
+        class FGR(FGRequestGenerator):
+            """
+            FG Request Generator.
+            """
+
+            def __init__(self, orchestrator: Orchestrator) -> None:
+                super().__init__(orchestrator)
+                self._fgs: "list[EmbeddingGraph]" = []
+
+                with open(
+                    f"{configPath}/forwarding-graphs.json", "r", encoding="utf8"
+                ) as fgFile:
+                    fgs: "list[EmbeddingGraph]" = json.load(fgFile)
+                    for fg in fgs:
+                        self._fgs.append(copy.deepcopy(fg))
+
+            def generateRequests(self) -> None:
+                """
+                Generate the requests.
+                """
+
+                copiedFGs: "list[EmbeddingGraph]" = []
+                for index, fg in enumerate(self._fgs):
+                    for i in range(0, experiment[0]):
+                        copiedFG: EmbeddingGraph = copy.deepcopy(fg)
+                        copiedFG["sfcrID"] = f"sfc{index}-{i}"
+                        copiedFGs.append(copiedFG)
+
+                self._fgs = copiedFGs
+
+                self._orchestrator.sendRequests(self._fgs)
+
+        class SFCSolver(Solver):
+            """
+            SFC Solver.
+            """
+
+            def __init__(
+                self, orchestrator: Orchestrator, trafficGenerator: TrafficGenerator
+            ) -> None:
+                super().__init__(orchestrator, trafficGenerator)
+                self._topology: Topology = None
+
+            def generateEmbeddingGraphs(self) -> None:
+                try:
+                    while self._requests.empty():
+                        pass
+                    requests: "list[Union[FGR, SFCRequest]]" = []
+                    while not self._requests.empty():
+                        requests.append(self._requests.get())
+                        sleep(0.1)
+                    self._topology: Topology = self._orchestrator.getTopology()
+
+                    GADijkstraAlgorithm(
+                        self._topology,
+                        requests,
+                        self._orchestrator.sendEmbeddingGraphs,
+                        self._orchestrator.deleteEmbeddingGraphs,
+                        trafficDesign,
+                        self._trafficGenerator,
+                        f"{experiment[0]}_{experiment[1]}_{experiment[2]}_{experiment[3]}_{experiment[4]}",
+                    )
+                    TUI.appendToSolverLog("Finished experiment.")
+                    sleep(2)
+                except Exception as e:
+                    TUI.appendToSolverLog(str(e), True)
+
+                sleep(10)
+                # TUI.exit()
+
+        sfcEm: SFCEmulator = SFCEmulator(FGR, SFCSolver, headless)
+        try:
+            sfcEm.startTest(topology, trafficDesign)
+        except Exception as e:
+            TUI.appendToSolverLog(str(e), True)
+        sfcEm.end()

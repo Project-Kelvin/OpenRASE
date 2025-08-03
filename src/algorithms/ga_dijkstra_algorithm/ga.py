@@ -3,8 +3,10 @@ This defines a Genetic Algorithm (GA) to produce an Embedding Graph from a Forwa
 GA is sued for VNf Embedding and Dijkstra isu sed for link embedding.
 """
 
+import os
 import timeit
 from typing import Callable
+from uuid import uuid4, UUID
 import numpy as np
 from deap import base, creator, tools
 from shared.models.traffic_design import TrafficDesign
@@ -26,22 +28,18 @@ from utils.tui import TUI
 
 NO_OF_INDIVIDUALS: int = 10
 
-with open(
-    f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/data.csv",
-    "w",
-    encoding="utf8",
-) as topologyFile:
-    topologyFile.write(
-        "generation, average_ar, max_ar, min_ar, average_latency, max_latency, min_latency\n"
-    )
+MAIN_DIR: str = "ga_dijkstra_algorithm"
 
-with open(
-    f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/pfs.csv",
-    "w",
-    encoding="utf8",
-) as pf:
-    pf.write("generation, latency, ar\n")
 
+class Individual(list):
+    """
+    Individual class for DEAP.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.id: UUID = uuid4()
+        self.fitness: base.Fitness = creator.MaxARMinLatency()
 
 def GADijkstraAlgorithm(
     topology: Topology,
@@ -50,6 +48,7 @@ def GADijkstraAlgorithm(
     deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
     trafficDesign: TrafficDesign,
     trafficGenerator: TrafficGenerator,
+    dirName: str
 ) -> "tuple[tools.ParetoFront]":
     """
     Run the Genetic Algorithm + Dijkstra Algorithm.
@@ -65,14 +64,49 @@ def GADijkstraAlgorithm(
         tuple[tools.ParetoFront]: the Pareto Front
     """
 
+    expDir: str = os.path.join(getConfig()['repoAbsolutePath'], "artifacts", "experiments")
+    if not os.path.exists( os.path.join(expDir, MAIN_DIR)):
+        os.makedirs(
+            os.path.join(expDir, MAIN_DIR)
+        )
+
+    if not os.path.exists(
+        os.path.join(expDir, MAIN_DIR, dirName)
+    ):
+        os.makedirs(
+            os.path.join(expDir, MAIN_DIR, dirName)
+        )
+
+    dataDir: str = os.path.join(
+        expDir, MAIN_DIR, dirName, "data.csv"
+    )
+    pfDir: str = os.path.join(
+        expDir, MAIN_DIR, dirName, "pfs.csv"
+    )
+
+    with open(
+        dataDir,
+        "w",
+        encoding="utf8",
+    ) as topologyFile:
+        topologyFile.write(
+            "generation, average_ar, max_ar, min_ar, average_latency, max_latency, min_latency\n"
+        )
+
+    with open(
+        pfDir,
+        "w",
+        encoding="utf8",
+    ) as pf:
+        pf.write("generation, latency, ar\n")
+
     startTime: float = timeit.default_timer()
     creator.create("MaxARMinLatency", base.Fitness, weights=(1.0, -1.0))
-    creator.create("Individual", list, fitness=creator.MaxARMinLatency)
 
     toolbox: base.Toolbox = base.Toolbox()
 
     toolbox.register(
-        "individual", generateRandomIndividual, creator.Individual, topology, fgrs
+        "individual", generateRandomIndividual, Individual, topology, fgrs
     )
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("mate", tools.cxTwoPoint)
@@ -87,7 +121,7 @@ def GADijkstraAlgorithm(
     decodedPop: "list[DecodedIndividual]" = decodePop(pop, topology, fgrs)
     HybridEvolution.cacheForOnline(decodedPop, trafficDesign)
     for ind in decodedPop:
-        individual: "creator.Individual" = pop[ind[0]]
+        individual: "Individual" = pop[ind[0]]
         individual.fitness.values = evaluation(
             ind,
             fgrs,
@@ -104,7 +138,7 @@ def GADijkstraAlgorithm(
     latencies = [ind.fitness.values[1] for ind in pop]
 
     with open(
-        f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/data.csv",
+        dataDir,
         "a",
         encoding="utf8",
     ) as topoFile:
@@ -117,7 +151,7 @@ def GADijkstraAlgorithm(
 
     for ind in hof:
         with open(
-            f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/pfs.csv",
+            pfDir,
             "a",
             encoding="utf8",
         ) as pfFile:
@@ -133,7 +167,7 @@ def GADijkstraAlgorithm(
         )
         HybridEvolution.cacheForOnline(decodedOffspring, trafficDesign)
         for ind in decodedOffspring:
-            individual: "creator.Individual" = offspring[ind[0]]
+            individual: "Individual" = offspring[ind[0]]
             individual.fitness.values = evaluation(
                 ind,
                 fgrs,
@@ -150,7 +184,7 @@ def GADijkstraAlgorithm(
 
         for ind in hof:
             with open(
-                f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/pfs.csv",
+                pfDir,
                 "a",
                 encoding="utf8",
             ) as pfFile:
@@ -160,7 +194,7 @@ def GADijkstraAlgorithm(
         latencies = [ind.fitness.values[1] for ind in pop]
 
         with open(
-            f"{getConfig()['repoAbsolutePath']}/artifacts/experiments/ga_dijkstra_algorithm/data.csv",
+            dataDir,
             "a",
             encoding="utf8",
         ) as topoFile:
