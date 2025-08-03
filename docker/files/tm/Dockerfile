@@ -1,4 +1,4 @@
-FROM ntop/ntopng:stable
+FROM ntop/ntopng:latest
 
 RUN apt-get update && apt-get install -y \
     bash \
