@@ -20,8 +20,8 @@ from algorithms.surrogacy.constants.surrogate import (
     SURROGACY_PATH,
     SURROGATE_PATH,
 )
-from algorithms.surrogacy.hybrid_online_offline import decodePop
 from algorithms.surrogacy.utils.extract_weights import getWeightLength
+from algorithms.surrogacy.utils.solvers import decodePop
 from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
 from sfc.traffic_generator import TrafficGenerator
 from utils.traffic_design import calculateTrafficDuration, getTrafficDesignRate

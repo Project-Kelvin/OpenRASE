@@ -21,7 +21,7 @@ def generateTrafficDesign(start: int, end: int, duration: int) -> "TrafficDesign
     rate: "TrafficDesign" = []
 
     for i in range(duration):
-        req: int = start + (end - start) * i / duration
+        req: int = start + round((end - (start - 1)) * i / duration)
         rate.append({
             "target": req,
             "duration": "1s"

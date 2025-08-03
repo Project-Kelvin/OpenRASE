@@ -7,7 +7,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 
 
 EmbeddingData = NewType("EmbeddingData", dict[str, dict[str, list[Tuple[str, int]]]])
-LinkData = NewType("LinkData", dict[str, dict[str, float]])
+LinkData = NewType("LinkData", dict[str, dict[str, tuple[float, float]]])
 DecodedIndividual = NewType(
     "DecodedIndividual",
     Tuple[int, list[EmbeddingGraph], EmbeddingData, LinkData, float],
