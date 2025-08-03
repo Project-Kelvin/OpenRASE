@@ -12,7 +12,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from algorithms.models.embedding import DecodedIndividual
-from algorithms.surrogacy.hybrid_online_offline import decodePop
+from algorithms.surrogacy.utils.solvers import decodePop
 from algorithms.surrogacy.utils.extract_weights import getWeightLength
 from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
 from algorithms.surrogacy.utils.scorer import Scorer
