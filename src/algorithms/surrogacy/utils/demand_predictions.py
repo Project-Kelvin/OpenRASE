@@ -3,7 +3,7 @@ Defines the functions used to make predictions efficiently.
 """
 
 from typing import Tuple
-import polars as pl
+import numpy as np
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from algorithms.surrogacy.models.traffic import TimeSFCRequests
 from calibrate.demand_predictor import DemandPredictor
@@ -69,52 +69,28 @@ class DemandPredictions:
             None
         """
 
-        cacheData: pl.DataFrame = pl.DataFrame()
+        cacheData: dict[str, list[float]] = {}
         for eg in egs:
             vnfsList: "list[Tuple[str, int]]" = self._getVNFsInEG(eg)
             reqps = [sfcs[eg["sfcID"]] for sfcs in data]
-            vnfs: "list[str]" = []
-            depths: "list[int]" = []
-            reqpsList: "list[float]" = []
 
             for req in reqps:
                 for vnf, depth in vnfsList:
-                    vnfs.append(vnf)
-                    depths.append(depth)
-                    reqpsList.append(req)
+                    divisor: float = 2 ** (depth - 1)
+                    effectiveReqps: float = req / divisor
+                    if vnf not in cacheData:
+                        cacheData[vnf] = [effectiveReqps]
+                    else:
+                        if effectiveReqps not in cacheData[vnf] and f"{vnf}_{str(effectiveReqps)}" not in self._cpuDemandData:
+                            cacheData[vnf].append(effectiveReqps)
 
-            egData: pl.DataFrame = pl.DataFrame({
-                "vnf": vnfs,
-                "depth": depths,
-                "reqps": reqpsList
-            })
-            cacheData = pl.concat([cacheData, egData])
-
-        cacheData = cacheData.unique()
-        cacheData = cacheData.with_columns(
-            (cacheData["reqps"] / (2 ** (cacheData["depth"] - 1))).alias("effectiveReqps")
-        )
-
-        if self._cpuDemandData is not None and self._memoryDemandData is not None:
-            cacheData = cacheData.filter(
-                f'{pl.col("vnf")}_{str(pl.col("effectiveReqps"))}' not in self._cpuDemandData
-                or f'{pl.col("vnf")}_{str(pl.col("effectiveReqps"))}' not in self._memoryDemandData
-            )
-
-        if cacheData.height > 0:
-            demandData: pl.DataFrame = self._demandPredictor.getVNFResourceDemands(
+        if len(cacheData.items()) > 0:
+            demandData: tuple[dict[str, float], dict[str, float]] = self._demandPredictor.getVNFResourceDemands(
                 cacheData
             )
+            self._cpuDemandData.update(demandData[0])
+            self._memoryDemandData.update(demandData[1])
 
-            if self._cpuDemandData is None:
-                self._cpuDemandData = {}
-            if self._memoryDemandData is None:
-                self._memoryDemandData = {}
-
-            for row in demandData.iter_rows(named=True):
-                key = f"{row['vnf']}_{str(row['effectiveReqps'])}"
-                self._cpuDemandData[key] = row['cpu']
-                self._memoryDemandData[key] = row['memory']
 
     def getDemand(self, vnf: str, reqps: float) -> ResourceDemand:
         """
