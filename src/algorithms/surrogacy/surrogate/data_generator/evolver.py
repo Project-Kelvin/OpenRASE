@@ -21,7 +21,7 @@ from algorithms.surrogacy.constants.surrogate import SURROGACY_PATH, SURROGATE_D
 from algorithms.surrogacy.surrogate.data_generator.init_pop_generator import (
     evolveInitialWeights,
 )
-from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
+from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
 from algorithms.surrogacy.utils.scorer import Scorer
 from sfc.traffic_generator import TrafficGenerator
 from utils.traffic_design import calculateTrafficDuration
@@ -40,7 +40,7 @@ if not os.path.exists(surrogateDataDirectory):
     os.makedirs(surrogateDataDirectory)
 
 isFirstSetWritten: bool = False
-hybridEvolution: "HybridEvolution" = HybridEvolution()
+hybridEvolution: "HybridEvaluation" = HybridEvaluation()
 
 def evolveWeights(
     fgs: "list[EmbeddingGraph]",

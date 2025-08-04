@@ -12,7 +12,7 @@ from dijkstar import Graph, find_path
 import pandas as pd
 from algorithms.models.embedding import DecodedIndividual, EmbeddingData, LinkData
 from algorithms.surrogacy.constants.surrogate import BRANCH
-from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
+from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
 from calibrate.demand_predictor import DemandPredictor
 from constants.topology import SERVER, SFCC
 from deap import base
@@ -371,7 +371,7 @@ def evaluation(
     )
     penaltyLatency: int = 50000
 
-    isValid: bool = not HybridEvolution.doesExceedMemoryLimit(
+    isValid: bool = not HybridEvaluation.doesExceedMemoryLimit(
         egs, topology, individual[2], trafficDesign, 2
     )
     if isValid and len(egs) > 0:

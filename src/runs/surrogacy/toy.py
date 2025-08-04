@@ -13,7 +13,7 @@ from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
 from algorithms.ga_dijkstra_algorithm.ga_utils import generateRandomIndividual, convertIndividualToEmbeddingGraph
 from algorithms.models.embedding import DecodedIndividual
-from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
+from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
@@ -145,7 +145,7 @@ def benchmark(headless: bool, control: bool, cpu: bool, memory: bool, links: boo
                     for r in range(NUM_OF_ROUNDS):
                         requestsToDeploy: "list[EmbeddingGraph]" = requests
                         eGraphs: "list[EmbeddingGraph]" = []
-                        hybridEvolution: HybridEvolution = HybridEvolution()
+                        hybridEvolution: HybridEvaluation = HybridEvaluation()
                         while len(eGraphs) != len(requestsToDeploy):
                             individual: list[list[float]] = generateRandomIndividual(Container, topology, requestsToDeploy, 0.01)
                             if not links:

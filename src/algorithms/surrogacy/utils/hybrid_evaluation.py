@@ -30,7 +30,7 @@ from utils.traffic_design import (
 from utils.tui import TUI
 
 
-class HybridEvolution:
+class HybridEvaluation:
     """
     Class to handle hybrid evolution for resource demand and latency predictions.
     """
@@ -128,24 +128,24 @@ class HybridEvolution:
 
         startTime: float = timeit.default_timer()
 
-        egs: "list[EmbeddingGraph]" = copy.deepcopy(HybridEvolution._combineEGs(pop))
+        egs: "list[EmbeddingGraph]" = copy.deepcopy(HybridEvaluation._combineEGs(pop))
 
         for i, eg in enumerate(egs):
             eg["sfcID"] = f"{eg['sfcID']}_{i}" if "sfcID" in eg else f"sfc{i}"
 
-        memoryData: TimeSFCRequests = HybridEvolution._generateTrafficData(
+        memoryData: TimeSFCRequests = HybridEvaluation._generateTrafficData(
             egs, trafficDesign, isMaxOnly=True
         )
         if not isMemoryOnly:
-            simulationData: TimeSFCRequests = HybridEvolution._generateTrafficData(
+            simulationData: TimeSFCRequests = HybridEvaluation._generateTrafficData(
                 egs, trafficDesign, isMaxOnly=False, isAvgOnly=isAvgOnly
             )
 
             demandData: TimeSFCRequests = simulationData + memoryData
 
-            HybridEvolution._demandPredictions.cacheResourceDemands(egs, demandData)
+            HybridEvaluation._demandPredictions.cacheResourceDemands(egs, demandData)
         else:
-            HybridEvolution._demandPredictions.cacheResourceDemands(egs, memoryData)
+            HybridEvaluation._demandPredictions.cacheResourceDemands(egs, memoryData)
 
         endTime: float = timeit.default_timer()
 
@@ -173,12 +173,12 @@ class HybridEvolution:
             tuple[float, float]: Maximum CPU and memory usage of hosts.
         """
 
-        data: pl.DataFrame = HybridEvolution._generateTrafficData(
+        data: pl.DataFrame = HybridEvaluation._generateTrafficData(
             egs, trafficDesign, isMaxOnly=True
         )
 
         scores: "dict[str, ResourceDemand]" = Scorer.getHostScores(
-            data, topology, embeddingData, HybridEvolution._demandPredictions
+            data, topology, embeddingData, HybridEvaluation._demandPredictions
         )
         maxMemory: float = max(
             [score["memory"] for score in scores.values()], default=0
@@ -209,7 +209,7 @@ class HybridEvolution:
             bool: True if the memory limit is exceeded, False otherwise.
         """
 
-        _maxCPU, maxMemory = HybridEvolution.getMaxCpuMemoryUsageOfHosts(
+        _maxCPU, maxMemory = HybridEvaluation.getMaxCpuMemoryUsageOfHosts(
             egs, topology, embeddingData, trafficDesign
         )
 
@@ -241,7 +241,7 @@ class HybridEvolution:
             np.array: A numpy array containing the generated scores.
         """
 
-        simulationData: pl.DataFrame = HybridEvolution._generateTrafficData(
+        simulationData: pl.DataFrame = HybridEvaluation._generateTrafficData(
             egs, trafficDesign, isMaxOnly=False, isAvgOnly=isAvgOnly
         )
 
@@ -251,7 +251,7 @@ class HybridEvolution:
             egs,
             embeddingData,
             linkData,
-            HybridEvolution._demandPredictions,
+            HybridEvaluation._demandPredictions,
         )
 
         return scores
@@ -284,7 +284,7 @@ class HybridEvolution:
         """
 
         try:
-            scores: np.array = HybridEvolution._generateScores(
+            scores: np.array = HybridEvaluation._generateScores(
                 trafficDesign,
                 egs,
                 topology,
@@ -341,7 +341,7 @@ class HybridEvolution:
             try:
                 futures = [
                     executor.submit(
-                        HybridEvolution._generateMeanScores,
+                        HybridEvaluation._generateMeanScores,
                         trafficDesign,
                         ind[1],
                         gen,
@@ -370,12 +370,12 @@ class HybridEvolution:
             axis=1,
         )
 
-        data: np.array = HybridEvolution._surrogateModel.predict(inputData, verbose=0)
+        data: np.array = HybridEvaluation._surrogateModel.predict(inputData, verbose=0)
 
         scores[:]["latency"] = data[:, 0]
         scores[:]["latency"] = scores[:]["latency"] + scores[:]["mean_total_delay"]
 
-        HybridEvolution._latencyPrediction = scores
+        HybridEvaluation._latencyPrediction = scores
 
         end: float = timeit.default_timer()
         TUI.appendToSolverLog(
@@ -395,13 +395,13 @@ class HybridEvolution:
             float: The predicted latency for the specified generation and individual.
         """
 
-        if HybridEvolution._latencyPrediction is None:
+        if HybridEvaluation._latencyPrediction is None:
             return None
 
-        mask = (HybridEvolution._latencyPrediction[:]["generation"] == gen) & (
-            HybridEvolution._latencyPrediction[:]["individual"] == ind
+        mask = (HybridEvaluation._latencyPrediction[:]["generation"] == gen) & (
+            HybridEvaluation._latencyPrediction[:]["individual"] == ind
         )
-        rows = HybridEvolution._latencyPrediction[mask]
+        rows = HybridEvaluation._latencyPrediction[mask]
 
         return rows[0]["latency"] if rows.shape[0] > 0 else 0.0
 
@@ -427,8 +427,8 @@ class HybridEvolution:
             None
         """
 
-        HybridEvolution._cacheDemand(pop, trafficDesign, isAvgOnly=isAvgOnly)
-        HybridEvolution._predictLatency(pop, trafficDesign, gen, topology)
+        HybridEvaluation._cacheDemand(pop, trafficDesign, isAvgOnly=isAvgOnly)
+        HybridEvaluation._predictLatency(pop, trafficDesign, gen, topology)
 
     @staticmethod
     def saveCachedLatency(filePath: str) -> None:
@@ -442,8 +442,8 @@ class HybridEvolution:
             None
         """
 
-        if HybridEvolution._latencyPrediction is not None:
-            np.savetxt(filePath, HybridEvolution._latencyPrediction, delimiter=",", fmt="%.2f", header="generation,individual,mean_max_link,mean_total_link,mean_total_delay,mean_cpu,latency")
+        if HybridEvaluation._latencyPrediction is not None:
+            np.savetxt(filePath, HybridEvaluation._latencyPrediction, delimiter=",", fmt="%.2f", header="generation,individual,mean_max_link,mean_total_link,mean_total_delay,mean_cpu,latency")
             TUI.appendToSolverLog(f"Saved cached latency predictions to {filePath}.")
         else:
             TUI.appendToSolverLog("No cached latency predictions to save.")
@@ -463,7 +463,7 @@ class HybridEvolution:
             None
         """
 
-        HybridEvolution._cacheDemand(pop, trafficDesign, isMemoryOnly=True)
+        HybridEvaluation._cacheDemand(pop, trafficDesign, isMemoryOnly=True)
 
     @staticmethod
     def evaluationOnSurrogate(
@@ -496,7 +496,7 @@ class HybridEvolution:
         latency: float = 0
 
         if len(egs) > 0:
-            if HybridEvolution.doesExceedMemoryLimit(
+            if HybridEvaluation.doesExceedMemoryLimit(
                 individual[1], topology, individual[2], trafficDesign, maxMemoryDemand
             ):
                 penalty: float = gen / ngen
@@ -507,7 +507,7 @@ class HybridEvolution:
 
                 return (individual[0], acceptanceRatio, latency)
 
-            latency: float = HybridEvolution.getPredictedLatency(gen, individual[0])
+            latency: float = HybridEvaluation.getPredictedLatency(gen, individual[0])
         else:
             latency = penaltyLatency
 
@@ -553,7 +553,7 @@ class HybridEvolution:
         penaltyLatency: int = 50000
 
         if len(individual[1]) > 0:
-            if HybridEvolution.doesExceedMemoryLimit(
+            if HybridEvaluation.doesExceedMemoryLimit(
                 individual[1], topology, individual[2], trafficDesign, maxMemoryDemand
             ):
                 penalty: float = gen / ngen
@@ -643,7 +643,7 @@ class HybridEvolution:
             medianLatency=("_value", "median"),
         )
 
-        scores: np.array = HybridEvolution._generateScores(
+        scores: np.array = HybridEvaluation._generateScores(
             trafficDesign, ind[1], topology, ind[2], ind[3]
         )
 

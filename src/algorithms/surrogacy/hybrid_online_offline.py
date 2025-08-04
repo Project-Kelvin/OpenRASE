@@ -1,6 +1,6 @@
 """
 This defines a Genetic Algorithm (GA) to produce an Embedding Graph from a Forwarding Graph.
-GA is sued for VNf Embedding and Dijkstra isu sed for link embedding.
+GA is used for VNf Embedding and Dijkstra is used for link embedding.
 """
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -16,7 +16,7 @@ from shared.models.topology import Topology
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.utils.config import getConfig
 from algorithms.models.embedding import DecodedIndividual
-from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
+from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
 from algorithms.ga_dijkstra_algorithm.ga_utils import (
     convertIndividualToEmbeddingGraph,
     generateRandomIndividual,
@@ -236,10 +236,10 @@ def geneticOperation(
     """
 
     populationEG: "list[DecodedIndividual]" = decodePop(pop, topology, fgrs)
-    HybridEvolution.cacheForOffline(
+    HybridEvaluation.cacheForOffline(
         populationEG, trafficDesign, topology, gen, isAvgOnly=True
     )
-    HybridEvolution.saveCachedLatency(
+    HybridEvaluation.saveCachedLatency(
         os.path.join(dirName, scoresDir, f"gen_{gen}.csv")
     )
 
@@ -247,7 +247,7 @@ def geneticOperation(
     with ProcessPoolExecutor() as executor:
         futures = [
             executor.submit(
-                HybridEvolution.evaluationOnSurrogate,
+                HybridEvaluation.evaluationOnSurrogate,
                 ind,
                 gen,
                 ngen,
@@ -306,9 +306,9 @@ def geneticOperation(
         populationEG: "list[DecodedIndividual]" = decodePop(
             qualifiedIndividuals, topology, fgrs
         )
-        HybridEvolution.cacheForOnline(populationEG, trafficDesign)
+        HybridEvaluation.cacheForOnline(populationEG, trafficDesign)
         for ind in populationEG:
-            ar, latency = HybridEvolution.evaluationOnEmulator(
+            ar, latency = HybridEvaluation.evaluationOnEmulator(
                 ind,
                 fgrs,
                 gen,
@@ -332,8 +332,8 @@ def geneticOperation(
         ars = [ind.fitness.values[0] for ind in qualifiedIndividuals]
         latencies = [ind.fitness.values[1] for ind in qualifiedIndividuals]
 
-        writeData(gen, ars, latencies, "emulator", dirName)
-        writePFs(gen, emHof, "emulator", dirName)
+        writeData(gen + 0.1, ars, latencies, "emulator", dirName)
+        writePFs(gen + 0.1, emHof, "emulator", dirName)
 
         qualifiedIndividuals = [
             ind

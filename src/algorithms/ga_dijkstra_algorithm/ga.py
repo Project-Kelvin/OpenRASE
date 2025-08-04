@@ -14,7 +14,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.utils.config import getConfig
 from algorithms.models.embedding import DecodedIndividual
-from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
+from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
 from sfc.traffic_generator import TrafficGenerator
 from algorithms.ga_dijkstra_algorithm.ga_utils import (
     algorithm,
@@ -119,7 +119,7 @@ def GADijkstraAlgorithm(
     CXPB, MUTPB, NGEN = 1.0, 1.0, 10
 
     decodedPop: "list[DecodedIndividual]" = decodePop(pop, topology, fgrs)
-    HybridEvolution.cacheForOnline(decodedPop, trafficDesign)
+    HybridEvaluation.cacheForOnline(decodedPop, trafficDesign)
     for ind in decodedPop:
         individual: "Individual" = pop[ind[0]]
         individual.fitness.values = evaluation(
@@ -165,7 +165,7 @@ def GADijkstraAlgorithm(
         decodedOffspring: "list[DecodedIndividual]" = decodePop(
             offspring, topology, fgrs
         )
-        HybridEvolution.cacheForOnline(decodedOffspring, trafficDesign)
+        HybridEvaluation.cacheForOnline(decodedOffspring, trafficDesign)
         for ind in decodedOffspring:
             individual: "Individual" = offspring[ind[0]]
             individual.fitness.values = evaluation(

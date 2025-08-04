@@ -22,7 +22,7 @@ from algorithms.surrogacy.constants.surrogate import (
 )
 from algorithms.surrogacy.utils.extract_weights import getWeightLength
 from algorithms.surrogacy.utils.solvers import decodePop
-from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
+from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
 from sfc.traffic_generator import TrafficGenerator
 from utils.traffic_design import calculateTrafficDuration, getTrafficDesignRate
 from utils.tui import TUI
@@ -55,7 +55,7 @@ with open(
     pf.write("generation, latency, ar\n")
 
 isFirstSetWritten: bool = False
-hybridEvolution: "HybridEvolution" = HybridEvolution()
+hybridEvolution: "HybridEvaluation" = HybridEvaluation()
 
 def crossover(
     toolbox: base.Toolbox, pop: "list[creator.Individual]", cxpb: float, mutpb: float
