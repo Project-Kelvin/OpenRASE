@@ -11,10 +11,10 @@ from dijkstar import Graph, find_path
 from shared.models.traffic_design import TrafficDesign
 from algorithms.ga_dijkstra_algorithm.ga_utils import getVNFsFromFGRs, parseNodes
 from algorithms.models.embedding import DecodedIndividual, EmbeddingData, LinkData
-from algorithms.surrogacy.constants.surrogate import BRANCH
-from algorithms.surrogacy.models.traffic import TimeSFCRequests
-from algorithms.surrogacy.utils.demand_predictions import DemandPredictions
-from algorithms.surrogacy.utils.scorer import Scorer
+from algorithms.hybrid.constants.surrogate import BRANCH
+from algorithms.hybrid.models.traffic import TimeSFCRequests
+from algorithms.hybrid.utils.demand_predictions import DemandPredictions
+from algorithms.hybrid.utils.scorer import Scorer
 from constants.topology import SERVER, SFCC
 from models.calibrate import ResourceDemand
 from utils.data import getAvailableCPUAndMemory

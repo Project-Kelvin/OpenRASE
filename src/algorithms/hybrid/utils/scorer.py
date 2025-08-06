@@ -8,8 +8,8 @@ import polars as pl
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.topology import Host, Link, Topology
 from algorithms.models.embedding import EmbeddingData, LinkData
-from algorithms.surrogacy.models.traffic import TimeSFCRequests
-from algorithms.surrogacy.utils.demand_predictions import DemandPredictions
+from algorithms.hybrid.models.traffic import TimeSFCRequests
+from algorithms.hybrid.utils.demand_predictions import DemandPredictions
 from models.calibrate import ResourceDemand
 from utils.data import getAvailableCPUAndMemory
 from utils.embedding_graph import traverseVNF

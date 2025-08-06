@@ -9,7 +9,7 @@ import numpy as np
 import tensorflow as tf
 import pandas as pd
 import matplotlib.pyplot as plt
-from algorithms.surrogacy.constants.surrogate import (
+from algorithms.hybrid.constants.surrogate import (
     SURROGACY_PATH,
     SURROGATE_DATA_PATH,
     SURROGATE_MODELS_PATH,

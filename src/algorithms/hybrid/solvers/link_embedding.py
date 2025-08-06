@@ -6,7 +6,7 @@ from timeit import default_timer
 from typing import Tuple
 import networkx as nx
 import heapq
-from algorithms.surrogacy.constants.surrogate import BRANCH
+from algorithms.hybrid.constants.surrogate import BRANCH
 from constants.topology import SERVER, SFCC
 from shared.models.topology import Link, Topology
 from shared.models.embedding_graph import EmbeddingGraph

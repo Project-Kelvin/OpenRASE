@@ -5,7 +5,7 @@ Defines the functions used to make predictions efficiently.
 from typing import Tuple
 import numpy as np
 from shared.models.embedding_graph import VNF, EmbeddingGraph
-from algorithms.surrogacy.models.traffic import TimeSFCRequests
+from algorithms.hybrid.models.traffic import TimeSFCRequests
 from calibrate.demand_predictor import DemandPredictor
 from models.calibrate import ResourceDemand
 from utils.embedding_graph import traverseVNF

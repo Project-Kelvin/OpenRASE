@@ -16,10 +16,10 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from algorithms.ga_dijkstra_algorithm.ga_utils import decodePop, generateRandomIndividual
 from algorithms.models.embedding import DecodedIndividual
-from algorithms.surrogacy.utils.extract_weights import getWeightLength
-from algorithms.surrogacy.constants.surrogate import SURROGACY_PATH, SURROGATE_DATA_PATH, SURROGATE_PATH
-from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
-from algorithms.surrogacy.utils.scorer import Scorer
+from algorithms.hybrid.utils.extract_weights import getWeightLength
+from algorithms.hybrid.constants.surrogate import SURROGACY_PATH, SURROGATE_DATA_PATH, SURROGATE_PATH
+from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
+from algorithms.hybrid.utils.scorer import Scorer
 from sfc.traffic_generator import TrafficGenerator
 from utils.traffic_design import calculateTrafficDuration
 from utils.tui import TUI

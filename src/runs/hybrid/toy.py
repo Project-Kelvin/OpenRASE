@@ -13,7 +13,7 @@ from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
 from algorithms.ga_dijkstra_algorithm.ga_utils import generateRandomIndividual, convertIndividualToEmbeddingGraph
 from algorithms.models.embedding import DecodedIndividual
-from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
+from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver

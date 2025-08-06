@@ -14,7 +14,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.utils.config import getConfig
 from algorithms.models.embedding import DecodedIndividual
-from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
+from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
 from sfc.traffic_generator import TrafficGenerator
 from algorithms.ga_dijkstra_algorithm.ga_utils import (
     algorithm,

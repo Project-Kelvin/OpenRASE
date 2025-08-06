@@ -14,9 +14,9 @@ from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
-from algorithms.surrogacy.constants.surrogate import SURROGACY_PATH
-from algorithms.surrogacy.surrogate.data_generator.evolver import evolveWeights
-from algorithms.surrogacy.surrogate.surrogate import train
+from algorithms.hybrid.constants.surrogate import SURROGACY_PATH
+from algorithms.hybrid.surrogate.data_generator.evolver import evolveWeights
+from algorithms.hybrid.surrogate.surrogate import train
 from mano.orchestrator import Orchestrator
 from sfc.fg_request_generator import FGRequestGenerator
 from sfc.sfc_emulator import SFCEmulator

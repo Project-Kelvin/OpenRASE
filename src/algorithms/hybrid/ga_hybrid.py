@@ -16,14 +16,14 @@ from shared.models.topology import Topology
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.utils.config import getConfig
 from algorithms.models.embedding import DecodedIndividual
-from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
+from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
 from algorithms.ga_dijkstra_algorithm.ga_utils import (
     convertIndividualToEmbeddingGraph,
     decodePop,
     generateRandomIndividual,
     mutate,
 )
-from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution
+from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution
 from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 

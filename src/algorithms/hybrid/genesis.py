@@ -13,16 +13,16 @@ from shared.models.traffic_design import TrafficDesign
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from algorithms.models.embedding import DecodedIndividual, LinkData
-from algorithms.surrogacy.constants.surrogate import (
+from algorithms.hybrid.constants.surrogate import (
     SURROGACY_PATH,
     SURROGATE_PATH,
 )
-from algorithms.surrogacy.solvers.chain_composition import generateFGs
-from algorithms.surrogacy.solvers.link_embedding import EmbedLinks
-from algorithms.surrogacy.solvers.vnf_embedding import generateEGs
-from algorithms.surrogacy.utils.extract_weights import getWeightLength, getWeights
-from algorithms.surrogacy.utils.hybrid_evolution import HybridEvolution, Individual
-from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
+from algorithms.hybrid.solvers.chain_composition import generateFGs
+from algorithms.hybrid.solvers.link_embedding import EmbedLinks
+from algorithms.hybrid.solvers.vnf_embedding import generateEGs
+from algorithms.hybrid.utils.extract_weights import getWeightLength, getWeights
+from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution, Individual
+from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
 from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 

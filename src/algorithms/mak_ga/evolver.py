@@ -21,7 +21,7 @@ from algorithms.mak_ga.utils import (
     isLinkConstraintViolated,
 )
 from algorithms.models.embedding import EmbeddingData, LinkData
-from algorithms.surrogacy.utils.demand_predictions import DemandPredictions
+from algorithms.hybrid.utils.demand_predictions import DemandPredictions
 from sfc.traffic_generator import TrafficGenerator
 from utils.traffic_design import calculateTrafficDuration
 

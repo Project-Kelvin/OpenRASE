@@ -11,9 +11,9 @@ from uuid import uuid4
 from dijkstar import Graph, find_path
 import pandas as pd
 from algorithms.models.embedding import DecodedIndividual, EmbeddingData, LinkData
-from algorithms.surrogacy.constants.surrogate import BRANCH
-from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
-from algorithms.surrogacy.utils.hybrid_evolution import Individual
+from algorithms.hybrid.constants.surrogate import BRANCH
+from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
+from algorithms.hybrid.utils.hybrid_evolution import Individual
 from calibrate.demand_predictor import DemandPredictor
 from constants.topology import SERVER, SFCC
 from deap import base

@@ -5,7 +5,7 @@ This defines the Neural Network used for genetic encoding.
 import copy
 from typing import Tuple
 import pandas as pd
-from algorithms.surrogacy.constants.surrogate import BRANCH
+from algorithms.hybrid.constants.surrogate import BRANCH
 from constants.topology import SERVER, SFCC
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.topology import Topology

@@ -17,10 +17,10 @@ from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 import tensorflow as tf
 from algorithms.models.embedding import DecodedIndividual, EmbeddingData
-from algorithms.surrogacy.models.traffic import TimeSFCRequests
-from algorithms.surrogacy.utils.demand_predictions import DemandPredictions
-from algorithms.surrogacy.utils.scorer import Scorer
-from algorithms.surrogacy.surrogate.surrogate import getSurrogateModel
+from algorithms.hybrid.models.traffic import TimeSFCRequests
+from algorithms.hybrid.utils.demand_predictions import DemandPredictions
+from algorithms.hybrid.utils.scorer import Scorer
+from algorithms.hybrid.surrogate.surrogate import getSurrogateModel
 from models.calibrate import ResourceDemand
 from sfc.traffic_generator import TrafficGenerator
 from utils.traffic_design import (
