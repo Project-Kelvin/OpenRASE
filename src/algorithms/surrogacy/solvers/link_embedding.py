@@ -502,14 +502,12 @@ class EmbedLinks:
             list[EmbeddingGraph]: the EGs.
         """
 
-        paths: "dict[str, list[str]]" = {}
-
         for eg in self._egs:
+            paths: "dict[str, list[str]]" = {}
             if "links" not in eg:
                 eg["links"] = []
 
             sfcNodes, sfcDivisors = self.parseNodes(nodes[eg["sfcID"]])
-
             for nodeList, divisor in zip(sfcNodes, sfcDivisors):
                 for i in range(len(nodeList) - 1):
                     if nodeList[i] == nodeList[i + 1]:
@@ -543,12 +541,12 @@ class EmbedLinks:
                             topoLink
                             for topoLink in self._topology["links"]
                             if (
-                                topoLink["source"] == path.nodes[p]
-                                and topoLink["destination"] == path.nodes[p + 1]
+                                topoLink["source"] == path[p]
+                                and topoLink["destination"] == path[p + 1]
                             )
                             or (
-                                topoLink["source"] == path.nodes[p + 1]
-                                and topoLink["destination"] == path.nodes[p]
+                                topoLink["source"] == path[p + 1]
+                                and topoLink["destination"] == path[p]
                             )
                         ][0]
                         linkDelay: float = (
@@ -561,7 +559,7 @@ class EmbedLinks:
                                 eg["sfcID"]
                                 in self._linkData[f"{path[p]}-{path[p + 1]}"]
                             ):
-                                pathData = tuple[float, float] = self._linkData[
+                                pathData: tuple[float, float] = self._linkData[
                                     f"{path[p]}-{path[p + 1]}"
                                 ][eg["sfcID"]]
                                 divisors: float = pathData[0] + 1 / divisor

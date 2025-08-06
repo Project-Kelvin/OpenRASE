@@ -18,9 +18,6 @@ from algorithms.ga_dijkstra_algorithm.ga_utils import decodePop, generateRandomI
 from algorithms.models.embedding import DecodedIndividual
 from algorithms.surrogacy.utils.extract_weights import getWeightLength
 from algorithms.surrogacy.constants.surrogate import SURROGACY_PATH, SURROGATE_DATA_PATH, SURROGATE_PATH
-from algorithms.surrogacy.surrogate.data_generator.init_pop_generator import (
-    evolveInitialWeights,
-)
 from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
 from algorithms.surrogacy.utils.scorer import Scorer
 from sfc.traffic_generator import TrafficGenerator

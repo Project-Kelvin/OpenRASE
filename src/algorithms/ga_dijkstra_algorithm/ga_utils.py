@@ -13,6 +13,7 @@ import pandas as pd
 from algorithms.models.embedding import DecodedIndividual, EmbeddingData, LinkData
 from algorithms.surrogacy.constants.surrogate import BRANCH
 from algorithms.surrogacy.utils.hybrid_evaluation import HybridEvaluation
+from algorithms.surrogacy.utils.hybrid_evolution import Individual
 from calibrate.demand_predictor import DemandPredictor
 from constants.topology import SERVER, SFCC
 from deap import base
@@ -63,13 +64,13 @@ def getVNFsFromFGRs(fgrs: "list[EmbeddingGraph]") -> "list[str]":
 
 
 def generateRandomIndividual(
-    container: list, topo: Topology, fgrs: "list[EmbeddingGraph]", alpha: float = 0.1
+    container: Individual, topo: Topology, fgrs: "list[EmbeddingGraph]", alpha: float = 0.1
 ) -> "list[list[int]]":
     """
     Generate a random individual.
 
     Parameters:
-        container (list): the container.
+        container (Individual): the container.
         topo (Topology): the topology.
         fgrs (EmbeddingGraph): the FG Request.
         alpha (float): the probability of a VNF being deployed on a host.
@@ -496,7 +497,7 @@ def crossover(
         ind2 (list[list[int]]): the second individual.
 
     Returns:
-        tuple[list[list[int]], list[list[int]]]: the crossovered individuals.
+        tuple[list[list[int]], list[list[int]]]: the crossbred individuals.
     """
 
     noOfVNFs: int = len(ind1)

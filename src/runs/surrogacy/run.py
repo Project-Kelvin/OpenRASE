@@ -8,7 +8,7 @@ from time import sleep
 from typing import Union
 
 import click
-from algorithms.surrogacy.evolver import evolveWeights
+from algorithms.surrogacy.genesis import solve
 from mano.orchestrator import Orchestrator
 from packages.python.shared.models.config import Config
 from packages.python.shared.models.embedding_graph import EmbeddingGraph
@@ -28,7 +28,7 @@ from utils.tui import TUI
 config: Config = getConfig()
 configPath: str = f"{config['repoAbsolutePath']}/src/runs/surrogacy/configs"
 
-topology: Topology = generateFatTreeTopology(4, 6, 1, 5120)
+topology: Topology = generateFatTreeTopology(4, 5, 1, 5120, 1)
 
 class SFCR(SFCRequestGenerator):
     """
@@ -107,13 +107,14 @@ class SFCSolver(Solver):
 
             self._topology: Topology = self._orchestrator.getTopology()
 
-            evolveWeights(
+            solve(
                 requests,
                 self._orchestrator.sendEmbeddingGraphs,
                 self._orchestrator.deleteEmbeddingGraphs,
                 self._trafficDesign,
                 self._trafficGenerator,
                 self._topology,
+                "8_0.1_False_5_1"
             )
             TUI.appendToSolverLog("Finished experiment.")
             sleep(2)

@@ -11,7 +11,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
-from algorithms.surrogacy.hybrid_online_offline import hybridSolver
+from algorithms.surrogacy.ga_hybrid import hybridSolver
 from sfc.fg_request_generator import FGRequestGenerator
 from sfc.sfc_emulator import SFCEmulator
 from sfc.solver import Solver
