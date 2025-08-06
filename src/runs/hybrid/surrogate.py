@@ -26,7 +26,7 @@ from utils.topology import generateFatTreeTopology
 from utils.traffic_design import generateTrafficDesign
 
 config: Config = getConfig()
-configPath: str = f"{config['repoAbsolutePath']}/src/runs/surrogacy/configs"
+configPath: str = f"{config['repoAbsolutePath']}/src/runs/hybrid/configs"
 
 directory = SURROGACY_PATH
 

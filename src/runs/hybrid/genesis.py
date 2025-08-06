@@ -26,7 +26,7 @@ from utils.tui import TUI
 
 
 config: Config = getConfig()
-configPath: str = f"{config['repoAbsolutePath']}/src/runs/surrogacy/configs"
+configPath: str = f"{config['repoAbsolutePath']}/src/runs/hybrid/configs"
 
 topology: Topology = generateFatTreeTopology(4, 5, 1, 5120, 1)
 
@@ -149,7 +149,7 @@ def run(headless: bool, minimal: bool) -> None:
     if minimal:
         trafficDesign: "list[TrafficDesign]" = [
             generateTrafficDesignFromFile(
-                f"{getConfig()['repoAbsolutePath']}/src/runs/surrogacy/data/requests.csv",
+                f"{getConfig()['repoAbsolutePath']}/src/runs/hybrid/data/requests.csv",
                 0.1,
                 1,
                 True,
@@ -159,7 +159,7 @@ def run(headless: bool, minimal: bool) -> None:
     else:
         trafficDesign: "list[TrafficDesign]" = [
             generateTrafficDesignFromFile(
-                f"{getConfig()['repoAbsolutePath']}/src/runs/surrogacy/data/requests.csv",
+                f"{getConfig()['repoAbsolutePath']}/src/runs/hybrid/data/requests.csv",
                 1,
                 4,
             )
