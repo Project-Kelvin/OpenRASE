@@ -4,6 +4,7 @@ This defines the GA that evolves teh weights of the Neural Network.
 
 from copy import deepcopy
 import random
+import timeit
 from typing import Callable, Tuple
 from uuid import uuid4
 from deap import tools
@@ -45,6 +46,7 @@ def decodePop(
         list[DecodedIndividual]: A list consisting of tuples containing the embedding graphs, embedding data, link data, and acceptance ratio.
     """
 
+    startTime: int = timeit.default_timer()
     decodedPop: "list[DecodedIndividual]" = []
 
     for i, individual in enumerate(pop):
@@ -68,6 +70,11 @@ def decodePop(
             linkData = embedLinks.getLinkData()
         ar: float = len(egs) / len(sfcrs)
         decodedPop.append((i, egs, embedData, linkData, ar))
+
+    endTime: int = timeit.default_timer()
+    TUI.appendToSolverLog(
+        f"Decoded {len(decodedPop)} individuals in {endTime - startTime:.2f} seconds."
+    )
 
     return decodedPop
 

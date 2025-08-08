@@ -3,25 +3,22 @@ This defines the Chain Composition Algorithm.
 """
 
 import numpy as np
-import pandas as pd
 from shared.constants.embedding_graph import TERMINAL
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
 from shared.utils.config import getConfig
-import tensorflow as tf
-
 from constants.topology import SERVER
 
 
-def convertSFCRsToDF(sfcrs: "list[SFCRequest]") -> pd.DataFrame:
+def convertSFCRsToNP(sfcrs: "list[SFCRequest]") -> np.ndarray:
     """
-    Converts a list of SFCRequests to a Pandas Dataframe.
+    Converts a list of SFCRequests to a Numpy array.
 
     Parameters:
         sfcrs (list[SFCRequest]): the list of SFCRequests.
 
     Returns:
-        pd.DataFrame: the Pandas Dataframe.
+        np.ndarray: the NumPy array.
     """
 
     data: "list[list[int]]" = []
@@ -40,64 +37,28 @@ def convertSFCRsToDF(sfcrs: "list[SFCRequest]") -> pd.DataFrame:
                 + vnfsHotCode
             )
 
-    columns: "list[str]" = []
+    return np.array(data, dtype=np.float64)
 
-    for i in range(len(sfcrs)):
-        columns.append(f"SFCR{i}")
-    for i in range(len(availableVNFs)):
-        columns.append(f"VNF{i}")
-
-    return pd.DataFrame(data, columns=columns)
-
-def getPriorityValue(data: pd.DataFrame, weights: "list[float]", bias: "list[float]") -> pd.DataFrame:
+def getPriorityValue(data: np.ndarray, weights: "list[float]", bias: int) -> np.array:
     """
     Get the priority value of VNFs using a NN.
 
     Parameters:
-        data (pd.DataFrame): the data.
+        data (np.ndarray): the data.
         weights (list[float]): the weights.
-        bias (list[float]): the bias.
+        bias (int): the bias.
 
     Returns:
-        pd.DataFrame: Data frame containing the priority values of VNFs.
+        np.ndarray: Array containing the priority values of VNFs.
     """
 
-    layers: "list[int]" = [len(data.columns), 1]
     copiedData = data.copy()
+    npWeights = np.array(weights, dtype=np.float64)
+    npWeights = npWeights.reshape(-1, 1)
+    copiedData = np.matmul(copiedData, npWeights)
+    priorityValue = copiedData[:, 0] + bias
 
-    model = tf.keras.Sequential(
-        [
-            tf.keras.Input(shape=(layers[0],)),
-            tf.keras.layers.Dense(layers[1], activation="relu"),
-        ]
-    )
-
-    index: int = 0
-    wStartIndex: int = 0
-    wEndIndex: int = layers[index] * layers[index + 1]
-    bStartIndex: int = 0
-    bEndIndex: int = layers[index + 1]
-    for layer in model.layers:
-        if isinstance(layer, tf.keras.layers.Dense):
-            layer.set_weights(
-                [
-                    np.array(weights[wStartIndex:wEndIndex]).reshape(
-                        layers[index], layers[index + 1]
-                    ),
-                    np.array(bias[bStartIndex:bEndIndex]).reshape(layers[index + 1]),
-                ]
-            )
-            index += 1
-            if index < len(layers) - 1:
-                wStartIndex = wEndIndex
-                wEndIndex = wStartIndex + (layers[index] * layers[index + 1])
-                bStartIndex = bEndIndex
-                bEndIndex = bStartIndex + layers[index + 1]
-
-    priority = model.predict(np.array(copiedData), verbose=0)
-    copiedData = copiedData.assign(PriorityValue=priority)
-
-    return copiedData
+    return priorityValue
 
 def sortVNFs(vnfs: "list[str]", order: "list[str]") -> "list[str]":
     """
@@ -182,14 +143,14 @@ def generateEG(sortedVNFs: "list[str]", sfcrID: str) -> EmbeddingGraph:
 
     return forwardingGraph
 
-def convertDFtoFGs(
-    df: pd.DataFrame, sfcrs: "list[SFCRequest]"
+def convertNPtoFGs(
+    priorityValues: np.ndarray, sfcrs: "list[SFCRequest]"
 ) -> "list[EmbeddingGraph]":
     """
-    Converts a Pandas Dataframe to a list of EmbeddingGraphs.
+    Converts a Numpy array to a list of EmbeddingGraphs.
 
     Parameters:
-        df (pd.DataFrame): the Pandas Dataframe.
+        priorityValues (np.ndarray): the priority values.
         sfcrs (list[SFCRequest]): the list of SFCRequests.
 
     Returns:
@@ -200,16 +161,16 @@ def convertDFtoFGs(
     startIndex: int = 0
     for sfcr in sfcrs:
         endIndex: int = startIndex + len(sfcr["vnfs"])
-        vnfPriority: "list[float]" = df[startIndex:endIndex]["PriorityValue"].to_list()
-        priorityDF: pd.DataFrame = pd.DataFrame(
-            {
-                "vnf": sfcr["vnfs"],
-                "priority": vnfPriority,
-            }
+        vnfPriority: np.ndarray = priorityValues[startIndex:endIndex]
+        priorityNP: np.ndarray = np.concatenate(
+            (
+                np.array(sfcr["vnfs"]).reshape(-1, 1),
+                np.array(vnfPriority, dtype=np.float64).reshape(-1, 1)
+            ),
+            axis=1
         )
-        priorityDF = priorityDF.sort_values(by="priority", ascending=False)
-        sortedVNFs: "list[str]" = priorityDF["vnf"].to_list()
-
+        priorityNP = priorityNP[priorityNP[:, 1].argsort()[::-1]]
+        sortedVNFs: "list[str]" = priorityNP[:, 0].tolist()
         if "strictOrder" in sfcr and len(sfcr["strictOrder"]) > 0:
             sortedVNFs = sortVNFs(sortedVNFs, sfcr["strictOrder"])
 
@@ -218,7 +179,7 @@ def convertDFtoFGs(
 
     return forwardingGraphs
 
-def generateFGs(sfcrs: "list[SFCRequest]", weights: "list[float]", bias: "list[float]") -> pd.DataFrame:
+def generateFGs(sfcrs: "list[SFCRequest]", weights: "list[float]", bias: "list[float]") -> list[EmbeddingGraph]:
     """
     Generates the EmbeddingGraphs for the given SFCRequests.
 
@@ -228,16 +189,16 @@ def generateFGs(sfcrs: "list[SFCRequest]", weights: "list[float]", bias: "list[f
         bias (list[float]): the bias.
 
     Returns:
-        pd.DataFrame: the Pandas Dataframe.
+        list[EmbeddingGraph]: the list of EmbeddingGraphs.
     """
 
-    # Convert the SFCRequests to a Pandas Dataframe
-    data: pd.DataFrame = convertSFCRsToDF(sfcrs)
+    # Convert the SFCRequests to a Numpy array
+    data: np.ndarray = convertSFCRsToNP(sfcrs)
 
     # Get the priority value
     data = getPriorityValue(data, weights, bias)
 
-    # Convert the Pandas Dataframe to a list of EmbeddingGraphs
-    forwardingGraphs: "list[EmbeddingGraph]" = convertDFtoFGs(data, sfcrs)
+    # Convert the Numpy array to a list of EmbeddingGraphs
+    forwardingGraphs: "list[EmbeddingGraph]" = convertNPtoFGs(data, sfcrs)
 
     return forwardingGraphs

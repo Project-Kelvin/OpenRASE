@@ -2,7 +2,6 @@
 This defines the functions used for VNF link embedding.
 """
 
-from timeit import default_timer
 from typing import Tuple
 import networkx as nx
 import heapq
@@ -10,10 +9,8 @@ from algorithms.hybrid.constants.surrogate import BRANCH
 from constants.topology import SERVER, SFCC
 from shared.models.topology import Link, Topology
 from shared.models.embedding_graph import EmbeddingGraph
-import tensorflow as tf
 import numpy as np
 from utils.tui import TUI
-import pandas as pd
 
 
 class HotCode:
@@ -179,7 +176,7 @@ class EmbedLinks:
         self._hotCode: HotCode = HotCode()
         self._convertToHotCodes()
         self._hCost: "dict[str, dict[str, dict[str, float]]]" = {}
-        self._data: pd.DataFrame = self._predictCost()
+        self._data: tuple[np.ndarray, np.ndarray] = self._predictCost()
         self._linkData: "dict[str, dict[str, float]]" = {}
 
     def _isHost(self, node: str) -> bool:
@@ -199,9 +196,12 @@ class EmbedLinks:
             or node == SERVER
         )
 
-    def _constructDF(self) -> pd.DataFrame:
+    def _constructNP(self) -> tuple[np.ndarray, np.ndarray]:
         """
-        Constructs the DataFrame.
+        Constructs the NumPy array.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: the NumPy array and the indices.
         """
 
         links: "list[list[int]]" = []
@@ -239,26 +239,7 @@ class EmbedLinks:
                 rows.append(row)
                 indices.append(f"{eg['sfcID']}_{linkIndex}")
 
-        columns: "list[str]" = []
-        columns.extend([f"SFC{i}" for i in range(len(self._egs))])
-        columns.extend(
-            [
-                f"Source{i}"
-                for i in range(
-                    len(self._topology["hosts"]) + len(self._topology["switches"]) + 2
-                )
-            ]
-        )
-        columns.extend(
-            [
-                f"Destination{i}"
-                for i in range(
-                    len(self._topology["hosts"]) + len(self._topology["switches"]) + 2
-                )
-            ]
-        )
-
-        return pd.DataFrame(rows, columns=columns, index=indices)
+        return np.array(rows, dtype=np.float64), indices
 
     def _constructGraph(self) -> nx.Graph:
         """
@@ -304,51 +285,23 @@ class EmbedLinks:
         for eg in self._egs:
             self._hotCode.addSFC(eg["sfcID"], sfcLength)
 
-    def _predictCost(self) -> pd.DataFrame:
+    def _predictCost(self) -> tuple[np.ndarray, np.ndarray]:
         """
         Builds the model.
 
         Returns:
-            The dataframe: pd.DataFrame.
+            tuple[np.ndarray, np.ndarray]: the heuristic costs and the indices.
         """
 
-        data: pd.DataFrame = self._constructDF()
-        layers: "list[int]" = [len(data.columns), 1]
+        data, indices = self._constructNP()
+        print(data)
+        print(indices)
+        npWeights = np.array(self._weights, dtype=np.float64).reshape(-1, 1)
+        heuristicCosts: np.ndarray = np.matmul(data, npWeights)
+        heuristicCosts = heuristicCosts[:, 0] + self._bias
 
-        model = tf.keras.Sequential(
-            [
-                tf.keras.Input(shape=(layers[0],)),
-                tf.keras.layers.Dense(layers[1], activation="relu"),
-            ]
-        )
+        return heuristicCosts, indices
 
-        index: int = 0
-        wStartIndex: int = 0
-        wEndIndex: int = layers[index] * layers[index + 1]
-        bStartIndex: int = 0
-        bEndIndex: int = layers[index + 1]
-        for layer in model.layers:
-            if isinstance(layer, tf.keras.layers.Dense):
-                layer.set_weights(
-                    [
-                        np.array(self._weights[wStartIndex:wEndIndex]).reshape(
-                            layers[index], layers[index + 1]
-                        ),
-                        np.array(self._bias[bStartIndex:bEndIndex]).reshape(
-                            layers[index + 1]
-                        ),
-                    ]
-                )
-                index += 1
-                if index < len(layers) - 1:
-                    wStartIndex = wEndIndex
-                    wEndIndex = wStartIndex + (layers[index] * layers[index + 1])
-                    bStartIndex = bEndIndex
-                    bEndIndex = bStartIndex + layers[index + 1]
-
-        prediction = model.predict(np.array(data), verbose=0)
-
-        return data.assign(Cost=prediction)
 
     def _getHeuristicCost(self, sfc: str, src: str, dst: str) -> float:
         """
@@ -363,13 +316,14 @@ class EmbedLinks:
             float: the heuristic cost.
         """
 
-        row: "list[int]" = []
-        try:
-            row = self._data.loc[f"{sfc}_{src}_{dst}"]
-        except KeyError:
-            row = self._data.loc[f"{sfc}_{dst}_{src}"]
+        data, indices = self._data
 
-        return row["Cost"]
+        if f"{sfc}_{src}_{dst}" in indices:
+            index = indices.index(f"{sfc}_{src}_{dst}")
+        else:
+            index = indices.index(f"{sfc}_{dst}_{src}")
+
+        return data[index]
 
     def _findPath(self, sfcID: str, source: str, destination: str) -> "list[str]":
         """

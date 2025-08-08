@@ -4,7 +4,6 @@ This defines the Neural Network used for genetic encoding.
 
 import copy
 from typing import Tuple
-import pandas as pd
 from algorithms.hybrid.constants.surrogate import BRANCH
 from constants.topology import SERVER, SFCC
 from shared.models.embedding_graph import VNF, EmbeddingGraph
@@ -12,19 +11,18 @@ from shared.models.topology import Topology
 from shared.utils.config import getConfig
 
 from utils.embedding_graph import traverseVNF
-import tensorflow as tf
 import numpy as np
 
-def convertFGsToDF(fgs: "list[EmbeddingGraph]", topology: Topology) -> pd.DataFrame:
+def convertFGsToNP(fgs: "list[EmbeddingGraph]", topology: Topology) -> np.ndarray:
     """
-    Converts a list of EmbeddingGraphs to a Pandas Dataframe.
+    Converts a list of EmbeddingGraphs to a NumPy array.
 
     Parameters:
         fgs (list[EmbeddingGraph]): the list of EmbeddingGraphs.
         topology (Topology): the topology.
 
     Returns:
-        pd.DataFrame: the Pandas Dataframe.
+        np.ndarray: the NumPy array.
     """
 
     vnfs: "list[str]" = getConfig()["vnfs"]["names"]
@@ -63,25 +61,14 @@ def convertFGsToDF(fgs: "list[EmbeddingGraph]", topology: Topology) -> pd.DataFr
 
         traverseVNF(fg["vnfs"], parseVNF, instances, shouldParseTerminal=False)
 
-        columns: "list[str]" = []
+    return np.array(data, dtype=np.float64)
 
-        for i in range(len(fgs)):
-            columns.append(f"SFC{i}")
-        for i in range(len(vnfs)):
-            columns.append(f"VNF{i}")
-        for i in range(len(topology["hosts"])):
-            columns.append(f"Host{i}")
-        columns.append("Position")
-
-    return pd.DataFrame(data, columns=columns)
-
-
-def convertDFtoEGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: Topology) -> "Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]":
+def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topology) -> "Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]":
     """
     Generates the Embedding Graphs.
 
     Parameters:
-        data (pd.DataFrame): the data.
+        data (np.ndarray): the data.
         fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
         topology (Topology): the topology.
 
@@ -131,9 +118,7 @@ def convertDFtoEGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
 
                 return
 
-            cls: "list[float]" = data[startIndex[0] : endIndex[0]][
-                "ConfidenceLevel"
-            ].tolist()
+            cls: "list[float]" = data[startIndex[0] : endIndex[0]].tolist()
             startIndex[0] = startIndex[0] + noHosts
             endIndex[0] = endIndex[0] + noHosts
 
@@ -178,49 +163,25 @@ def convertDFtoEGs(data: pd.DataFrame, fgs: "list[EmbeddingGraph]", topology: To
     return (egs, nodes, embeddingData)
 
 
-def getConfidenceValues(data: pd.DataFrame, weights: "list[float]", bias: "list[float]") -> pd.DataFrame:
+def getConfidenceValues(data: np.ndarray, weights: "list[float]", bias: "list[float]") -> np.ndarray:
     """
     Gets the confidence values.
 
     Parameters:
-        data (pd.DataFrame): the data.
+        data (np.ndarray): the data.
         weights (list[list[float]]): the weights.
         bias (list[float]): the bias.
 
     Returns:
-        pd.DataFrame: the confidence values.
+        np.ndarray: the confidence values.
     """
 
-    layers: "list[int]" = [len(data.columns), 1]
     copiedData = data.copy()
+    npWeights = np.array(weights, dtype=np.float64).reshape(-1, 1)
+    confidenceValues: np.ndarray = np.matmul(copiedData, npWeights)
+    confidenceValues = confidenceValues[:, 0] + bias
 
-    model = tf.keras.Sequential([
-        tf.keras.Input(shape=(layers[0], )),
-        tf.keras.layers.Dense(layers[1], activation='sigmoid'),
-    ])
-
-    index: int = 0
-    wStartIndex: int = 0
-    wEndIndex: int = layers[index] * layers[index + 1]
-    bStartIndex: int = 0
-    bEndIndex: int = layers[index + 1]
-    for layer in model.layers:
-        if isinstance(layer, tf.keras.layers.Dense):
-            layer.set_weights([
-                np.array(weights[wStartIndex:wEndIndex]).reshape(layers[index], layers[index + 1]),
-                np.array(bias[bStartIndex:bEndIndex]).reshape(layers[index + 1])
-            ])
-            index += 1
-            if index < len(layers) - 1:
-                wStartIndex = wEndIndex
-                wEndIndex = wStartIndex + (layers[index] * layers[index + 1])
-                bStartIndex = bEndIndex
-                bEndIndex = bStartIndex + layers[index + 1]
-
-    prediction = model.predict(np.array(copiedData), verbose=0)
-    copiedData = copiedData.assign(ConfidenceLevel=prediction)
-
-    return copiedData
+    return confidenceValues
 
 def generateEGs(
     fgs: "list[EmbeddingGraph]", topology: Topology, weights: "list[float]", bias: "list[float]"
@@ -238,8 +199,8 @@ def generateEGs(
         Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
     """
 
-    data: pd.DataFrame = convertFGsToDF(fgs, topology)
+    data: np.ndarray = convertFGsToNP(fgs, topology)
     data = getConfidenceValues(data, weights, bias)
-    egs, nodes, embeddingData = convertDFtoEGs(data, fgs, topology)
+    egs, nodes, embeddingData = convertNPtoEGs(data, fgs, topology)
 
     return egs, nodes, embeddingData
