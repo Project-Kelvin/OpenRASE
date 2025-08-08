@@ -5,6 +5,8 @@ This defines the functions used for VNF link embedding.
 from typing import Tuple
 import networkx as nx
 import heapq
+
+from shared.models.sfc_request import SFCRequest
 from algorithms.hybrid.constants.surrogate import BRANCH
 from constants.topology import SERVER, SFCC
 from shared.models.topology import Link, Topology
@@ -24,7 +26,7 @@ class HotCode:
         """
 
         self.nodes: "dict[str, list[int]]" = {}
-        self.egs: "dict[str, list[int]]" = {}
+        self.sfcrs: "dict[str, list[int]]" = {}
 
     def addNode(self, name: str, length: int) -> None:
         """
@@ -47,8 +49,8 @@ class HotCode:
             length (int): the length.
         """
 
-        self.egs[name] = [0] * length
-        self.egs[name][len(self.egs) - 1] = 1
+        self.sfcrs[name] = [0] * length
+        self.sfcrs[name][len(self.sfcrs) - 1] = 1
 
     def getNodeCode(self, name: str) -> "list[int]":
         """
@@ -74,7 +76,7 @@ class HotCode:
             list[int]: the code.
         """
 
-        return self.egs[name]
+        return self.sfcrs[name]
 
 
 class Node:
@@ -151,6 +153,7 @@ class EmbedLinks:
     def __init__(
         self,
         topology: Topology,
+        sfcrs: "list[SFCRequest]",
         egs: "list[EmbeddingGraph]",
         weights: "list[float]",
         bias: "list[float]",
@@ -160,6 +163,7 @@ class EmbedLinks:
 
         Parameters:
             topology (Topology): the topology.
+            sfcrs (list[SFCRequest]): the SFC requests.
             egs (list[EmbeddingGraph]): the EGs.
             weights (list[float]): the weights.
             bias (list[float]): the bias.
@@ -168,6 +172,7 @@ class EmbedLinks:
             None
         """
 
+        self._sfcrs: "list[SFCRequest]" = sfcrs
         self._egs: "list[EmbeddingGraph]" = egs
         self._topology: Topology = topology
         self._graph: nx.Graph = self._constructGraph()
@@ -210,8 +215,8 @@ class EmbedLinks:
             row: "list[int]" = []
             row.extend(self._hotCode.getNodeCode(link["source"]))
             row.extend(self._hotCode.getNodeCode(link["destination"]))
-            linkIndices.append(f"{link['source']}_{link['destination']}")
 
+            linkIndices.append(f"{link['source']}_{link['destination']}")
             links.append(row)
 
         hosts: "list[str]" = [host["id"] for host in self._topology["hosts"]]
@@ -231,13 +236,13 @@ class EmbedLinks:
 
         rows: "list[list[int]]" = []
         indices: "list[str]" = []
-        for eg in self._egs:
+        for sfcr in self._sfcrs:
             for link, linkIndex in zip(links, linkIndices):
                 row: "list[int]" = []
-                row.extend(self._hotCode.getSFCCode(eg["sfcID"]))
+                row.extend(self._hotCode.getSFCCode(sfcr["sfcrID"]))
                 row.extend(link)
                 rows.append(row)
-                indices.append(f"{eg['sfcID']}_{linkIndex}")
+                indices.append(f"{sfcr['sfcrID']}_{linkIndex}")
 
         return np.array(rows, dtype=np.float64), indices
 
@@ -271,7 +276,7 @@ class EmbedLinks:
         nodeLength: int = (
             len(self._topology["hosts"]) + len(self._topology["switches"]) + 2
         )
-        sfcLength: int = len(self._egs)
+        sfcLength: int = len(self._sfcrs)
 
         self._hotCode.addNode(SFCC, nodeLength)
         self._hotCode.addNode(SERVER, nodeLength)
@@ -282,8 +287,8 @@ class EmbedLinks:
         for switch in self._topology["switches"]:
             self._hotCode.addNode(switch["id"], nodeLength)
 
-        for eg in self._egs:
-            self._hotCode.addSFC(eg["sfcID"], sfcLength)
+        for sfcr in self._sfcrs:
+            self._hotCode.addSFC(sfcr["sfcrID"], sfcLength)
 
     def _predictCost(self) -> tuple[np.ndarray, np.ndarray]:
         """
@@ -294,11 +299,10 @@ class EmbedLinks:
         """
 
         data, indices = self._constructNP()
-        print(data)
-        print(indices)
         npWeights = np.array(self._weights, dtype=np.float64).reshape(-1, 1)
         heuristicCosts: np.ndarray = np.matmul(data, npWeights)
         heuristicCosts = heuristicCosts[:, 0] + self._bias
+        heuristicCosts = heuristicCosts[:] * (heuristicCosts[:] > 0)
 
         return heuristicCosts, indices
 

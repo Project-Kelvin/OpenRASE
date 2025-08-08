@@ -65,7 +65,7 @@ def decodePop(
         embedLinks: EmbedLinks = None
         linkData: LinkData = None
         if len(egs) > 0:
-            embedLinks = EmbedLinks(topology, egs, linkWeights, linkBias)
+            embedLinks = EmbedLinks(topology, sfcrs, egs, linkWeights, linkBias)
             egs = embedLinks.embedLinks(nodes)
             linkData = embedLinks.getLinkData()
         ar: float = len(egs) / len(sfcrs)
