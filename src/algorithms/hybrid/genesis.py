@@ -2,6 +2,7 @@
 This defines the GA that evolves teh weights of the Neural Network.
 """
 
+from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
 import random
 import timeit
@@ -31,6 +32,44 @@ tf.get_logger().setLevel("ERROR")
 tf.keras.utils.disable_interactive_logging()
 
 
+def decodeIndividual(
+    individual: "list[float]", index: int, topology: Topology, sfcrs: "list[SFCRequest]"
+) -> DecodedIndividual:
+    """
+    Decodes an individual to an Embedding Graph.
+
+    Parameters:
+        individual (list[float]): the individual.
+        index (int): the index of the individual.
+        topology (Topology): the topology.
+        sfcrs (list[SFCRequest]): the list of SFCRequests.
+
+    Returns:
+        DecodedIndividual: A tuple containing the embedding graphs, embedding data, link data, and acceptance ratio.
+    """
+
+    weights: "Tuple[list[float], list[float], list[float], list[float]]" = (
+        getWeights(individual, sfcrs, topology)
+    )
+    ccWeights: "list[float]" = weights[0]
+    ccBias: "list[float]" = weights[1]
+    vnfWeights: "list[float]" = weights[2]
+    vnfBias: "list[float]" = weights[3]
+    linkWeights: "list[float]" = weights[4]
+    linkBias: "list[float]" = weights[5]
+    fgs: dict[str, list[str]] = generateFGs(sfcrs, ccWeights, ccBias)
+    egs, nodes, embedData = generateEGs(fgs, topology, vnfWeights, vnfBias)
+    embedLinks: EmbedLinks = None
+    linkData: LinkData = None
+    if len(egs) > 0:
+        embedLinks = EmbedLinks(topology, sfcrs, egs, linkWeights, linkBias)
+        egs = embedLinks.embedLinks(nodes)
+        linkData = embedLinks.getLinkData()
+    ar: float = len(egs) / len(sfcrs)
+
+    return (index, egs, embedData, linkData, ar)
+
+
 def decodePop(
     pop: "list[list[float]]", topology: Topology, sfcrs: "list[SFCRequest]"
 ) -> list[DecodedIndividual]:
@@ -49,27 +88,14 @@ def decodePop(
     startTime: int = timeit.default_timer()
     decodedPop: "list[DecodedIndividual]" = []
 
-    for i, individual in enumerate(pop):
-        weights: "Tuple[list[float], list[float], list[float], list[float]]" = (
-            getWeights(individual, sfcrs, topology)
-        )
-        ccWeights: "list[float]" = weights[0]
-        ccBias: "list[float]" = weights[1]
-        vnfWeights: "list[float]" = weights[2]
-        vnfBias: "list[float]" = weights[3]
-        linkWeights: "list[float]" = weights[4]
-        linkBias: "list[float]" = weights[5]
-        fgs: "list[EmbeddingGraph]" = generateFGs(sfcrs, ccWeights, ccBias)
-        copiedFGs: "list[EmbeddingGraph]" = [deepcopy(fg) for fg in fgs]
-        egs, nodes, embedData = generateEGs(copiedFGs, topology, vnfWeights, vnfBias)
-        embedLinks: EmbedLinks = None
-        linkData: LinkData = None
-        if len(egs) > 0:
-            embedLinks = EmbedLinks(topology, sfcrs, egs, linkWeights, linkBias)
-            egs = embedLinks.embedLinks(nodes)
-            linkData = embedLinks.getLinkData()
-        ar: float = len(egs) / len(sfcrs)
-        decodedPop.append((i, egs, embedData, linkData, ar))
+    with ProcessPoolExecutor() as executor:
+        futures = [
+            executor.submit(decodeIndividual, individual, index, topology, sfcrs)
+            for index, individual in enumerate(pop)
+        ]
+
+        for future in futures:
+            decodedPop.append(future.result())
 
     endTime: int = timeit.default_timer()
     TUI.appendToSolverLog(

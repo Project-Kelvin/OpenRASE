@@ -4,6 +4,8 @@ This defines the Neural Network used for genetic encoding.
 
 import copy
 from typing import Tuple
+
+from shared.constants.embedding_graph import TERMINAL
 from algorithms.hybrid.constants.surrogate import BRANCH
 from constants.topology import SERVER, SFCC
 from shared.models.embedding_graph import VNF, EmbeddingGraph
@@ -13,12 +15,12 @@ from shared.utils.config import getConfig
 from utils.embedding_graph import traverseVNF
 import numpy as np
 
-def convertFGsToNP(fgs: "list[EmbeddingGraph]", topology: Topology) -> np.ndarray:
+def convertFGsToNP(fgs: dict[str, list[str]], topology: Topology) -> np.ndarray:
     """
     Converts a list of EmbeddingGraphs to a NumPy array.
 
     Parameters:
-        fgs (list[EmbeddingGraph]): the list of EmbeddingGraphs.
+        fgs (dict[str, list[str]]): the dictionary of EmbeddingGraphs.
         topology (Topology): the topology.
 
     Returns:
@@ -28,38 +30,27 @@ def convertFGsToNP(fgs: "list[EmbeddingGraph]", topology: Topology) -> np.ndarra
     vnfs: "list[str]" = getConfig()["vnfs"]["names"]
     data: "list[list[int]]" = []
     instances: "dict[str, int]" = {}
-    for index, fg in enumerate(fgs):
+    for index, fg in enumerate(fgs.values()):
         fgID: int = index
         fgHotCode: "list[int]" = [0] * len(fgs)
         fgHotCode[fgID] = 1
 
-        def parseVNF(vnf: VNF, _pos: int, instances: "dict[str, int]") -> None:
-            """
-            Parses a VNF.
-
-            Parameters:
-                vnf (VNF): the VNF.
-                _pos (int): the position.
-                instances (dict[str, int]): the instances.
-            """
-
-            vnfID: int = vnfs.index(vnf["vnf"]["id"])
+        for vnf in fg:
+            vnfID: int = vnfs.index(vnf)
             vnfsHotCode: "list[int]" = [0] * len(vnfs)
             vnfsHotCode[vnfID] = 1
 
-            if vnf["vnf"]["id"] not in instances:
-                instances[vnf["vnf"]["id"]] = 1
+            if vnf not in instances:
+                instances[vnf] = 1
             else:
-                instances[vnf["vnf"]["id"]] += 1
+                instances[vnf] += 1
 
             for hIndex, _host in enumerate(topology["hosts"]):
                 # pylint: disable=cell-var-from-loop
                 hostHotCode: "list[int]" = [0] * len(topology["hosts"])
                 hostHotCode[hIndex] = 1
-                row: "list[int]" = fgHotCode + vnfsHotCode + hostHotCode + [instances[vnf["vnf"]["id"]]]
+                row: "list[int]" = fgHotCode + vnfsHotCode + hostHotCode + [instances[vnf]]
                 data.append(row)
-
-        traverseVNF(fg["vnfs"], parseVNF, instances, shouldParseTerminal=False)
 
     return np.array(data, dtype=np.float64)
 
@@ -77,88 +68,105 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
     """
 
     noHosts: int = len(topology["hosts"])
-    startIndex: "list[int]" = [0]
-    endIndex: "list[int]" = [noHosts]
-
     egs: "list[EmbeddingGraph]" = []
     nodes: "dict[str, list[str]]" = {}
     embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" = {}
+    splitters: "list[str]" = getConfig()["vnfs"]["splitters"]
 
-    for index, fg in enumerate(fgs):
-        nodes[fg["sfcID"]] = [SFCC]
-        embeddingNotFound: "list[bool]" = [False]
+    for sfcrID, sortedVNFs in fgs.items():
+        startIndex: int = 0
+        endIndex: int = noHosts
+        forwardingGraph: EmbeddingGraph = {"sfcID": sfcrID, "vnfs": {}}
+        nodes[sfcrID] = [SFCC]
+        embeddingNotFound: bool = False
         oldDepth: int = 1
+        depth: int = 1
+        vnfDict: VNF = forwardingGraph["vnfs"]
 
-        def parseVNF(
-            vnf: VNF, depth: int, embeddingNotFound, startIndex, endIndex) -> None:
+        def addVNF(vnfs: "list[str]", vnfDict: VNF, depth: int) -> None:
             """
-            Parses a VNF.
+            Adds VNF to the EmbeddingGraph.
 
             Parameters:
-                vnf (VNF): the VNF.
-                depth (int): the depth.
-                startIndex (list[int]): the start index.
-                endIndex (list[int]): the end index.
+                vnfs (list[str]): the VNFs.
+                vnfDict (VNF): the VNF dictionary.
+                depth (int): the depth of the VNF.
+                splitters (list[str]): the list of splitters.
+
+            Returns:
+                None
             """
 
-            nonlocal oldDepth
+            nonlocal oldDepth, startIndex, endIndex, nodes, embeddingData, embeddingNotFound, splitters
 
             if depth != oldDepth:
                 oldDepth = depth
-                if nodes[fg["sfcID"]][-1] != SERVER:
+                if nodes[sfcrID][-1] != SERVER:
                     # pylint: disable=cell-var-from-loop
-                    nodes[fg["sfcID"]].append(BRANCH)
+                    nodes[sfcrID].append(BRANCH)
 
-            if embeddingNotFound[0]:
+            if embeddingNotFound:
                 return
 
-            if "host" in vnf and vnf["host"]["id"] == SERVER:
-                # pylint: disable=cell-var-from-loop
-                nodes[fg["sfcID"]].append(SERVER)
+            if len(vnfs) == 0:
+                vnfDict["host"] = {"id": SERVER}
+                vnfDict["next"] = TERMINAL
+                nodes[sfcrID].append(SERVER)
 
                 return
 
-            cls: "list[float]" = data[startIndex[0] : endIndex[0]].tolist()
-            startIndex[0] = startIndex[0] + noHosts
-            endIndex[0] = endIndex[0] + noHosts
+            vnf: str = vnfs.pop(0)
+            splitter: bool = vnf in splitters
+            vnfDict["next"] = [{}, {}] if splitter else {}
+            cls: "list[float]" = data[startIndex : endIndex].tolist()
+            startIndex = startIndex + noHosts
+            endIndex = endIndex + noHosts
 
             maxCL: float = max(cls)
 
-            if maxCL < 0.1:
-                embeddingNotFound[0] = True
+            if maxCL < 0.5:
+                embeddingNotFound = True
 
                 return
             else:
-                vnf["host"] = {"id": topology["hosts"][cls.index(maxCL)]["id"]}
+                vnfDict["vnf"] = {"id": vnf}
+                vnfDict["host"] = {"id": topology["hosts"][cls.index(maxCL)]["id"]}
 
                 # pylint: disable=cell-var-from-loop
-                if nodes[fg["sfcID"]][-1] != vnf["host"]["id"]:
+                if nodes[sfcrID][-1] != vnfDict["host"]["id"]:
                     # pylint: disable=cell-var-from-loop
-                    nodes[fg["sfcID"]].append(vnf["host"]["id"])
+                    nodes[sfcrID].append(vnfDict["host"]["id"])
 
-                if vnf["host"]["id"] in embeddingData:
-                    if fg["sfcID"] in embeddingData[vnf["host"]["id"]]:
-                        embeddingData[vnf["host"]["id"]][fg["sfcID"]].append([vnf["vnf"]["id"], depth])
+                if vnfDict["host"]["id"] in embeddingData:
+                    if sfcrID in embeddingData[vnfDict["host"]["id"]]:
+                        embeddingData[vnfDict["host"]["id"]][sfcrID].append(
+                            [vnfDict["vnf"]["id"], depth]
+                        )
                     else:
-                        embeddingData[vnf["host"]["id"]][fg["sfcID"]] = [[vnf["vnf"]["id"], depth]]
+                        embeddingData[vnfDict["host"]["id"]][sfcrID] = [
+                            [vnfDict["vnf"]["id"], depth]
+                        ]
                 else:
-                    embeddingData[vnf["host"]["id"]] = {
-                        fg["sfcID"]: [[vnf["vnf"]["id"], depth]]
+                    embeddingData[vnfDict["host"]["id"]] = {
+                        sfcrID: [[vnfDict["vnf"]["id"], depth]]
                     }
 
-        traverseVNF(fg["vnfs"], parseVNF, embeddingNotFound, startIndex, endIndex)
+            if splitter:
+                depth += 1
+                for i in range(2):
+                    addVNF(vnfs.copy(), vnfDict["next"][i], depth)
+            else:
+                addVNF(vnfs, vnfDict["next"], depth)
 
-        if not embeddingNotFound[0]:
-            if "sfcrID" in fg:
-                del fg["sfcrID"]
+        addVNF(sortedVNFs, vnfDict, depth)
 
-            eg: EmbeddingGraph = copy.deepcopy(fg)
-
+        if not embeddingNotFound:
+            eg: EmbeddingGraph = copy.deepcopy(forwardingGraph)
             egs.append(eg)
         else:
             for hosts in embeddingData.values():
-                if fg["sfcID"] in hosts:
-                    del hosts[fg["sfcID"]]
+                if forwardingGraph["sfcID"] in hosts:
+                    del hosts[forwardingGraph["sfcID"]]
 
     return (egs, nodes, embeddingData)
 
@@ -180,6 +188,7 @@ def getConfidenceValues(data: np.ndarray, weights: "list[float]", bias: "list[fl
     npWeights = np.array(weights, dtype=np.float64).reshape(-1, 1)
     confidenceValues: np.ndarray = np.matmul(copiedData, npWeights)
     confidenceValues = confidenceValues[:, 0] + bias
+    confidenceValues = 1/(1 + np.exp(-confidenceValues[:]))  # Sigmoid activation function
 
     return confidenceValues
 

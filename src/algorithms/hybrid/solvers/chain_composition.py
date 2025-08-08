@@ -84,68 +84,9 @@ def sortVNFs(vnfs: "list[str]", order: "list[str]") -> "list[str]":
 
     return vnfs
 
-def generateEG(sortedVNFs: "list[str]", sfcrID: str) -> EmbeddingGraph:
-    """
-    Generates the EmbeddingGraph for the given SFCRequest.
-
-    Parameters:
-        sortedVNFs (list[str]): the sorted VNFs.
-        sfcrID (str): the SFCRequest ID.
-
-    Returns:
-        None
-    """
-
-    forwardingGraph: EmbeddingGraph = {
-            "sfcID": sfcrID,
-            "vnfs": {}
-        }
-
-    vnfDict: VNF = forwardingGraph["vnfs"]
-    splitters: "list[str]" = getConfig()["vnfs"]["splitters"]
-
-    def addVNF(vnfs: "list[str]", vnfDict: VNF, splitters: "list[str]") -> None:
-        """
-        Adds VNF to the EmbeddingGraph.
-
-        Parameters:
-            vnfs (list[str]): the VNFs.
-            vnfDict (VNF): the VNF dictionary.
-            splitters (list[str]): the list of splitters.
-
-        Returns:
-            None
-        """
-
-        if len(vnfs) == 0:
-            vnfDict["host"] = {
-                "id": SERVER
-            }
-            vnfDict["next"] = TERMINAL
-
-            return
-
-        vnf: str = vnfs.pop(0)
-        splitter: bool = vnf in splitters
-        vnfDict["vnf"] = {
-            "id": vnf
-        }
-        vnfDict["next"] = [{}, {}] if splitter else {}
-
-        if splitter:
-            for i in range(2):
-
-                addVNF(vnfs.copy(), vnfDict["next"][i], splitters)
-        else:
-            addVNF(vnfs, vnfDict["next"], splitters)
-
-    addVNF(sortedVNFs, vnfDict, splitters)
-
-    return forwardingGraph
-
 def convertNPtoFGs(
     priorityValues: np.ndarray, sfcrs: "list[SFCRequest]"
-) -> "list[EmbeddingGraph]":
+) -> "dict[str, list[str]]":
     """
     Converts a Numpy array to a list of EmbeddingGraphs.
 
@@ -154,11 +95,11 @@ def convertNPtoFGs(
         sfcrs (list[SFCRequest]): the list of SFCRequests.
 
     Returns:
-        list[EmbeddingGraph]: the list of EmbeddingGraphs.
+        dict[str, list[str]]: the dictionary of ordered VNFs in every SFCR.
     """
 
-    forwardingGraphs: "list[EmbeddingGraph]" = []
     startIndex: int = 0
+    fgs: dict[str, list[str]] = {}
     for sfcr in sfcrs:
         endIndex: int = startIndex + len(sfcr["vnfs"])
         vnfPriority: np.ndarray = priorityValues[startIndex:endIndex]
@@ -174,12 +115,13 @@ def convertNPtoFGs(
         if "strictOrder" in sfcr and len(sfcr["strictOrder"]) > 0:
             sortedVNFs = sortVNFs(sortedVNFs, sfcr["strictOrder"])
 
-        forwardingGraphs.append(generateEG(sortedVNFs, sfcr["sfcrID"]))
+        fgs[sfcr["sfcrID"]] = sortedVNFs
+
         startIndex = endIndex
 
-    return forwardingGraphs
+    return fgs
 
-def generateFGs(sfcrs: "list[SFCRequest]", weights: "list[float]", bias: "list[float]") -> list[EmbeddingGraph]:
+def generateFGs(sfcrs: "list[SFCRequest]", weights: "list[float]", bias: "list[float]") -> dict[str, list[str]]:
     """
     Generates the EmbeddingGraphs for the given SFCRequests.
 
@@ -189,7 +131,7 @@ def generateFGs(sfcrs: "list[SFCRequest]", weights: "list[float]", bias: "list[f
         bias (list[float]): the bias.
 
     Returns:
-        list[EmbeddingGraph]: the list of EmbeddingGraphs.
+        dict[str, list[str]]: the dictionary of ordered VNFs in every SFCR.
     """
 
     # Convert the SFCRequests to a Numpy array
@@ -199,6 +141,6 @@ def generateFGs(sfcrs: "list[SFCRequest]", weights: "list[float]", bias: "list[f
     data = getPriorityValue(data, weights, bias)
 
     # Convert the Numpy array to a list of EmbeddingGraphs
-    forwardingGraphs: "list[EmbeddingGraph]" = convertNPtoFGs(data, sfcrs)
+    forwardingGraphs: dict[str, list[str]] = convertNPtoFGs(data, sfcrs)
 
     return forwardingGraphs
