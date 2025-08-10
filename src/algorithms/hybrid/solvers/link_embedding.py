@@ -155,8 +155,9 @@ class EmbedLinks:
         topology: Topology,
         sfcrs: "list[SFCRequest]",
         egs: "list[EmbeddingGraph]",
+        predefinedWeights: "list[float]",
         weights: "list[float]",
-        bias: "list[float]",
+        noOfNeurons: int
     ) -> None:
         """
         Initializes the link embedding.
@@ -165,19 +166,21 @@ class EmbedLinks:
             topology (Topology): the topology.
             sfcrs (list[SFCRequest]): the SFC requests.
             egs (list[EmbeddingGraph]): the EGs.
+            predefinedWeights (list[float]): the predefined weights.
             weights (list[float]): the weights.
-            bias (list[float]): the bias.
+            noOfNeurons (int): the number of neurons in the hidden layer.
 
         Returns:
             None
         """
 
+        self._noOfNeurons: int = noOfNeurons
         self._sfcrs: "list[SFCRequest]" = sfcrs
         self._egs: "list[EmbeddingGraph]" = egs
         self._topology: Topology = topology
         self._graph: nx.Graph = self._constructGraph()
+        self._pdWeights: "list[float]" = predefinedWeights
         self._weights: "list[float]" = weights
-        self._bias: "list[float]" = bias
         self._hotCode: HotCode = HotCode()
         self._convertToHotCodes()
         self._hCost: "dict[str, dict[str, dict[str, float]]]" = {}
@@ -299,13 +302,14 @@ class EmbedLinks:
         """
 
         data, indices = self._constructNP()
-        npWeights = np.array(self._weights, dtype=np.float64).reshape(-1, 1)
+        npWeights = np.array(self._pdWeights, dtype=np.float64).reshape(-1, self._noOfNeurons)
         heuristicCosts: np.ndarray = np.matmul(data, npWeights)
-        heuristicCosts = heuristicCosts[:, 0] + self._bias
-        heuristicCosts = heuristicCosts[:] * (heuristicCosts[:] > 0)
+        heuristicCosts = np.sin(heuristicCosts)  # Sine activation function
+        npWeights = np.array(self._weights, dtype=np.float64).reshape(-1, 1)
+        heuristicCosts = np.matmul(heuristicCosts, npWeights)
+        heuristicCosts = abs(np.sin(heuristicCosts))  # Sine activation function
 
         return heuristicCosts, indices
-
 
     def _getHeuristicCost(self, sfc: str, src: str, dst: str) -> float:
         """

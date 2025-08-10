@@ -362,6 +362,11 @@ class HybridEvaluation:
                 else:
                     scores = np.concatenate((scores, future.result()))
 
+        if scores is None or len(scores) == 0:
+            TUI.appendToSolverLog("No scores generated for latency prediction.")
+
+            return
+
         inputData: np.array = np.concatenate(
             (
                 scores[:]["mean_max_link"].reshape(-1, 1),

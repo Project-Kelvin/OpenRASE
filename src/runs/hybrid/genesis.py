@@ -160,7 +160,7 @@ def run(headless: bool, minimal: bool) -> None:
         trafficDesign: "list[TrafficDesign]" = [
             generateTrafficDesignFromFile(
                 f"{getConfig()['repoAbsolutePath']}/src/runs/hybrid/data/requests.csv",
-                1,
+                0.1,
                 4,
             )
         ]

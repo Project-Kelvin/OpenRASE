@@ -118,19 +118,19 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
             vnf: str = vnfs.pop(0)
             splitter: bool = vnf in splitters
             vnfDict["next"] = [{}, {}] if splitter else {}
-            cls: "list[float]" = data[startIndex : endIndex].tolist()
+            cl: "list[float]" = data[startIndex : endIndex, 0].tolist()
             startIndex = startIndex + noHosts
             endIndex = endIndex + noHosts
 
-            maxCL: float = max(cls)
+            maxCL: float = max(cl)
 
-            if maxCL < 0.5:
+            if abs(maxCL) < 0.1:
                 embeddingNotFound = True
 
                 return
             else:
                 vnfDict["vnf"] = {"id": vnf}
-                vnfDict["host"] = {"id": topology["hosts"][cls.index(maxCL)]["id"]}
+                vnfDict["host"] = {"id": topology["hosts"][cl.index(maxCL)]["id"]}
 
                 # pylint: disable=cell-var-from-loop
                 if nodes[sfcrID][-1] != vnfDict["host"]["id"]:
@@ -168,48 +168,58 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
                 if forwardingGraph["sfcID"] in hosts:
                     del hosts[forwardingGraph["sfcID"]]
 
+        for host, vnfs in embeddingData.items():
+            no = 0
+            for sfcs in vnfs.values():
+                no += len(sfcs)
+            print(f"Host {host} has {no} VNFs embedded.")
+
     return (egs, nodes, embeddingData)
 
 
-def getConfidenceValues(data: np.ndarray, weights: "list[float]", bias: "list[float]") -> np.ndarray:
+def getConfidenceValues(data: np.ndarray, predefinedWeights: "list[float]", weights: "list[float]", noOfNeurons: int) -> np.ndarray:
     """
     Gets the confidence values.
 
     Parameters:
         data (np.ndarray): the data.
-        weights (list[list[float]]): the weights.
-        bias (list[float]): the bias.
+        predefinedWeights (list[float]): the predefined weights.
+        weights (list[float]): the weights.
+        noOfNeurons (int): the number of neurons in the hidden layer.
 
     Returns:
         np.ndarray: the confidence values.
     """
 
     copiedData = data.copy()
-    npWeights = np.array(weights, dtype=np.float64).reshape(-1, 1)
+    npWeights = np.array(predefinedWeights, dtype=np.float64).reshape(-1, noOfNeurons)
     confidenceValues: np.ndarray = np.matmul(copiedData, npWeights)
-    confidenceValues = confidenceValues[:, 0] + bias
-    confidenceValues = 1/(1 + np.exp(-confidenceValues[:]))  # Sigmoid activation function
+    confidenceValues = np.sin(confidenceValues) # Sine activation function
+    npWeights = np.array(weights, dtype=np.float64).reshape(-1, 1)
+    confidenceValues = np.matmul(confidenceValues, npWeights)
+    confidenceValues = np.sin(confidenceValues)  # Sine activation function
 
     return confidenceValues
 
 def generateEGs(
-    fgs: "list[EmbeddingGraph]", topology: Topology, weights: "list[float]", bias: "list[float]"
+    fgs: dict[str, list[str]], topology: Topology, pdWeights: "list[float]", weights: "list[float]", noOfNeurons: int
 ) -> Tuple["list[EmbeddingGraph]", dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]:
     """
     Generates the Embedding Graphs.
 
     Parameters:
-        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        fgs (dict[str, list[str]]): the dict of Embedding Graphs.
         topology (Topology): the topology.
+        pdWeights (list[float]): the predefined weights.
         weights (list[float]): the weights.
-        bias (list[float]): the bias.
+        noOfNeurons (int): the number of neurons in the hidden layer.
 
     Returns:
         Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
     """
 
     data: np.ndarray = convertFGsToNP(fgs, topology)
-    data = getConfidenceValues(data, weights, bias)
+    data = getConfidenceValues(data, pdWeights, weights, noOfNeurons)
     egs, nodes, embeddingData = convertNPtoEGs(data, fgs, topology)
 
     return egs, nodes, embeddingData

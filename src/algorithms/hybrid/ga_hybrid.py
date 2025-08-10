@@ -27,6 +27,7 @@ from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution
 from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 
+POP_SIZE: int = 2000
 
 hybridEvolution: HybridEvolution = HybridEvolution(
     "ga_hybrid",
@@ -52,5 +53,6 @@ def solve(
         deleteEGs,
         trafficDesign,
         trafficGenerator,
+        POP_SIZE,
         experiment
     )

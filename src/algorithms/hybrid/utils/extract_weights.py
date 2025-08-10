@@ -2,12 +2,14 @@
 This defines the functions used to extract weight values from individuals.
 """
 
+import random
 from typing import Tuple
+import numpy as np
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.utils.config import getConfig
 
-def getCCWeights(sfcrs: "list[SFCRequest]") -> int:
+def getCCWeightsLength(sfcrs: "list[SFCRequest]") -> int:
     """
     Gets the number of CC weights.
 
@@ -20,7 +22,7 @@ def getCCWeights(sfcrs: "list[SFCRequest]") -> int:
 
     return len(sfcrs) + len(getConfig()["vnfs"]["names"])
 
-def getLinkWeight(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
+def getLinkWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
     """
     Gets the number of link weights.
 
@@ -34,7 +36,7 @@ def getLinkWeight(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
 
     return len(sfcrs) + 2 * (len(topology["hosts"]) + len(topology["switches"]) + 2)
 
-def getVNFWeight(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
+def getVNFWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
     """
     Gets the number of VNF weights.
 
@@ -48,91 +50,89 @@ def getVNFWeight(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
 
     return len(sfcrs) + len(getConfig()["vnfs"]["names"]) + len(topology["hosts"]) + 1
 
-def getCCBias() -> int:
-    """
-    Gets the number of CC biases.
-
-    Returns:
-        int: the number of CC biases.
-    """
-
-    return 1
-
-def getLinkBias() -> int:
-    """
-    Gets the number of link biases.
-
-    Returns:
-        int: the number of link biases.
-    """
-
-    return 1
-
-def getVNFBias() -> int:
-    """
-    Gets the number of VNF biases.
-
-    Returns:
-        int: the number of VNF biases.
-    """
-
-    return 1
-
-def getWeightLength(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
+def getPredefinedWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology, noOfNeurons: int) -> int:
     """
     Gets the number of weights.
 
     Parameters:
         sfcrs (list[SFCRequest]): the list of Embedding Graphs.
         topology (Topology): the topology.
+        noOfNeurons (int): the number of neurons in the hidden layer.
 
     Returns:
         int: the number of weights.
     """
 
+    return noOfNeurons * (
+        getCCWeightsLength(sfcrs)
+        + getLinkWeightsLength(sfcrs, topology)
+        + getVNFWeightsLength(sfcrs, topology)
+    )
+
+def getPredefinedWeights(
+    sfcrs: "list[SFCRequest]", topology: Topology, noOfNeurons: int
+) -> "Tuple[list[float], list[float], list[float]]":
+    """
+    Gets the weights.
+
+    Parameters:
+        sfcrs (list[SFCRequest]): the list of SFCRequests.
+        topology (Topology): the topology.
+        noOfNeurons (int): the number of neurons in the hidden layer.
+
+    Returns:
+        tuple[list[float], list[float], list[float]]: VNF weights, VNF bias, link weights.
+    """
+
+    ccWeights: int = getCCWeightsLength(sfcrs) * noOfNeurons
+    vnfWeights: int = getVNFWeightsLength(sfcrs, topology) * noOfNeurons
+    linkWeights: int = getLinkWeightsLength(sfcrs, topology) * noOfNeurons
+
+    totalWeights: int = (
+        ccWeights + vnfWeights + linkWeights
+    )
+
+    predefinedWeights: "list[float]" = [ generateRandomWeight() for _ in range(totalWeights) ]
+
+    ccWeightUpper: int = ccWeights
+    vnfWeightUpper: int = ccWeightUpper + vnfWeights
+    linkWeightUpper: int = vnfWeightUpper + linkWeights
+
     return (
-        getCCWeights(sfcrs)
-        + getLinkWeight(sfcrs, topology)
-        + getVNFWeight(sfcrs, topology)
-        + getCCBias()
-        + getLinkBias()
-        + getVNFBias()
+        predefinedWeights[0:ccWeightUpper],
+        predefinedWeights[ccWeightUpper:vnfWeightUpper],
+        predefinedWeights[vnfWeightUpper:linkWeightUpper],
     )
 
 def getWeights(
-    individual: "list[float]", sfcrs: "list[SFCRequest]", topology: Topology
-) -> "Tuple[list[float], list[float], list[float], list[float]]":
+    individual: "list[float]", noOfNeurons: int
+) -> "Tuple[list[float], list[float], list[float]]":
     """
     Gets the weights.
 
     Parameters:
         individual (list[float]): the individual.
-        sfcrs (list[SFCRequest]): the list of Embedding Graphs.
-        topology (Topology): the topology.
+        noOfNeurons (int): the number of neurons in the hidden layer.
 
     Returns:
-        tuple[list[float], list[float], list[float], list[float]]: VNF weights, VNF bias, link weights, link bias.
+        tuple[list[float], list[float], list[float]]: CC weights, VNF weights, link weights.
     """
 
-    ccWeights: int = getCCWeights(sfcrs)
-    vnfWeights: int = getVNFWeight(sfcrs, topology)
-    linkWeights: int = getLinkWeight(sfcrs, topology)
-    ccBias: int = getCCBias()
-    vnfBias: int = getVNFBias()
-    linkBias: int = getLinkBias()
-
-    ccWeightUpper: int = ccWeights
-    ccBiasUpper: int = ccWeightUpper + ccBias
-    vnfWeightUpper: int = ccBiasUpper + vnfWeights
-    vnfBiasUpper: int = vnfWeightUpper + vnfBias
-    linkWeightUpper: int = vnfBiasUpper + linkWeights
-    linkBiasUpper: int = linkWeightUpper + linkBias
-
+    ccWeightUpper: int = noOfNeurons
+    vnfWeightUpper: int = ccWeightUpper + noOfNeurons
+    linkWeightUpper: int = vnfWeightUpper + noOfNeurons
     return (
         individual[0:ccWeightUpper],
-        individual[ccWeightUpper:ccBiasUpper],
-        individual[ccBiasUpper:vnfWeightUpper],
-        individual[vnfWeightUpper:vnfBiasUpper],
-        individual[vnfBiasUpper:linkWeightUpper],
-        individual[linkWeightUpper:linkBiasUpper],
+        individual[ccWeightUpper:vnfWeightUpper],
+        individual[vnfWeightUpper:linkWeightUpper],
     )
+
+def generateRandomWeight() -> float:
+    """
+    Generates a random weight.
+
+    Returns:
+        float: a random weight.
+    """
+
+    return random.uniform(-1 * np.pi, 1 * np.pi)

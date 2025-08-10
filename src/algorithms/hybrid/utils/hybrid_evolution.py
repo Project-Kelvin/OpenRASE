@@ -364,6 +364,7 @@ class HybridEvolution:
         deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
         trafficDesign: "list[TrafficDesign]",
         trafficGenerator: TrafficGenerator,
+        popSize: int,
         experiment: str,
     ) -> None:
         """
@@ -376,6 +377,7 @@ class HybridEvolution:
             sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
             trafficDesign (list[TrafficDesign]): the traffic design.
             trafficGenerator (TrafficGenerator): the traffic generator.
+            popSize (int): the population size.
             experiment (str): the experiment name.
 
         Returns:
@@ -387,13 +389,13 @@ class HybridEvolution:
         )
 
         expStartTime: int = timeit.default_timer()
-        POP_SIZE: int = 10
         NGEN = 500
         MAX_MEMORY_DEMAND: int = 2
         MAX_LATENCY: int = 150
         MIN_AR: float = 1.0
         MIN_QUAL_IND: int = 1
         CXPB: float = 1.0
+        INDPB: float = 1.0
         MUTPB: float = 1.0
         SCORES_DIR: str = "scores"
 
@@ -402,8 +404,8 @@ class HybridEvolution:
         if not os.path.exists(expDir):
             os.makedirs(expDir)
 
-        if not os.path.exists(os.path.join(expDir, "scores")):
-            os.makedirs(os.path.join(expDir, "scores"))
+        if not os.path.exists(os.path.join(expDir, SCORES_DIR)):
+            os.makedirs(os.path.join(expDir, SCORES_DIR))
 
         with open(
             os.path.join(expDir, "data.csv"),
@@ -428,10 +430,10 @@ class HybridEvolution:
         )
         self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
         self._toolbox.register("mate", self._crossover)
-        self._toolbox.register("mutate", self._mutate, indpb=1.0)
+        self._toolbox.register("mutate", self._mutate, indpb=INDPB)
         self._toolbox.register("select", tools.selNSGA2)
 
-        pop: "list[Individual]" = self._toolbox.population(n=POP_SIZE)
+        pop: "list[Individual]" = self._toolbox.population(n=popSize)
 
         gen: int = 1
         hof: tools.ParetoFront = tools.ParetoFront()
@@ -449,7 +451,7 @@ class HybridEvolution:
             MIN_AR,
             MAX_LATENCY,
             MIN_QUAL_IND,
-            POP_SIZE,
+            popSize,
             trafficGenerator,
             sendEGs,
             deleteEGs,
@@ -476,7 +478,7 @@ class HybridEvolution:
                 MIN_AR,
                 MAX_LATENCY,
                 MIN_QUAL_IND,
-                POP_SIZE,
+                popSize,
                 trafficGenerator,
                 sendEGs,
                 deleteEGs,

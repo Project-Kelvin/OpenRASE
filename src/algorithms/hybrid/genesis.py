@@ -3,12 +3,12 @@ This defines the GA that evolves teh weights of the Neural Network.
 """
 
 from concurrent.futures import ProcessPoolExecutor
-from copy import deepcopy
 import random
 import timeit
 from typing import Callable, Tuple
 from uuid import uuid4
 from deap import tools
+import numpy as np
 import tensorflow as tf
 from shared.models.sfc_request import SFCRequest
 from shared.models.traffic_design import TrafficDesign
@@ -22,7 +22,11 @@ from algorithms.hybrid.constants.surrogate import (
 from algorithms.hybrid.solvers.chain_composition import generateFGs
 from algorithms.hybrid.solvers.link_embedding import EmbedLinks
 from algorithms.hybrid.solvers.vnf_embedding import generateEGs
-from algorithms.hybrid.utils.extract_weights import getWeightLength, getWeights
+from algorithms.hybrid.utils.extract_weights import (
+    generateRandomWeight,
+    getWeights,
+    getPredefinedWeights,
+)
 from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution, Individual
 from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
 from sfc.traffic_generator import TrafficGenerator
@@ -31,9 +35,15 @@ from utils.tui import TUI
 tf.get_logger().setLevel("ERROR")
 tf.keras.utils.disable_interactive_logging()
 
+predefinedWeights: tuple[list[float], list[float], list[float]] = None
+NO_OF_NEURONS: int = 2
+POP_SIZE: int = 100
 
 def decodeIndividual(
-    individual: "list[float]", index: int, topology: Topology, sfcrs: "list[SFCRequest]"
+    individual: "list[float]",
+    index: int,
+    topology: Topology,
+    sfcrs: "list[SFCRequest]",
 ) -> DecodedIndividual:
     """
     Decodes an individual to an Embedding Graph.
@@ -48,27 +58,29 @@ def decodeIndividual(
         DecodedIndividual: A tuple containing the embedding graphs, embedding data, link data, and acceptance ratio.
     """
 
-    weights: "Tuple[list[float], list[float], list[float], list[float]]" = (
-        getWeights(individual, sfcrs, topology)
+    global predefinedWeights
+
+    weights: "Tuple[list[float], list[float], list[float]]" = (
+        getWeights(individual, NO_OF_NEURONS)
     )
-    ccWeights: "list[float]" = weights[0]
-    ccBias: "list[float]" = weights[1]
-    vnfWeights: "list[float]" = weights[2]
-    vnfBias: "list[float]" = weights[3]
-    linkWeights: "list[float]" = weights[4]
-    linkBias: "list[float]" = weights[5]
-    fgs: dict[str, list[str]] = generateFGs(sfcrs, ccWeights, ccBias)
-    egs, nodes, embedData = generateEGs(fgs, topology, vnfWeights, vnfBias)
+    ccPDWeights: "list[float]" = predefinedWeights[0]
+    vnfPDWeights: "list[float]" = predefinedWeights[1]
+    linkPDWeights: "list[float]" = predefinedWeights[2]
+    ccWeights: list[float] = weights[0]
+    vnfWeights: list[float] = weights[1]
+    linkWeights: list[float] = weights[2]
+
+    fgs: dict[str, list[str]] = generateFGs(sfcrs, ccPDWeights, ccWeights, NO_OF_NEURONS)
+    egs, nodes, embedData = generateEGs(fgs, topology, vnfPDWeights, vnfWeights, NO_OF_NEURONS)
     embedLinks: EmbedLinks = None
     linkData: LinkData = None
     if len(egs) > 0:
-        embedLinks = EmbedLinks(topology, sfcrs, egs, linkWeights, linkBias)
+        embedLinks = EmbedLinks(topology, sfcrs, egs, linkPDWeights, linkWeights, NO_OF_NEURONS)
         egs = embedLinks.embedLinks(nodes)
         linkData = embedLinks.getLinkData()
     ar: float = len(egs) / len(sfcrs)
 
     return (index, egs, embedData, linkData, ar)
-
 
 def decodePop(
     pop: "list[list[float]]", topology: Topology, sfcrs: "list[SFCRequest]"
@@ -121,9 +133,9 @@ def generateRandomIndividual(
 
     individual = container()
     individual.id = uuid4()
-    weightLength: int = getWeightLength(sfcrs, topology)
+    weightLength: int = NO_OF_NEURONS * 3
     for _ in range(weightLength):
-        individual.append(random.uniform(-1, 1))
+        individual.append(generateRandomWeight())
     return Individual(individual)
 
 def crossover(
@@ -158,15 +170,7 @@ def mutate(
         Individual: the mutated individual.
     """
 
-    return tools.mutGaussian(individual, mu=0.0, sigma=1.0, indpb=indpb)
-
-hybridEvolution: HybridEvolution = HybridEvolution(
-    "genesis",
-    decodePop,
-    generateRandomIndividual,
-    crossover,
-    mutate
-)
+    return tools.mutGaussian(individual, mu=0.0, sigma=np.pi, indpb=indpb)
 
 def solve(
     sfcrs: "list[SFCRequest]",
@@ -175,7 +179,7 @@ def solve(
     trafficDesign: TrafficDesign,
     trafficGenerator: TrafficGenerator,
     topology: Topology,
-    experimentName: str
+    experimentName: str,
 ) -> None:
     """
     Evolves the weights of the Neural Network.
@@ -193,6 +197,13 @@ def solve(
         None
     """
 
+    global predefinedWeights
+    predefinedWeights = getPredefinedWeights(sfcrs, topology, NO_OF_NEURONS)
+
+    hybridEvolution: HybridEvolution = HybridEvolution(
+        "genesis", decodePop, generateRandomIndividual, crossover, mutate
+    )
+
     hybridEvolution.hybridSolve(
         topology,
         sfcrs,
@@ -200,5 +211,6 @@ def solve(
         deleteEGs,
         trafficDesign,
         trafficGenerator,
-        experimentName
+        POP_SIZE,
+        experimentName,
     )
