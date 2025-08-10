@@ -175,17 +175,18 @@ class EmbedLinks:
         """
 
         self._noOfNeurons: int = noOfNeurons
-        self._sfcrs: "list[SFCRequest]" = sfcrs
-        self._egs: "list[EmbeddingGraph]" = egs
+        self._sfcrs: list[SFCRequest] = sfcrs
+        self._egs: list[EmbeddingGraph] = egs
         self._topology: Topology = topology
         self._graph: nx.Graph = self._constructGraph()
-        self._pdWeights: "list[float]" = predefinedWeights
-        self._weights: "list[float]" = weights
+        self._pdWeights: list[float] = predefinedWeights
+        self._weights: list[float] = weights
         self._hotCode: HotCode = HotCode()
         self._convertToHotCodes()
-        self._hCost: "dict[str, dict[str, dict[str, float]]]" = {}
-        self._data: tuple[np.ndarray, np.ndarray] = self._predictCost()
-        self._linkData: "dict[str, dict[str, float]]" = {}
+        self._hCost: dict[str, dict[str, dict[str, float]]] = {}
+        self._links: list[str] = []
+        self._data: np.ndarray = self._predictCost()
+        self._linkData: dict[str, dict[str, float]] = {}
 
     def _isHost(self, node: str) -> bool:
         """
@@ -204,50 +205,25 @@ class EmbedLinks:
             or node == SERVER
         )
 
-    def _constructNP(self) -> tuple[np.ndarray, np.ndarray]:
+    def _constructNP(self) -> np.ndarray:
         """
         Constructs the NumPy array.
 
         Returns:
-            tuple[np.ndarray, np.ndarray]: the NumPy array and the indices.
+            tuple[np.ndarray]: the NumPy array containing the input data.
         """
 
-        links: "list[list[int]]" = []
-        linkIndices: "list[str]" = []
-        for link in self._topology["links"]:
-            row: "list[int]" = []
-            row.extend(self._hotCode.getNodeCode(link["source"]))
-            row.extend(self._hotCode.getNodeCode(link["destination"]))
-
-            linkIndices.append(f"{link['source']}_{link['destination']}")
-            links.append(row)
-
-        hosts: "list[str]" = [host["id"] for host in self._topology["hosts"]]
-        hosts.append(SFCC)
-        hosts.append(SERVER)
-
-        switches: "list[int]" = [switch["id"] for switch in self._topology["switches"]]
-
-        for switch in switches:
-            for host in hosts:
-                if f"{switch}_{host}" not in linkIndices:
-                    linkIndices.append(f"{switch}_{host}")
-                    links.append(
-                        self._hotCode.getNodeCode(switch)
-                        + self._hotCode.getNodeCode(host)
-                    )
-
         rows: "list[list[int]]" = []
-        indices: "list[str]" = []
+        links = EmbedLinks.getLinks(self._topology)
         for sfcr in self._sfcrs:
-            for link, linkIndex in zip(links, linkIndices):
+            for link in links:
                 row: "list[int]" = []
                 row.extend(self._hotCode.getSFCCode(sfcr["sfcrID"]))
-                row.extend(link)
+                row.extend(self._hotCode.getNodeCode(link))
                 rows.append(row)
-                indices.append(f"{sfcr['sfcrID']}_{linkIndex}")
+                self._links.append(f"{sfcr['sfcrID']}_{link}")
 
-        return np.array(rows, dtype=np.float64), indices
+        return np.array(rows, dtype=np.float64)
 
     def _constructGraph(self) -> nx.Graph:
         """
@@ -268,6 +244,35 @@ class EmbedLinks:
 
         return graph
 
+    @staticmethod
+    def getLinks(topology: Topology) -> list[str]:
+        """
+        Gets the links.
+
+        Parameters:
+            topology (Topology): the topology.
+
+        Returns:
+            list[str]: the links.
+        """
+
+        links: list[str] = []
+        for link in topology["links"]:
+            links.append(f"{link['source']}_{link['destination']}")
+
+        hosts: "list[str]" = [host["id"] for host in topology["hosts"]]
+        hosts.append(SFCC)
+        hosts.append(SERVER)
+
+        switches: "list[int]" = [switch["id"] for switch in topology["switches"]]
+
+        for switch in switches:
+            for host in hosts:
+                if f"{switch}_{host}" not in links:
+                    links.append(f"{switch}_{host}")
+
+        return links
+
     def _convertToHotCodes(self) -> None:
         """
         Converts the EGs to hot codes.
@@ -276,40 +281,32 @@ class EmbedLinks:
             None
         """
 
-        nodeLength: int = (
-            len(self._topology["hosts"]) + len(self._topology["switches"]) + 2
-        )
+        links = EmbedLinks.getLinks(self._topology)
+        for link in links:
+            self._hotCode.addNode(link, len(links))
+
         sfcLength: int = len(self._sfcrs)
-
-        self._hotCode.addNode(SFCC, nodeLength)
-        self._hotCode.addNode(SERVER, nodeLength)
-
-        for hosts in self._topology["hosts"]:
-            self._hotCode.addNode(hosts["id"], nodeLength)
-
-        for switch in self._topology["switches"]:
-            self._hotCode.addNode(switch["id"], nodeLength)
 
         for sfcr in self._sfcrs:
             self._hotCode.addSFC(sfcr["sfcrID"], sfcLength)
 
-    def _predictCost(self) -> tuple[np.ndarray, np.ndarray]:
+    def _predictCost(self) -> np.ndarray:
         """
         Builds the model.
 
         Returns:
-            tuple[np.ndarray, np.ndarray]: the heuristic costs and the indices.
+            np.ndarray: the heuristic costs.
         """
 
-        data, indices = self._constructNP()
+        data = self._constructNP()
         npWeights = np.array(self._pdWeights, dtype=np.float64).reshape(-1, self._noOfNeurons)
         heuristicCosts: np.ndarray = np.matmul(data, npWeights)
-        heuristicCosts = np.sin(heuristicCosts)  # Sine activation function
+        heuristicCosts = abs(np.sin(heuristicCosts))  # Sine activation function
         npWeights = np.array(self._weights, dtype=np.float64).reshape(-1, 1)
         heuristicCosts = np.matmul(heuristicCosts, npWeights)
         heuristicCosts = abs(np.sin(heuristicCosts))  # Sine activation function
 
-        return heuristicCosts, indices
+        return heuristicCosts
 
     def _getHeuristicCost(self, sfc: str, src: str, dst: str) -> float:
         """
@@ -324,14 +321,12 @@ class EmbedLinks:
             float: the heuristic cost.
         """
 
-        data, indices = self._data
-
-        if f"{sfc}_{src}_{dst}" in indices:
-            index = indices.index(f"{sfc}_{src}_{dst}")
+        if f"{sfc}_{src}_{dst}" in self._links:
+            index = self._links.index(f"{sfc}_{src}_{dst}")
         else:
-            index = indices.index(f"{sfc}_{dst}_{src}")
+            index = self._links.index(f"{sfc}_{dst}_{src}")
 
-        return data[index]
+        return self._data[index]
 
     def _findPath(self, sfcID: str, source: str, destination: str) -> "list[str]":
         """

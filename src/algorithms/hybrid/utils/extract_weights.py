@@ -34,7 +34,7 @@ def getLinkWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
         int: the number of link weights.
     """
 
-    return len(sfcrs) + 2 * (len(topology["hosts"]) + len(topology["switches"]) + 2)
+    return len(sfcrs) + len(EmbedLinks.getLinks(topology))
 
 def getVNFWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
     """
