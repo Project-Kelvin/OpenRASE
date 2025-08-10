@@ -8,6 +8,7 @@ import heapq
 
 from shared.models.sfc_request import SFCRequest
 from algorithms.hybrid.constants.surrogate import BRANCH
+from algorithms.hybrid.utils.solvers import activationFunction
 from constants.topology import SERVER, SFCC
 from shared.models.topology import Link, Topology
 from shared.models.embedding_graph import EmbeddingGraph
@@ -301,10 +302,10 @@ class EmbedLinks:
         data = self._constructNP()
         npWeights = np.array(self._pdWeights, dtype=np.float64).reshape(-1, self._noOfNeurons)
         heuristicCosts: np.ndarray = np.matmul(data, npWeights)
-        heuristicCosts = abs(np.sin(heuristicCosts))  # Sine activation function
+        heuristicCosts = activationFunction(heuristicCosts)
         npWeights = np.array(self._weights, dtype=np.float64).reshape(-1, 1)
         heuristicCosts = np.matmul(heuristicCosts, npWeights)
-        heuristicCosts = abs(np.sin(heuristicCosts))  # Sine activation function
+        heuristicCosts = abs(activationFunction(heuristicCosts))
 
         return heuristicCosts
 

@@ -4,9 +4,9 @@ This defines the Neural Network used for genetic encoding.
 
 import copy
 from typing import Tuple
-
 from shared.constants.embedding_graph import TERMINAL
 from algorithms.hybrid.constants.surrogate import BRANCH
+from algorithms.hybrid.utils.solvers import activationFunction
 from constants.topology import SERVER, SFCC
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.topology import Topology
@@ -124,7 +124,7 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
 
             maxCL: float = max(cl)
 
-            if abs(maxCL) < 0.1:
+            if abs(maxCL) < 0:
                 embeddingNotFound = True
 
                 return
@@ -168,11 +168,14 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
                 if forwardingGraph["sfcID"] in hosts:
                     del hosts[forwardingGraph["sfcID"]]
 
+        print("********************")
         for host, vnfs in embeddingData.items():
             no = 0
             for sfcs in vnfs.values():
                 no += len(sfcs)
             print(f"Host {host} has {no} VNFs embedded.")
+        print("#####################")
+
 
     return (egs, nodes, embeddingData)
 
@@ -194,10 +197,10 @@ def getConfidenceValues(data: np.ndarray, predefinedWeights: "list[float]", weig
     copiedData = data.copy()
     npWeights = np.array(predefinedWeights, dtype=np.float64).reshape(-1, noOfNeurons)
     confidenceValues: np.ndarray = np.matmul(copiedData, npWeights)
-    confidenceValues = np.sin(confidenceValues) # Sine activation function
+    confidenceValues = activationFunction(confidenceValues)
     npWeights = np.array(weights, dtype=np.float64).reshape(-1, 1)
     confidenceValues = np.matmul(confidenceValues, npWeights)
-    confidenceValues = np.sin(confidenceValues)  # Sine activation function
+    confidenceValues = activationFunction(confidenceValues)
 
     return confidenceValues
 

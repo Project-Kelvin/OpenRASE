@@ -7,6 +7,7 @@ from shared.constants.embedding_graph import TERMINAL
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
 from shared.utils.config import getConfig
+from algorithms.hybrid.utils.solvers import activationFunction
 from constants.topology import SERVER
 
 
@@ -57,10 +58,10 @@ def getPriorityValue(data: np.ndarray, predefinedWeights: "list[float]", weights
     npPDWeights: np.ndarray = np.array(predefinedWeights, dtype=np.float64)
     npPDWeights = npPDWeights.reshape(-1, noOfNeurons)
     copiedData = np.matmul(copiedData, npPDWeights)
-    copiedData = np.sin(copiedData)
+    copiedData = activationFunction(copiedData)
     npWeights: np.ndarray = np.array(weights, dtype=np.float64).reshape(-1, 1)
     priorityValues: np.ndarray = np.matmul(copiedData, npWeights)
-    priorityValues = np.sin(priorityValues)
+    priorityValues = activationFunction(priorityValues)
 
     return priorityValues
 

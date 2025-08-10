@@ -9,6 +9,8 @@ from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.utils.config import getConfig
 
+from algorithms.hybrid.solvers.link_embedding import EmbedLinks
+
 def getCCWeightsLength(sfcrs: "list[SFCRequest]") -> int:
     """
     Gets the number of CC weights.
