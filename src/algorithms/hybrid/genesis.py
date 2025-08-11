@@ -23,9 +23,11 @@ from algorithms.hybrid.solvers.chain_composition import generateFGs
 from algorithms.hybrid.solvers.link_embedding import EmbedLinks
 from algorithms.hybrid.solvers.vnf_embedding import generateEGs
 from algorithms.hybrid.utils.extract_weights import (
+    generatePredefinedWeights,
     generateRandomWeight,
     getWeights,
     getPredefinedWeights,
+    getWeightsLength,
 )
 from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution, Individual
 from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
@@ -36,8 +38,9 @@ tf.get_logger().setLevel("ERROR")
 tf.keras.utils.disable_interactive_logging()
 
 predefinedWeights: tuple[list[float], list[float], list[float]] = None
-NO_OF_NEURONS: int = 2
+NO_OF_NEURONS: int = 0
 POP_SIZE: int = 100
+
 
 def decodeIndividual(
     individual: "list[float]",
@@ -58,11 +61,17 @@ def decodeIndividual(
         DecodedIndividual: A tuple containing the embedding graphs, embedding data, link data, and acceptance ratio.
     """
 
-    global predefinedWeights
+    # global predefinedWeights
 
-    weights: "Tuple[list[float], list[float], list[float]]" = (
-        getWeights(individual, NO_OF_NEURONS)
+    predefinedIndividual = individual[:-getWeightsLength(NO_OF_NEURONS)] if NO_OF_NEURONS > 0 else individual
+    predefinedWeights: "tuple[list[float], list[float], list[float]]" = getPredefinedWeights(
+        predefinedIndividual, sfcrs, topology, NO_OF_NEURONS
     )
+
+    weights: "Tuple[list[float], list[float], list[float]]" = getWeights(
+        individual[getWeightsLength(NO_OF_NEURONS):], NO_OF_NEURONS
+    )
+
     ccPDWeights: "list[float]" = predefinedWeights[0]
     vnfPDWeights: "list[float]" = predefinedWeights[1]
     linkPDWeights: "list[float]" = predefinedWeights[2]
@@ -70,17 +79,24 @@ def decodeIndividual(
     vnfWeights: list[float] = weights[1]
     linkWeights: list[float] = weights[2]
 
-    fgs: dict[str, list[str]] = generateFGs(sfcrs, ccPDWeights, ccWeights, NO_OF_NEURONS)
-    egs, nodes, embedData = generateEGs(fgs, topology, vnfPDWeights, vnfWeights, NO_OF_NEURONS)
+    fgs: dict[str, list[str]] = generateFGs(
+        sfcrs, ccPDWeights, ccWeights, NO_OF_NEURONS
+    )
+    egs, nodes, embedData = generateEGs(
+        fgs, topology, vnfPDWeights, vnfWeights, NO_OF_NEURONS
+    )
     embedLinks: EmbedLinks = None
     linkData: LinkData = None
     if len(egs) > 0:
-        embedLinks = EmbedLinks(topology, sfcrs, egs, linkPDWeights, linkWeights, NO_OF_NEURONS)
+        embedLinks = EmbedLinks(
+            topology, sfcrs, egs, linkPDWeights, linkWeights, NO_OF_NEURONS
+        )
         egs = embedLinks.embedLinks(nodes)
         linkData = embedLinks.getLinkData()
     ar: float = len(egs) / len(sfcrs)
 
     return (index, egs, embedData, linkData, ar)
+
 
 def decodePop(
     pop: "list[list[float]]", topology: Topology, sfcrs: "list[SFCRequest]"
@@ -116,6 +132,7 @@ def decodePop(
 
     return decodedPop
 
+
 def generateRandomIndividual(
     container: Individual, topology: Topology, sfcrs: "list[SFCRequest]"
 ) -> Individual:
@@ -133,10 +150,16 @@ def generateRandomIndividual(
 
     individual = container()
     individual.id = uuid4()
-    weightLength: int = NO_OF_NEURONS * 3
+
+    individual.extend(generatePredefinedWeights(
+        sfcrs, topology, NO_OF_NEURONS
+    ))
+
+    weightLength: int = getWeightsLength(NO_OF_NEURONS)
     for _ in range(weightLength):
         individual.append(generateRandomWeight())
-    return Individual(individual)
+
+    return individual
 
 def crossover(
     ind1: Individual,
@@ -155,6 +178,7 @@ def crossover(
 
     return tools.cxBlend(ind1, ind2, alpha=0.5)
 
+
 def mutate(
     individual: Individual,
     indpb: float,
@@ -171,6 +195,7 @@ def mutate(
     """
 
     return tools.mutGaussian(individual, mu=0.0, sigma=np.pi, indpb=indpb)
+
 
 def solve(
     sfcrs: "list[SFCRequest]",
@@ -198,7 +223,12 @@ def solve(
     """
 
     global predefinedWeights
-    predefinedWeights = getPredefinedWeights(sfcrs, topology, NO_OF_NEURONS)
+    predefinedWeights = getPredefinedWeights(
+        generatePredefinedWeights(sfcrs, topology, NO_OF_NEURONS),
+        sfcrs,
+        topology,
+        NO_OF_NEURONS,
+    )
 
     hybridEvolution: HybridEvolution = HybridEvolution(
         "genesis", decodePop, generateRandomIndividual, crossover, mutate

@@ -300,12 +300,14 @@ class EmbedLinks:
         """
 
         data = self._constructNP()
-        npWeights = np.array(self._pdWeights, dtype=np.float64).reshape(-1, self._noOfNeurons)
+        npWeights = np.array(self._pdWeights, dtype=np.float64).reshape(-1, self._noOfNeurons if self._noOfNeurons > 0 else 1)
         heuristicCosts: np.ndarray = np.matmul(data, npWeights)
-        heuristicCosts = activationFunction(heuristicCosts)
-        npWeights = np.array(self._weights, dtype=np.float64).reshape(-1, 1)
-        heuristicCosts = np.matmul(heuristicCosts, npWeights)
         heuristicCosts = abs(activationFunction(heuristicCosts))
+
+        if self._noOfNeurons > 0:
+            npWeights = np.array(self._weights, dtype=np.float64).reshape(-1, 1)
+            heuristicCosts = np.matmul(heuristicCosts, npWeights)
+            heuristicCosts = abs(activationFunction(heuristicCosts))
 
         return heuristicCosts
 

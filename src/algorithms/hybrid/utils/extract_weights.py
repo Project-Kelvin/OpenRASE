@@ -50,7 +50,7 @@ def getVNFWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
         int: the number of VNF weights.
     """
 
-    return len(sfcrs) + len(getConfig()["vnfs"]["names"]) + len(topology["hosts"]) + 1
+    return len(sfcrs) + len(getConfig()["vnfs"]["names"]) + 1
 
 def getPredefinedWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology, noOfNeurons: int) -> int:
     """
@@ -65,19 +65,56 @@ def getPredefinedWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology, no
         int: the number of weights.
     """
 
+    if noOfNeurons == 0:
+        noOfNeurons = 1
+
     return noOfNeurons * (
         getCCWeightsLength(sfcrs)
         + getLinkWeightsLength(sfcrs, topology)
         + getVNFWeightsLength(sfcrs, topology)
     )
 
+def getWeightsLength(noOfNeurons: int) -> int:
+    """
+    Gets the total number of weights.
+
+    Parameters:
+        noOfNeurons (int): the number of neurons in the hidden layer.
+
+    Returns:
+        int: the total number of weights.
+    """
+
+    return 3 * noOfNeurons
+
+def generatePredefinedWeights(sfcrs: "list[SFCRequest]", topology: Topology, noOfNeurons: int) -> "list[float]":
+    """
+    Generates the predefined weights.
+
+    Parameters:
+        sfcrs (list[SFCRequest]): the list of SFCRequests.
+        topology (Topology): the topology.
+        noOfNeurons (int): the number of neurons in the hidden layer.
+
+    Returns:
+        list[float]: the predefined weights.
+    """
+
+    totalWeights: int = getPredefinedWeightsLength(sfcrs, topology, noOfNeurons)
+    return [generateRandomWeight() for _ in range(totalWeights)]
+
+
 def getPredefinedWeights(
-    sfcrs: "list[SFCRequest]", topology: Topology, noOfNeurons: int
+    predefinedWeights: list[float],
+    sfcrs: "list[SFCRequest]",
+    topology: Topology,
+    noOfNeurons: int,
 ) -> "Tuple[list[float], list[float], list[float]]":
     """
     Gets the weights.
 
     Parameters:
+        predefinedWeights (list[float]): the predefined weights.
         sfcrs (list[SFCRequest]): the list of SFCRequests.
         topology (Topology): the topology.
         noOfNeurons (int): the number of neurons in the hidden layer.
@@ -86,15 +123,12 @@ def getPredefinedWeights(
         tuple[list[float], list[float], list[float]]: VNF weights, VNF bias, link weights.
     """
 
+    if noOfNeurons == 0:
+        noOfNeurons = 1
+
     ccWeights: int = getCCWeightsLength(sfcrs) * noOfNeurons
     vnfWeights: int = getVNFWeightsLength(sfcrs, topology) * noOfNeurons
     linkWeights: int = getLinkWeightsLength(sfcrs, topology) * noOfNeurons
-
-    totalWeights: int = (
-        ccWeights + vnfWeights + linkWeights
-    )
-
-    predefinedWeights: "list[float]" = [ generateRandomWeight() for _ in range(totalWeights) ]
 
     ccWeightUpper: int = ccWeights
     vnfWeightUpper: int = ccWeightUpper + vnfWeights
@@ -105,6 +139,7 @@ def getPredefinedWeights(
         predefinedWeights[ccWeightUpper:vnfWeightUpper],
         predefinedWeights[vnfWeightUpper:linkWeightUpper],
     )
+
 
 def getWeights(
     individual: "list[float]", noOfNeurons: int

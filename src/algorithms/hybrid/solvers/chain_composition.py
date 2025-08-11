@@ -56,12 +56,13 @@ def getPriorityValue(data: np.ndarray, predefinedWeights: "list[float]", weights
 
     copiedData = data.copy()
     npPDWeights: np.ndarray = np.array(predefinedWeights, dtype=np.float64)
-    npPDWeights = npPDWeights.reshape(-1, noOfNeurons)
+    npPDWeights = npPDWeights.reshape(-1, noOfNeurons if noOfNeurons > 0 else 1)
     copiedData = np.matmul(copiedData, npPDWeights)
-    copiedData = activationFunction(copiedData)
-    npWeights: np.ndarray = np.array(weights, dtype=np.float64).reshape(-1, 1)
-    priorityValues: np.ndarray = np.matmul(copiedData, npWeights)
-    priorityValues = activationFunction(priorityValues)
+    priorityValues = activationFunction(copiedData)
+    if noOfNeurons > 0:
+        npWeights: np.ndarray = np.array(weights, dtype=np.float64).reshape(-1, 1)
+        priorityValues: np.ndarray = np.matmul(priorityValues, npWeights)
+        priorityValues = activationFunction(priorityValues)
 
     return priorityValues
 

@@ -3,6 +3,7 @@ This defines the Neural Network used for genetic encoding.
 """
 
 import copy
+import random
 from typing import Tuple
 from shared.constants.embedding_graph import TERMINAL
 from algorithms.hybrid.constants.surrogate import BRANCH
@@ -45,12 +46,8 @@ def convertFGsToNP(fgs: dict[str, list[str]], topology: Topology) -> np.ndarray:
             else:
                 instances[vnf] += 1
 
-            for hIndex, _host in enumerate(topology["hosts"]):
-                # pylint: disable=cell-var-from-loop
-                hostHotCode: "list[int]" = [0] * len(topology["hosts"])
-                hostHotCode[hIndex] = 1
-                row: "list[int]" = fgHotCode + vnfsHotCode + hostHotCode + [instances[vnf]]
-                data.append(row)
+            row: "list[int]" = fgHotCode + vnfsHotCode + [instances[vnf]]
+            data.append(row)
 
     return np.array(data, dtype=np.float64)
 
@@ -74,8 +71,7 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
     splitters: "list[str]" = getConfig()["vnfs"]["splitters"]
 
     for sfcrID, sortedVNFs in fgs.items():
-        startIndex: int = 0
-        endIndex: int = noHosts
+        index: int = 0
         forwardingGraph: EmbeddingGraph = {"sfcID": sfcrID, "vnfs": {}}
         nodes[sfcrID] = [SFCC]
         embeddingNotFound: bool = False
@@ -97,7 +93,7 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
                 None
             """
 
-            nonlocal oldDepth, startIndex, endIndex, nodes, embeddingData, embeddingNotFound, splitters
+            nonlocal oldDepth, index, nodes, embeddingData, embeddingNotFound, splitters
 
             if depth != oldDepth:
                 oldDepth = depth
@@ -118,19 +114,24 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
             vnf: str = vnfs.pop(0)
             splitter: bool = vnf in splitters
             vnfDict["next"] = [{}, {}] if splitter else {}
-            cl: "list[float]" = data[startIndex : endIndex, 0].tolist()
-            startIndex = startIndex + noHosts
-            endIndex = endIndex + noHosts
+            cl: "list[float]" = data[index, 0]
+            index += noHosts
 
-            maxCL: float = max(cl)
+            # maxCL: float = max(cl)
 
-            if abs(maxCL) < 0:
+            if cl < 0.0:
                 embeddingNotFound = True
 
                 return
             else:
                 vnfDict["vnf"] = {"id": vnf}
-                vnfDict["host"] = {"id": topology["hosts"][cl.index(maxCL)]["id"]}
+                interval: float = (1 - 0.0) / noHosts
+                hostIndex: int = int(cl // interval)
+                hostIndex = int(random.gauss(hostIndex, 1))
+                hostIndex = hostIndex % noHosts
+                if hostIndex < 0:
+                    hostIndex = noHosts + hostIndex
+                vnfDict["host"] = {"id": topology["hosts"][hostIndex]["id"]}
 
                 # pylint: disable=cell-var-from-loop
                 if nodes[sfcrID][-1] != vnfDict["host"]["id"]:
@@ -168,13 +169,14 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
                 if forwardingGraph["sfcID"] in hosts:
                     del hosts[forwardingGraph["sfcID"]]
 
-        print("********************")
-        for host, vnfs in embeddingData.items():
-            no = 0
-            for sfcs in vnfs.values():
-                no += len(sfcs)
-            print(f"Host {host} has {no} VNFs embedded.")
-        print("#####################")
+    print("********************")
+    print(f"Number of Embedding Graphs: {len(egs)}")
+    for host, vnfs in embeddingData.items():
+        no = 0
+        for sfcs in vnfs.values():
+            no += len(sfcs)
+        print(f"Host {host} has {no} VNFs embedded.")
+    print("#####################")
 
 
     return (egs, nodes, embeddingData)
@@ -195,12 +197,13 @@ def getConfidenceValues(data: np.ndarray, predefinedWeights: "list[float]", weig
     """
 
     copiedData = data.copy()
-    npWeights = np.array(predefinedWeights, dtype=np.float64).reshape(-1, noOfNeurons)
+    npWeights = np.array(predefinedWeights, dtype=np.float64).reshape(-1, noOfNeurons if noOfNeurons > 0 else 1)
     confidenceValues: np.ndarray = np.matmul(copiedData, npWeights)
     confidenceValues = activationFunction(confidenceValues)
-    npWeights = np.array(weights, dtype=np.float64).reshape(-1, 1)
-    confidenceValues = np.matmul(confidenceValues, npWeights)
-    confidenceValues = activationFunction(confidenceValues)
+    if noOfNeurons > 0:
+        npWeights = np.array(weights, dtype=np.float64).reshape(-1, 1)
+        confidenceValues = np.matmul(confidenceValues, npWeights)
+        confidenceValues = activationFunction(confidenceValues)
 
     return confidenceValues
 
