@@ -38,7 +38,7 @@ tf.get_logger().setLevel("ERROR")
 tf.keras.utils.disable_interactive_logging()
 
 predefinedWeights: tuple[list[float], list[float], list[float]] = None
-NO_OF_NEURONS: int = 0
+NO_OF_NEURONS: int = 2
 POP_SIZE: int = 100
 
 
@@ -61,15 +61,15 @@ def decodeIndividual(
         DecodedIndividual: A tuple containing the embedding graphs, embedding data, link data, and acceptance ratio.
     """
 
-    # global predefinedWeights
+    global predefinedWeights
 
-    predefinedIndividual = individual[:-getWeightsLength(NO_OF_NEURONS)] if NO_OF_NEURONS > 0 else individual
-    predefinedWeights: "tuple[list[float], list[float], list[float]]" = getPredefinedWeights(
-        predefinedIndividual, sfcrs, topology, NO_OF_NEURONS
-    )
+    # predefinedIndividual = individual[:-getWeightsLength(NO_OF_NEURONS)] if NO_OF_NEURONS > 0 else individual
+    # predefinedWeights: "tuple[list[float], list[float], list[float]]" = getPredefinedWeights(
+    #     predefinedIndividual, sfcrs, topology, NO_OF_NEURONS
+    # )
 
     weights: "Tuple[list[float], list[float], list[float]]" = getWeights(
-        individual[getWeightsLength(NO_OF_NEURONS):], NO_OF_NEURONS
+        individual, NO_OF_NEURONS
     )
 
     ccPDWeights: "list[float]" = predefinedWeights[0]
@@ -151,9 +151,9 @@ def generateRandomIndividual(
     individual = container()
     individual.id = uuid4()
 
-    individual.extend(generatePredefinedWeights(
-        sfcrs, topology, NO_OF_NEURONS
-    ))
+    # individual.extend(generatePredefinedWeights(
+    #     sfcrs, topology, NO_OF_NEURONS
+    # ))
 
     weightLength: int = getWeightsLength(NO_OF_NEURONS)
     for _ in range(weightLength):

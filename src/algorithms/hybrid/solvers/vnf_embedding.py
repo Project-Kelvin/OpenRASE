@@ -125,9 +125,7 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
                 return
             else:
                 vnfDict["vnf"] = {"id": vnf}
-                interval: float = (1 - 0.0) / noHosts
-                hostIndex: int = int(cl // interval)
-                hostIndex = int(random.gauss(hostIndex, 1))
+                hostIndex = int(random.gauss(cl, 2))
                 hostIndex = hostIndex % noHosts
                 if hostIndex < 0:
                     hostIndex = noHosts + hostIndex
@@ -182,7 +180,7 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
     return (egs, nodes, embeddingData)
 
 
-def getConfidenceValues(data: np.ndarray, predefinedWeights: "list[float]", weights: "list[float]", noOfNeurons: int) -> np.ndarray:
+def getConfidenceValues(data: np.ndarray, predefinedWeights: "list[float]", weights: "list[float]", noOfNeurons: int, topology: Topology) -> np.ndarray:
     """
     Gets the confidence values.
 
@@ -191,11 +189,13 @@ def getConfidenceValues(data: np.ndarray, predefinedWeights: "list[float]", weig
         predefinedWeights (list[float]): the predefined weights.
         weights (list[float]): the weights.
         noOfNeurons (int): the number of neurons in the hidden layer.
+        topology (Topology): the topology.
 
     Returns:
         np.ndarray: the confidence values.
     """
 
+    noOfHosts: int = len(topology["hosts"])
     copiedData = data.copy()
     npWeights = np.array(predefinedWeights, dtype=np.float64).reshape(-1, noOfNeurons if noOfNeurons > 0 else 1)
     confidenceValues: np.ndarray = np.matmul(copiedData, npWeights)
@@ -203,7 +203,7 @@ def getConfidenceValues(data: np.ndarray, predefinedWeights: "list[float]", weig
     if noOfNeurons > 0:
         npWeights = np.array(weights, dtype=np.float64).reshape(-1, 1)
         confidenceValues = np.matmul(confidenceValues, npWeights)
-        confidenceValues = activationFunction(confidenceValues)
+        confidenceValues = noOfHosts * activationFunction(confidenceValues)
 
     return confidenceValues
 
@@ -225,7 +225,7 @@ def generateEGs(
     """
 
     data: np.ndarray = convertFGsToNP(fgs, topology)
-    data = getConfidenceValues(data, pdWeights, weights, noOfNeurons)
+    data = getConfidenceValues(data, pdWeights, weights, noOfNeurons, topology)
     egs, nodes, embeddingData = convertNPtoEGs(data, fgs, topology)
 
     return egs, nodes, embeddingData
