@@ -167,16 +167,6 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
                 if forwardingGraph["sfcID"] in hosts:
                     del hosts[forwardingGraph["sfcID"]]
 
-    print("********************")
-    print(f"Number of Embedding Graphs: {len(egs)}")
-    for host, vnfs in embeddingData.items():
-        no = 0
-        for sfcs in vnfs.values():
-            no += len(sfcs)
-        print(f"Host {host} has {no} VNFs embedded.")
-    print("#####################")
-
-
     return (egs, nodes, embeddingData)
 
 

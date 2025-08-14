@@ -11,7 +11,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
-from algorithms.hybrid.ga_hybrid import hybridSolver
+from algorithms.hybrid.ga_hybrid import solve
 from sfc.fg_request_generator import FGRequestGenerator
 from sfc.sfc_emulator import SFCEmulator
 from sfc.solver import Solver
@@ -187,7 +187,7 @@ def run(headless: bool) -> None:
                         getConfig()["repoAbsolutePath"],
                         "src",
                         "runs",
-                        "surrogacy",
+                        "hybrid",
                         "configs",
                         "forwarding-graphs.json",
                     ),
@@ -217,7 +217,7 @@ def run(headless: bool) -> None:
                     f"{getConfig()['repoAbsolutePath']}",
                     "src",
                     "runs",
-                    "surrogacy",
+                    "hybrid",
                     "data",
                     "requests.csv",
                 ),
@@ -250,7 +250,7 @@ def run(headless: bool) -> None:
                         requests.append(self._requests.get())
                         sleep(0.1)
 
-                    hybridSolver(
+                    solve(
                         topology,
                         requests,
                         self._orchestrator.sendEmbeddingGraphs,
