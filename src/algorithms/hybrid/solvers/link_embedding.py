@@ -9,6 +9,7 @@ import heapq
 from shared.models.sfc_request import SFCRequest
 from algorithms.hybrid.constants.surrogate import BRANCH
 from algorithms.hybrid.utils.solvers import activationFunction
+from algorithms.utils.graphs import parseNodes
 from constants.topology import SERVER, SFCC
 from shared.models.topology import Link, Topology
 from shared.models.embedding_graph import EmbeddingGraph
@@ -390,57 +391,6 @@ class EmbedLinks:
             index += 1
             closedSet.append(currentNode)
 
-    def parseNodes(self, nodes: "list[str]") -> "Tuple[list[list[str]], list[int]]":
-        """
-        Parses the nodes.
-
-        Parameters:
-            nodes (list[str]): the nodes.
-
-        Returns:
-            Tuple[list[list[str]], list[int]]: the parsed nodes, the parsed divisors.
-        """
-
-        parsedNodes: "list[list[str]]" = []
-        roots: "list[list[str]]" = []
-        branch: "list[str]" = []
-        connectingNode: str = None
-        currentDivisor: int = 1
-        divisors: "list[int]" = []
-        parsedDivisors: "list[int]" = []
-
-        for node in nodes:
-            if node == BRANCH:
-                roots.append(branch[:])
-                parsedNodes.append(branch[:])
-                parsedDivisors.append(currentDivisor)
-                currentDivisor *= 2
-                divisors.append(currentDivisor)
-                connectingNode = branch[-1]
-                branch = []
-            elif node == SERVER:
-                if connectingNode:
-                    parsedNodes.append([connectingNode, node])
-                    parsedDivisors.append(currentDivisor)
-                    connectingNode = None
-                else:
-                    branch.append(node)
-                    parsedNodes.append(branch[:])
-                    parsedDivisors.append(currentDivisor)
-                    branch = []
-                if len(roots) > 0:
-                    lastRoot: "list[str]" = roots.pop()
-                    currentDivisor = divisors.pop()
-                    connectingNode = lastRoot[-1]
-            else:
-                if connectingNode:
-                    parsedNodes.append([connectingNode, node])
-                    parsedDivisors.append(currentDivisor)
-                    connectingNode = None
-                branch.append(node)
-
-        return parsedNodes, parsedDivisors
-
     def getLinkData(self) -> "dict[str, dict[str, float]]":
         """
         Gets the link data.
@@ -467,7 +417,7 @@ class EmbedLinks:
             if "links" not in eg:
                 eg["links"] = []
 
-            sfcNodes, sfcDivisors = self.parseNodes(nodes[eg["sfcID"]])
+            sfcNodes, sfcDivisors = parseNodes(nodes[eg["sfcID"]])
             for nodeList, divisor in zip(sfcNodes, sfcDivisors):
                 for i in range(len(nodeList) - 1):
                     if nodeList[i] == nodeList[i + 1]:
