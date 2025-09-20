@@ -8,12 +8,15 @@ from time import sleep
 from typing import Any
 import click
 from shared.models.embedding_graph import EmbeddingGraph
+from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
 from algorithms.hybrid.genesis import solve
+from mano.orchestrator import Orchestrator
 from sfc.fg_request_generator import FGRequestGenerator
 from sfc.sfc_emulator import SFCEmulator
+from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
 from utils.topology import generateFatTreeTopology
 from utils.traffic_design import generateTrafficDesignFromFile
@@ -33,16 +36,18 @@ def run(headless: bool) -> None:
         None
     """
 
-    experimentsIncludeFilter: list[dict[str, Any]] = []
+    experimentsIncludeFilter: list[dict[str, Any]] = [
+        (8, 0.2, False, 5, 1),
+    ]
     experimentsExcludeFilter: list[dict[str, Any]] = []
     experimentPriority: list[str] = []
     experimentsToRun: list[dict[str, Any]] = []
 
-    for noOfCopy in [8, 16]:
+    for noOfCopy in [8, 12]:
         for trafficScale in [0.1, 0.2]:
             for trafficPattern in [False, True]:
                 for linkBandwidth in [10, 5]:
-                    for noOfCPUs in [2, 1]:
+                    for noOfCPUs in [2, 1, 0.5]:
                         experimentsToRun.append(
                             {
                                 "name": f"{noOfCopy}_{trafficScale}_{trafficPattern}_{linkBandwidth}_{noOfCPUs}",
@@ -92,16 +97,17 @@ def run(headless: bool) -> None:
         ):
             continue
 
-        class FGGen(FGRequestGenerator):
+        class SFCRGen(SFCRequestGenerator):
             """
             Class to generate FG Requests.
             """
 
-            def __init__(self, fgs: "list[EmbeddingGraph]") -> None:
+            def __init__(self, orchestrator: Orchestrator) -> None:
                 """
-                Initialize the FGGen class.
+                Initialize the SFCRGen class.
                 """
-                super().__init__(fgs)
+
+                super().__init__(orchestrator)
                 with open(
                     os.path.join(
                         getConfig()["repoAbsolutePath"],
@@ -109,27 +115,27 @@ def run(headless: bool) -> None:
                         "runs",
                         "hybrid",
                         "configs",
-                        "forwarding-graphs.json",
+                        "sfcrs.json",
                     ),
                     "r",
                     encoding="utf8",
                 ) as f:
-                    self.fgs = json.load(f)
+                    self.sfcrs = json.load(f)
 
             def generateRequests(self) -> "list[EmbeddingGraph]":
                 """
                 Generate the FG Requests.
                 """
 
-                fgsToSend: "list[EmbeddingGraph]" = []
+                sfcrsToSend: "list[SFCRequest]" = []
 
-                for i, fg in enumerate(self.fgs):
+                for i, sfcr in enumerate(self.sfcrs):
                     for c in range(exp["noOfCopies"]):
-                        fgToSend: EmbeddingGraph = fg.copy()
-                        fgToSend["sfcrID"] = f"sfcr{i}-{c}"
-                        fgsToSend.append(fgToSend)
+                        sfcrToSend: SFCRequest = sfcr.copy()
+                        sfcrToSend["sfcrID"] = f"sfcr{i}-{c}"
+                        sfcrsToSend.append(sfcrToSend)
 
-                self._orchestrator.sendRequests(fgsToSend)
+                self._orchestrator.sendRequests(sfcrsToSend)
 
         trafficDesign: "list[TrafficDesign]" = [
             generateTrafficDesignFromFile(
@@ -185,7 +191,7 @@ def run(headless: bool) -> None:
 
                 TUI.appendToSolverLog("Finished experiment.")
 
-        sfcEm: SFCEmulator = SFCEmulator(FGGen, HybridSolver, headless)
+        sfcEm: SFCEmulator = SFCEmulator(SFCRGen, HybridSolver, headless)
         sfcEm.startTest(
             topology,
             trafficDesign,

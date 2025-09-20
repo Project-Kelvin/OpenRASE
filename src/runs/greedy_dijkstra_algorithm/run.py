@@ -31,7 +31,7 @@ import os
 
 config: Config = getConfig()
 configPath: str = (
-    f"{config['repoAbsolutePath']}/src/runs/simple_dijkstra_algorithm/configs"
+    f"{config['repoAbsolutePath']}/src/runs/greedy_dijkstra_algorithm/configs"
 )
 
 

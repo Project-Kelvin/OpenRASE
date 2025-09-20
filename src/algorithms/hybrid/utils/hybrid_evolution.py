@@ -389,9 +389,9 @@ class HybridEvolution:
         )
 
         expStartTime: int = timeit.default_timer()
-        NGEN = 500
+        NGEN: int = 500
         MAX_MEMORY_DEMAND: int = 2
-        MAX_LATENCY: int = 150
+        MAX_LATENCY: int = 100
         MIN_AR: float = 1.0
         MIN_QUAL_IND: int = 1
         CXPB: float = 1.0
@@ -500,8 +500,8 @@ class HybridEvolution:
             expFile.write(
                 f"Traffic Pattern: {'Pattern B' if names[2] == 'True' else 'Pattern A'}\n"
             )
-            expFile.write(f"Link Bandwidth: {int(names[3])}\n")
-            expFile.write(f"No. of CPUs: {int(names[4])}\n")
+            expFile.write(f"Link Bandwidth: {names[3]}\n")
+            expFile.write(f"No. of CPUs: {names[4]}\n")
             expFile.write(f"Time taken: {expEndTime - expStartTime:.2f}\n")
 
         self._toolbox.unregister("individual")

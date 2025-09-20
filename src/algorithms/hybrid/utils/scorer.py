@@ -24,7 +24,7 @@ class Scorer:
     def getHostScores(
         data: dict[str, float],
         topology: Topology,
-        embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]",
+        embeddingData: EmbeddingData,
         demandPredictor: DemandPredictions,
     ) -> "dict[str, ResourceDemand]":
         """

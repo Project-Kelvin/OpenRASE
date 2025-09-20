@@ -30,7 +30,6 @@ from algorithms.hybrid.utils.extract_weights import (
     getWeightsLength,
 )
 from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution, Individual
-from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
 from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 

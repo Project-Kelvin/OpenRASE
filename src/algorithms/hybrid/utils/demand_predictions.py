@@ -2,8 +2,6 @@
 Defines the functions used to make predictions efficiently.
 """
 
-from typing import Tuple
-import numpy as np
 from shared.models.embedding_graph import VNF, EmbeddingGraph
 from algorithms.hybrid.models.traffic import TimeSFCRequests
 from calibrate.demand_predictor import DemandPredictor
@@ -24,7 +22,7 @@ class DemandPredictions:
         self._cpuDemandData: dict[str, float] = {}
         self._memoryDemandData: dict[str, float] = {}
 
-    def _getVNFsInEG(self, eg: "EmbeddingGraph") -> "list[Tuple[str, int]]":
+    def _getVNFsInEG(self, eg: "EmbeddingGraph") -> "list[tuple[str, int]]":
         """
         Get the VNFs in the embedding graph.
 
@@ -34,7 +32,7 @@ class DemandPredictions:
             list[Tuple[str, int]]: A list of tuples containing the VNF name and its depth in the embedding graph.
         """
 
-        vnfList: "list[Tuple[str, int]]" = []
+        vnfList: "list[tuple[str, int]]" = []
         def parseVNF(vnf: VNF, depth: int) -> None:
             """
             Recursive function to parse VNFs in the embedding graph.
@@ -71,7 +69,7 @@ class DemandPredictions:
 
         cacheData: dict[str, list[float]] = {}
         for eg in egs:
-            vnfsList: "list[Tuple[str, int]]" = self._getVNFsInEG(eg)
+            vnfsList: "list[tuple[str, int]]" = self._getVNFsInEG(eg)
             reqps = [sfcs[eg["sfcID"]] for sfcs in data]
 
             for req in reqps:

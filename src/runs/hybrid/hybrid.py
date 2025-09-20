@@ -12,6 +12,7 @@ from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
 from algorithms.hybrid.ga_hybrid import solve
+from mano.orchestrator import Orchestrator
 from sfc.fg_request_generator import FGRequestGenerator
 from sfc.sfc_emulator import SFCEmulator
 from sfc.solver import Solver
@@ -32,63 +33,6 @@ def run(headless: bool) -> None:
     Returns:
         None
     """
-
-    experiments: list[dict[str, Any]] = [
-        {
-            "name": "baseline",
-            "noOfCopies": 8,
-            "trafficScale": 0.1,
-            "trafficPattern": False,
-            "linkBandwidth": 10,
-            "noOfCPUs": 2,
-            "memory": 5120,
-        },
-        {
-            "name": "cpus_1",
-            "noOfCopies": 8,
-            "trafficScale": 0.1,
-            "trafficPattern": False,
-            "linkBandwidth": 10,
-            "noOfCPUs": 1,
-            "memory": 5120,
-        },
-        {
-            "name": "bw_5",
-            "noOfCopies": 8,
-            "trafficScale": 0.1,
-            "trafficPattern": False,
-            "linkBandwidth": 5,
-            "noOfCPUs": 2,
-            "memory": 5120,
-        },
-        {
-            "name": "sfcrs_64",
-            "noOfCopies": 16,
-            "trafficScale": 0.1,
-            "trafficPattern": False,
-            "linkBandwidth": 10,
-            "noOfCPUs": 2,
-            "memory": 5120,
-        },
-        {
-            "name": "traffic_scale_2",
-            "noOfCopies": 8,
-            "trafficScale": 0.2,
-            "trafficPattern": False,
-            "linkBandwidth": 10,
-            "noOfCPUs": 2,
-            "memory": 5120,
-        },
-        {
-            "name": "traffic_b",
-            "noOfCopies": 8,
-            "trafficScale": 0.1,
-            "trafficPattern": True,
-            "linkBandwidth": 10,
-            "noOfCPUs": 2,
-            "memory": 5120,
-        },
-    ]
 
     experimentsIncludeFilter: list[dict[str, Any]] = [
     ]
@@ -111,20 +55,14 @@ def run(headless: bool) -> None:
         # (16, 0.2, True, 10, 2), #incomplete,
     ]
     experimentPriority: list[str] = [
-        "8_0.1_False_10_2",
-        "8_0.1_False_10_1",
-        "8_0.1_False_5_2",
-        "8_0.2_False_10_2",
-        "8_0.1_True_10_2",
-        "16_0.1_False_10_2",
     ]
     experimentsToRun: list[dict[str, Any]] = []
 
-    for noOfCopy in [8, 16]:
+    for noOfCopy in [8, 12]:
         for trafficScale in [0.1, 0.2]:
             for trafficPattern in [False, True]:
                 for linkBandwidth in [10, 5]:
-                    for noOfCPUs in [2, 1]:
+                    for noOfCPUs in [2, 1, 0.5]:
                         experimentsToRun.append(
                             {
                                 "name": f"{noOfCopy}_{trafficScale}_{trafficPattern}_{linkBandwidth}_{noOfCPUs}",
@@ -177,11 +115,12 @@ def run(headless: bool) -> None:
             Class to generate FG Requests.
             """
 
-            def __init__(self, fgs: "list[EmbeddingGraph]") -> None:
+            def __init__(self, orchestrator: Orchestrator) -> None:
                 """
                 Initialize the FGGen class.
                 """
-                super().__init__(fgs)
+
+                super().__init__(orchestrator)
                 with open(
                     os.path.join(
                         getConfig()["repoAbsolutePath"],
@@ -249,7 +188,6 @@ def run(headless: bool) -> None:
                     while not self._requests.empty():
                         requests.append(self._requests.get())
                         sleep(0.1)
-
                     solve(
                         topology,
                         requests,
