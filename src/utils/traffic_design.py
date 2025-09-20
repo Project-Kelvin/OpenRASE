@@ -21,7 +21,7 @@ def generateTrafficDesign(start: int, end: int, duration: int) -> "TrafficDesign
     rate: "TrafficDesign" = []
 
     for i in range(duration):
-        req: int = start + round((end - (start - 1)) * i / duration)
+        req: int = start + round((end - start) * i / (duration - 1))
         rate.append({
             "target": req,
             "duration": "1s"
@@ -38,6 +38,7 @@ def generateTrafficDesignFromFile(dataFile: str, scale: float = 1, hourDuration:
         scale (float): the scale factor.
         hourDuration (float): the simulated duration of the hour in seconds.
         minimal (bool): whether to generate minimal traffic design.
+        type2 (bool): whether to generate type 2 traffic design.
 
     Returns:
         TrafficDesign: the Traffic Design.
