@@ -147,3 +147,19 @@ sudo poetry run init
 ```bash
 sudo poetry run test
 ```
+
+# Citation
+If you use OpenRASE in your research, please cite:
+```bibtex
+@INPROCEEDINGS{11197454,
+  author={Krishnamohan, Theviyanthan and Harvey, Paul},
+  booktitle={2025 International Conference on Software, Telecommunications and Computer Networks (SoftCOM)}, 
+  title={OpenRASE: Service Function Chain Emulation}, 
+  year={2025},
+  volume={},
+  number={},
+  pages={1-6},
+  keywords={Service function chaining;Heuristic algorithms;Software algorithms;Dynamic scheduling;Computer networks;Software;Telecommunications;Resource management;Optimization;Genetic algorithms;Emulator;Network Function Virtualisation (NFV);Network Function Virtualisation Resource Allocation (NFV-RA);Service Function Chaining (SFC);Autonomous Network},
+  doi={}
+}
+```
