@@ -35,6 +35,7 @@ deap = "^1.4.1"
 networkx = {version = "3.2.1", extras = ["default"]}
 tensorflow = "2.18"
 polars = "^1.30.0"
+scikit-learn = "1.6"
 
 [build-system]
 requires = ["poetry-core"]
@@ -59,3 +60,5 @@ hybrid = "runs.hybrid.hybrid:run"
 traffic = "runs.visualise_traffic_pattern:run"
 gaha = "runs.hybrid.gaha:run"
 gda = "runs.greedy_dijkstra_algorithm.genesis_comp:run"
+trainModels = "runs.hybrid.surrogate:trainModels"
+dynamic = "runs.hybrid.genesis_dynamic:run"

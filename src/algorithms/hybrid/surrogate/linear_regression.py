@@ -10,44 +10,24 @@ import tensorflow as tf
 import pandas as pd
 import matplotlib.pyplot as plt
 from algorithms.hybrid.constants.surrogate import (
-    SURROGACY_PATH,
-    SURROGATE_MODELS_PATH,
+    SURROGACY_PATH
 )
 from algorithms.hybrid.surrogate.combine_data import combineData
 
 features: "list[str]" = ["max_link_score", "max_cpu"]
 OUTPUT: str = "latency"
-modelPath: str = SURROGATE_MODELS_PATH
 
-if not os.path.exists(modelPath):
-    os.makedirs(modelPath)
+SURROGATE_OUTPUT_PATH: str = os.path.join(SURROGACY_PATH, "linear_regression_model")
 
-MODEL_PATH: str = os.path.join(SURROGATE_MODELS_PATH, "surrogate.keras")
+if not os.path.exists(SURROGATE_OUTPUT_PATH):
+    os.makedirs(SURROGATE_OUTPUT_PATH)
 
-def train() -> None:
+def trainLR() -> None:
     """
     Trains the surrogate model.
     """
 
     trainingData, testData, allData = combineData()
-
-    # Scatter plot of max_cpu vs max_link_score for all data
-    plotData: pd.DataFrame = allData
-    plt.figure(1, (8, 4), dpi=300)
-    plt.scatter(
-        plotData["max_cpu"],
-        plotData["max_link_score"],
-        c=plotData[OUTPUT],
-        vmax=700,
-    )
-    plt.ylim(0, 1000)
-    plt.xlabel("Maximum CPU Demand")
-    plt.ylabel("Maximum Bandwidth Demand")
-    plt.legend()
-    plt.colorbar(label="Traffic Latency (ms)")
-    plt.grid(True)
-    plt.savefig(f"{SURROGACY_PATH}/cpu_vs_max_link.png")
-    plt.clf()
 
     xTrain: np.ndarray = trainingData[features].values
     yTrain: np.ndarray = trainingData[OUTPUT].values
@@ -56,18 +36,11 @@ def train() -> None:
 
     normalizer = tf.keras.layers.Normalization()
     normalizer.adapt(xTrain)
-    activation: str = "sigmoid"
 
     model: tf.keras.Sequential = tf.keras.Sequential(
         [
             tf.keras.layers.Input(shape=(len(features),)),
             normalizer,
-            tf.keras.layers.Dense(
-                16, kernel_initializer="glorot_normal", activation=activation
-            ),
-            tf.keras.layers.Dense(
-                16, kernel_initializer="glorot_normal", activation=activation
-            ),
             tf.keras.layers.Dense(1),
         ]
     )
@@ -77,7 +50,9 @@ def train() -> None:
         loss="mse",
         metrics=[tf.keras.metrics.RootMeanSquaredError()],
     )
-    history: Any = model.fit(xTrain, yTrain, epochs=200, verbose=1, validation_split=0.1)
+    history: Any = model.fit(
+        xTrain, yTrain, epochs=200, verbose=1, validation_split=0.1
+    )
     print(model.evaluate(xTest, yTest))
 
     # Plotting the training history
@@ -88,23 +63,29 @@ def train() -> None:
     plt.ylabel("Error")
     plt.legend()
     plt.grid(True)
-    plt.savefig(f"{SURROGACY_PATH}/loss_vs_val_loss.png")
+    plt.savefig(f"{SURROGATE_OUTPUT_PATH}/loss_vs_val_loss.png")
     plt.clf()
 
     output: np.array = model.predict(xTest)
     testData: pd.DataFrame = testData.assign(PredictedLatency=output.flatten())
-    testData.to_csv(f"{SURROGACY_PATH}/predictions.csv", index=False)
+    testData.to_csv(f"{SURROGATE_OUTPUT_PATH}/predictions.csv", index=False)
     testData = testData.sort_values(by=OUTPUT).reset_index(drop=True)
 
     # Scatter plot of predicted vs actual latency
     plt.figure(2, (8, 4), dpi=300)
-    plt.scatter(testData.index, testData["PredictedLatency"], label="Predicted Average Traffic Latency (ms)")
-    plt.scatter(testData.index, testData[OUTPUT], label="Actual Average Traffic Latency (ms)")
+    plt.scatter(
+        testData.index,
+        testData["PredictedLatency"],
+        label="Predicted Average Traffic Latency (ms)",
+    )
+    plt.scatter(
+        testData.index, testData[OUTPUT], label="Actual Average Traffic Latency (ms)"
+    )
     plt.xlabel("Index")
     plt.ylabel("Traffic Latency (ms)")
     plt.legend()
     plt.grid(True)
-    plt.savefig(f"{SURROGACY_PATH}/latency_vs_predicted_latency.png")
+    plt.savefig(f"{SURROGATE_OUTPUT_PATH}/latency_vs_predicted_latency.png")
     plt.clf()
 
     # Scatter plot of max_cpu vs max_link_score with actual and predicted latency
@@ -141,7 +122,9 @@ def train() -> None:
     plt2.grid(True)
     plt2.set_title("Predicted Traffic Latency")
 
-    plt.savefig(f"{SURROGACY_PATH}/latency_vs_predicted_latency_scatter_two_plots.png")
+    plt.savefig(
+        f"{SURROGATE_OUTPUT_PATH}/latency_vs_predicted_latency_scatter_two_plots.png"
+    )
     plt.clf()
 
     cpus: "list[float]" = [random.uniform(0, 1.75) for _ in range(1000000)]
@@ -167,40 +150,5 @@ def train() -> None:
     ax.set_xlabel("Maximum CPU Demand", fontsize=10)
     ax.set_ylabel("Maximum Bandwidth Demand", fontsize=10)
     ax.grid(True)
-    plt.savefig(f"{SURROGACY_PATH}/simulated_latency_scatter.png")
+    plt.savefig(f"{SURROGATE_OUTPUT_PATH}/simulated_latency_scatter.png")
     plt.clf()
-
-    model.save(MODEL_PATH)
-
-
-def predictLatency(data: pd.DataFrame) -> pd.DataFrame:
-    """
-    Predicts the latency.
-
-    Parameters:
-        data (pd.DataFrame): the data.
-
-    Returns:
-        pd.DataFrame: the data with predicted latency.
-    """
-
-    model: tf.keras.Sequential = getSurrogateModel()
-    output: np.array = model.predict(data[features], verbose=0)
-    data = data.assign(PredictedLatency=output.flatten())
-
-    return data
-
-def getSurrogateModel() -> tf.keras.Sequential:
-    """
-    Returns the model.
-
-    Returns:
-        tf.keras.Sequential: the model.
-    """
-
-    try:
-        return tf.keras.models.load_model(MODEL_PATH)
-    except Exception as e:
-        print(f"Error loading model: {e}")
-
-        return None
