@@ -1,5 +1,5 @@
 
-FROM golang:1.24-alpine3.22 as builder
+FROM golang:1.25-alpine3.22 as builder
 
 WORKDIR $GOPATH/src/go.k6.io/k6
 
