@@ -50,7 +50,7 @@ def getVNFWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
         int: the number of VNF weights.
     """
 
-    return len(sfcrs) + len(getConfig()["vnfs"]["names"]) + 1
+    return len(sfcrs) + len(getConfig()["vnfs"]["names"]) + 2
 
 def getPredefinedWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology, noOfNeurons: int) -> int:
     """

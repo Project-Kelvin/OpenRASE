@@ -16,50 +16,53 @@ from shared.utils.config import getConfig
 from utils.embedding_graph import traverseVNF
 import numpy as np
 
-def convertFGsToNP(fgs: dict[str, list[str]], topology: Topology) -> np.ndarray:
+def convertFGsToNP(fgs: dict[str, list[str]]) -> tuple[np.ndarray, list[str]]:
     """
     Converts a list of EmbeddingGraphs to a NumPy array.
 
     Parameters:
         fgs (dict[str, list[str]]): the dictionary of EmbeddingGraphs.
-        topology (Topology): the topology.
 
     Returns:
-        np.ndarray: the NumPy array.
+        tuple[np.ndarray, list[str]]: (the NumPy array, the list of indices).
     """
 
     vnfs: "list[str]" = getConfig()["vnfs"]["names"]
     data: "list[list[int]]" = []
-    instances: "dict[str, int]" = {}
-    for index, fg in enumerate(fgs.values()):
+    totalInstances: int = 2
+    indices: list[str] = []
+
+    for index, fg in enumerate(fgs.items()):
         fgID: int = index
         fgHotCode: "list[int]" = [0] * len(fgs)
         fgHotCode[fgID] = 1
 
-        for vnf in fg:
+        for vnf in fg[1]:
             vnfID: int = vnfs.index(vnf)
             vnfsHotCode: "list[int]" = [0] * len(vnfs)
             vnfsHotCode[vnfID] = 1
 
-            if vnf not in instances:
-                instances[vnf] = 1
-            else:
-                instances[vnf] += 1
+            for instances in range(0, totalInstances):
+                instanceHotCode: "list[int]" = [0] * totalInstances
+                instanceHotCode[instances] = 1
+                row: "list[int]" = fgHotCode + vnfsHotCode + instanceHotCode
+                data.append(row)
+                indices.append(f"{fg[0]}_{vnf}_{instances}")
 
-            row: "list[int]" = fgHotCode + vnfsHotCode + [instances[vnf]]
-            data.append(row)
+    return np.array(data, dtype=np.float64), indices
 
-    return np.array(data, dtype=np.float64)
 
-def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topology) -> "Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]":
+def convertNPtoEGs(
+    data: np.ndarray, fgs: dict[str, list[str]], topology: Topology, indices: list[str]
+) -> "Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]":
     """
     Generates the Embedding Graphs.
 
     Parameters:
         data (np.ndarray): the data.
-        fgs (list[EmbeddingGraph]): the list of Embedding Graphs.
+        fgs (dict[str, list[str]]): the dictionary of Embedding Graphs.
         topology (Topology): the topology.
-
+        indices (list[str]): the list of indices.
     Returns:
         Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
     """
@@ -69,9 +72,7 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
     nodes: "dict[str, list[str]]" = {}
     embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" = {}
     splitters: "list[str]" = getConfig()["vnfs"]["splitters"]
-
     for sfcrID, sortedVNFs in fgs.items():
-        index: int = 0
         forwardingGraph: EmbeddingGraph = {"sfcID": sfcrID, "vnfs": {}}
         nodes[sfcrID] = [SFCC]
         embeddingNotFound: bool = False
@@ -79,7 +80,7 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
         depth: int = 1
         vnfDict: VNF = forwardingGraph["vnfs"]
 
-        def addVNF(vnfs: "list[str]", vnfDict: VNF, depth: int) -> None:
+        def addVNF(vnfs: "list[str]", vnfDict: VNF, depth: int, instance: int) -> None:
             """
             Adds VNF to the EmbeddingGraph.
 
@@ -87,13 +88,13 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
                 vnfs (list[str]): the VNFs.
                 vnfDict (VNF): the VNF dictionary.
                 depth (int): the depth of the VNF.
-                splitters (list[str]): the list of splitters.
+                instance (int): the instance number.
 
             Returns:
                 None
             """
 
-            nonlocal oldDepth, index, nodes, embeddingData, embeddingNotFound, splitters
+            nonlocal oldDepth, indices, nodes, embeddingData, embeddingNotFound, splitters
 
             if depth != oldDepth:
                 oldDepth = depth
@@ -114,21 +115,23 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
             vnf: str = vnfs.pop(0)
             splitter: bool = vnf in splitters
             vnfDict["next"] = [{}, {}] if splitter else {}
-            cl: "list[float]" = data[index, 0]
-            index += noHosts
+            index: int = indices.index(f"{sfcrID}_{vnf}_{instance}")
+            cl: float = data[index, 0]
 
-            # maxCL: float = max(cl)
+            # Reject 10% of the VNFs
+            rejectionRate: float = 0.05
+            absCL: float = abs(cl)
+            acceptanceValue: float = absCL % int(absCL) if int(absCL) != 0 else absCL
 
-            if cl < 0.0:
+            if acceptanceValue < rejectionRate:
                 embeddingNotFound = True
 
                 return
             else:
-                vnfDict["vnf"] = {"id": vnf}
-                hostIndex = int(random.gauss(cl, 2))
+                hostIndex = abs(int(random.gauss(cl, 2)))
                 hostIndex = hostIndex % noHosts
-                if hostIndex < 0:
-                    hostIndex = noHosts + hostIndex
+
+                vnfDict["vnf"] = {"id": vnf}
                 vnfDict["host"] = {"id": topology["hosts"][hostIndex]["id"]}
 
                 # pylint: disable=cell-var-from-loop
@@ -153,12 +156,11 @@ def convertNPtoEGs(data: np.ndarray, fgs: "list[EmbeddingGraph]", topology: Topo
             if splitter:
                 depth += 1
                 for i in range(2):
-                    addVNF(vnfs.copy(), vnfDict["next"][i], depth)
+                    addVNF(vnfs.copy(), vnfDict["next"][i], depth, i)
             else:
-                addVNF(vnfs, vnfDict["next"], depth)
+                addVNF(vnfs, vnfDict["next"], depth, 0)
 
-        addVNF(sortedVNFs, vnfDict, depth)
-
+        addVNF(sortedVNFs, vnfDict, depth, 0)
         if not embeddingNotFound:
             eg: EmbeddingGraph = copy.deepcopy(forwardingGraph)
             egs.append(eg)
@@ -214,8 +216,8 @@ def generateEGs(
         Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
     """
 
-    data: np.ndarray = convertFGsToNP(fgs, topology)
+    data, indices = convertFGsToNP(fgs)
     data = getConfidenceValues(data, pdWeights, weights, noOfNeurons, topology)
-    egs, nodes, embeddingData = convertNPtoEGs(data, fgs, topology)
+    egs, nodes, embeddingData = convertNPtoEGs(data, fgs, topology, indices)
 
     return egs, nodes, embeddingData

@@ -200,7 +200,7 @@ def solve(
     sfcrs: "list[SFCRequest]",
     sendEGs: "Callable[[list[EmbeddingGraph]], None]",
     deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
-    trafficDesign: TrafficDesign,
+    trafficDesign: list[TrafficDesign],
     trafficGenerator: TrafficGenerator,
     topology: Topology,
     experimentName: str,
