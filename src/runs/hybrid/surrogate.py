@@ -16,7 +16,16 @@ from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
 from algorithms.hybrid.constants.surrogate import SURROGACY_PATH
 from algorithms.hybrid.surrogate.data_generator.evolver import evolveWeights
+from algorithms.hybrid.surrogate.gaussian_process import trainGP
+from algorithms.hybrid.surrogate.linear_regression import trainLR
+from algorithms.hybrid.surrogate.nn_linear import trainNNLinear
+from algorithms.hybrid.surrogate.nn_one_layer import trainNNOneLayer
+from algorithms.hybrid.surrogate.nn_one_layer_32 import trainNNOneLayer32
+from algorithms.hybrid.surrogate.nn_relu import trainNNReLU
+from algorithms.hybrid.surrogate.nn_three_layers import trainNNThreeLayers
+from algorithms.hybrid.surrogate.random_forest import trainRF
 from algorithms.hybrid.surrogate.surrogate import train
+from algorithms.hybrid.surrogate.svr import trainSVR
 from mano.orchestrator import Orchestrator
 from sfc.fg_request_generator import FGRequestGenerator
 from sfc.sfc_emulator import SFCEmulator
@@ -32,6 +41,21 @@ directory = SURROGACY_PATH
 
 if not os.path.exists(directory):
     os.makedirs(directory)
+
+def trainModels() -> None:
+    """
+    Runs the linear regression surrogate model.
+    """
+
+    trainSVR()
+    trainGP()
+    trainLR()
+    trainNNLinear()
+    trainRF()
+    trainNNOneLayer32()
+    trainNNThreeLayers()
+    trainNNReLU()
+    trainNNOneLayer()
 
 
 def trainModel() -> None:
