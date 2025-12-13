@@ -183,6 +183,7 @@ def run(headless: bool) -> None:
                         trafficDesign,
                         self._trafficGenerator,
                         topology,
+                        "genesis",
                         exp["name"],
                     )
 

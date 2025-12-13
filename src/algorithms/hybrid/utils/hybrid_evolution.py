@@ -246,7 +246,6 @@ class HybridEvolution:
         HybridEvaluation.saveCachedLatency(
             os.path.join(dirName, scoresDir, f"gen_{gen}.csv")
         )
-
         startTime: int = timeit.default_timer()
         with ProcessPoolExecutor() as executor:
             futures = [
@@ -266,7 +265,6 @@ class HybridEvolution:
                 result: "tuple[int, float, float]" = future.result()
                 ind: "Individual" = pop[result[0]]
                 ind.fitness.values = (result[1], result[2])
-
         endTime: int = timeit.default_timer()
         TUI.appendToSolverLog(
             f"Finished generation {gen} in {endTime - startTime} seconds."
@@ -395,8 +393,8 @@ class HybridEvolution:
         MIN_AR: float = 1.0
         MIN_QUAL_IND: int = 1
         CXPB: float = 1.0
-        INDPB: float = 1.0
-        MUTPB: float = 1.0
+        INDPB: float = 0.2
+        MUTPB: float = 0.8
         SCORES_DIR: str = "scores"
 
         expDir: str = os.path.join(self._artifactsDir, experiment)

@@ -203,6 +203,7 @@ def solve(
     trafficDesign: list[TrafficDesign],
     trafficGenerator: TrafficGenerator,
     topology: Topology,
+    dirName: str,
     experimentName: str,
 ) -> None:
     """
@@ -212,9 +213,10 @@ def solve(
         sfcrs (list[SFCRequest]): the list of Service Function Chains.
         sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
         deleteEGs (Callable[[list[EmbeddingGraph]], None]): the function to delete the Embedding Graphs.
-        trafficDesign (TrafficDesign): the traffic design.
+        trafficDesign (list[TrafficDesign]): the traffic design.
         trafficGenerator (TrafficGenerator): the traffic generator.
         topology (Topology): the topology.
+        dirName (str): the directory name.
         experimentName (str): the name of the experiment.
 
     Returns:
@@ -230,7 +232,7 @@ def solve(
     )
 
     hybridEvolution: HybridEvolution = HybridEvolution(
-        "genesis", decodePop, generateRandomIndividual, crossover, mutate
+        dirName, decodePop, generateRandomIndividual, crossover, mutate
     )
 
     hybridEvolution.hybridSolve(
