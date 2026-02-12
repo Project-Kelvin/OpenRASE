@@ -118,7 +118,7 @@ def convertNPtoEGs(
             index: int = indices.index(f"{sfcrID}_{vnf}_{instance}")
             cl: float = data[index, 0]
 
-            # Reject 10% of the VNFs
+            # Reject 5% of the VNFs
             rejectionRate: float = 0.05
             absCL: float = abs(cl)
             acceptanceValue: float = absCL % int(absCL) if int(absCL) != 0 else absCL
