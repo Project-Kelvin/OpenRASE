@@ -41,6 +41,7 @@ class Individual(list):
         self.id: UUID = uuid4()
         self.fitness: base.Fitness = creator.MaxARMinLatency()
 
+
 def GADijkstraAlgorithm(
     topology: Topology,
     fgrs: "list[EmbeddingGraph]",
@@ -48,7 +49,7 @@ def GADijkstraAlgorithm(
     deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
     trafficDesign: TrafficDesign,
     trafficGenerator: TrafficGenerator,
-    dirName: str
+    dirName: str,
 ) -> "tuple[tools.ParetoFront]":
     """
     Run the Genetic Algorithm + Dijkstra Algorithm.
@@ -64,25 +65,19 @@ def GADijkstraAlgorithm(
         tuple[tools.ParetoFront]: the Pareto Front
     """
 
-    expDir: str = os.path.join(getConfig()['repoAbsolutePath'], "artifacts", "experiments")
-    if not os.path.exists( os.path.join(expDir, MAIN_DIR)):
-        os.makedirs(
-            os.path.join(expDir, MAIN_DIR)
-        )
-
-    if not os.path.exists(
-        os.path.join(expDir, MAIN_DIR, dirName)
-    ):
-        os.makedirs(
-            os.path.join(expDir, MAIN_DIR, dirName)
-        )
-
-    dataDir: str = os.path.join(
-        expDir, MAIN_DIR, dirName, "data.csv"
+    TUI.appendToSolverLog(f"Starting Experiment: {dirName}")
+    expDir: str = os.path.join(
+        getConfig()["repoAbsolutePath"], "artifacts", "experiments"
     )
-    pfDir: str = os.path.join(
-        expDir, MAIN_DIR, dirName, "pfs.csv"
-    )
+    if not os.path.exists(os.path.join(expDir, MAIN_DIR)):
+        os.makedirs(os.path.join(expDir, MAIN_DIR))
+
+    if not os.path.exists(os.path.join(expDir, MAIN_DIR, dirName)):
+        os.makedirs(os.path.join(expDir, MAIN_DIR, dirName))
+
+    dataDir: str = os.path.join(expDir, MAIN_DIR, dirName, "data.csv")
+    pfDir: str = os.path.join(expDir, MAIN_DIR, dirName, "pfs.csv")
+    timeDir: str = os.path.join(expDir, MAIN_DIR, dirName, "times.log")
 
     with open(
         dataDir,
@@ -100,14 +95,11 @@ def GADijkstraAlgorithm(
     ) as pf:
         pf.write("generation, latency, ar\n")
 
-    startTime: float = timeit.default_timer()
     creator.create("MaxARMinLatency", base.Fitness, weights=(1.0, -1.0))
 
     toolbox: base.Toolbox = base.Toolbox()
 
-    toolbox.register(
-        "individual", generateRandomIndividual, Individual, topology, fgrs
-    )
+    toolbox.register("individual", generateRandomIndividual, Individual, topology, fgrs)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("mate", tools.cxTwoPoint)
     toolbox.register("mutate", mutate, indpb=1.0)
@@ -117,7 +109,9 @@ def GADijkstraAlgorithm(
     gen: int = 1
 
     CXPB, MUTPB, NGEN = 1.0, 1.0, 10
+    TIME_LIMIT: int = 24 * 60 * 60
 
+    startTime: float = timeit.default_timer()
     decodedPop: "list[DecodedIndividual]" = decodePop(pop, topology, fgrs)
     HybridEvaluation.cacheForOnline(decodedPop, trafficDesign)
     for ind in decodedPop:
@@ -159,7 +153,9 @@ def GADijkstraAlgorithm(
 
     gen = gen + 1
 
-    while gen <= NGEN:
+    elapsedTime = timeit.default_timer() - startTime
+
+    while elapsedTime < TIME_LIMIT:
         TUI.appendToSolverLog(f"Generation: {gen}")
         offspring = algorithm(pop, toolbox, CXPB, MUTPB)
         decodedOffspring: "list[DecodedIndividual]" = decodePop(
@@ -182,17 +178,23 @@ def GADijkstraAlgorithm(
         pop[:] = toolbox.select(pop + offspring, k=NO_OF_INDIVIDUALS)
         hof.update(pop)
 
+        TUI.appendToSolverLog(f"Pareto Front for Generation {gen}:")
         for ind in hof:
             with open(
                 pfDir,
                 "a",
                 encoding="utf8",
             ) as pfFile:
-                pfFile.write(f"{gen}, {ind.fitness.values[1]}, {ind.fitness.values[0]}\n")
+                pfFile.write(
+                    f"{gen}, {ind.fitness.values[1]}, {ind.fitness.values[0]}\n"
+                )
 
         ars = [ind.fitness.values[0] for ind in pop]
         latencies = [ind.fitness.values[1] for ind in pop]
 
+        TUI.appendToSolverLog(
+            f"Average AR: {np.mean(ars)}, Average Latency: {np.mean(latencies)}"
+        )
         with open(
             dataDir,
             "a",
@@ -203,8 +205,17 @@ def GADijkstraAlgorithm(
             )
 
         gen = gen + 1
+        elapsedTime = timeit.default_timer() - startTime
+        TUI.appendToSolverLog(f"Elapsed Time: {elapsedTime} seconds")
 
     endTime: float = timeit.default_timer()
+
+    with open(
+        timeDir,
+        "w",
+        encoding="utf8",
+    ) as timeFile:
+        timeFile.write(f"Time taken: {endTime - startTime} seconds")
     TUI.appendToSolverLog(f"Time taken: {endTime - startTime} seconds")
 
     return hof
