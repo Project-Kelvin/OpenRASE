@@ -77,3 +77,136 @@ def generateFatTreeTopology(k: int, bandwidth: int, cpu: int, memory: int, delay
                 )
 
     return Topology(hosts=hosts, switches=coreSwitches + aggrSwitches + edgeSwitches, links=links)
+
+def generateTopologyFromEdgeList(edgeListFile: str) -> Topology:
+    """
+    Generate a topology from an edge list.
+
+    Parameters:
+        edgeListFile (str): the path to the edge list file.
+
+    Returns:
+        Topology: the generated topology.
+    """
+
+    hostIDs: dict[int, Host] = {}
+    switchIDs: dict[int, Switch] = {}
+    linkIDs: list[str] = []
+    links: list[Link] = []
+    hosts: list[Host] = []
+    switches: list[Switch] = []
+    topology: Topology = {}
+    bandwidth: int = 10
+    cpus: int = 1
+    memory: int = 5 * 1024
+    delay: int = 10
+
+
+    with open(edgeListFile, "r") as f:
+        i: int = 0
+        firstSwitchID: int = 0
+        lastSwitchID: int = 0
+
+        for line in f:
+            components: list[str] = line.split(" ")
+
+            if i == 0:
+                firstSwitchID = int(components[0])
+
+            lastSwitchID = int(components[0])
+
+            if int(components[0]) not in hostIDs:
+                host: Host = Host(
+                    id=f"h{int(components[0])}",
+                    cpu=cpus,
+                    memory=memory,
+                )
+                switch: Switch = Switch(id=f"s{int(components[0])}")
+                hostIDs[int(components[0])] = host
+                switchIDs[int(components[0])] = switch
+                hosts.append(host)
+                switches.append(switch)
+                links.append(
+                    Link(
+                        source=f"h{int(components[0])}",
+                        destination=f"s{int(components[0])}",
+                        bandwidth=bandwidth,
+                        delay=delay,
+                    )
+                )
+            if int(components[1]) not in hostIDs:
+                host: Host = Host(
+                    id=f"h{int(components[1])}",
+                    cpu=cpus,
+                    memory=memory,
+                )
+                switch: Switch = Switch(id=f"s{int(components[1])}")
+                hostIDs[int(components[1])] = host
+                switchIDs[int(components[1])] = switch
+                hosts.append(host)
+                switches.append(switch)
+                links.append(
+                    Link(
+                        source=f"h{int(components[1])}",
+                        destination=f"s{int(components[1])}",
+                        bandwidth=bandwidth,
+                        delay=delay,
+                    )
+                )
+            if (
+                f"{components[0]}-{components[1]}" not in linkIDs
+                and f"{components[1]}-{components[0]}" not in linkIDs
+            ):
+                linkIDs.append(f"{components[0]}-{components[1]}")
+                links.append(
+                    Link(
+                        source=f"s{int(components[0])}",
+                        destination=f"s{int(components[1])}",
+                        bandwidth=bandwidth,
+                        delay=delay,
+                    )
+                )
+            i += 1
+
+        serverSwitchID: str = "91"
+        sfccSwitchID: str = "92"
+        switches.append(Switch(id=f"s{serverSwitchID}"))
+        switches.append(Switch(id=f"s{sfccSwitchID}"))
+
+        links.append(
+            Link(
+                source=SERVER,
+                destination=f"s{serverSwitchID}",
+                bandwidth=bandwidth,
+                delay=delay,
+            )
+        )
+        links.append(
+            Link(
+                source=f"s{serverSwitchID}",
+                destination=f"s{lastSwitchID}",
+                bandwidth=bandwidth,
+                delay=delay,
+            )
+        )
+        links.append(
+            Link(
+                source=SFCC,
+                destination=f"s{sfccSwitchID}",
+                bandwidth=bandwidth,
+                delay=delay,
+            )
+        )
+        links.append(
+            Link(
+                source=f"s{sfccSwitchID}",
+                destination=f"s{firstSwitchID}",
+                bandwidth=bandwidth,
+                delay=delay,
+            )
+        )
+        topology["hosts"] = hosts
+        topology["switches"] = switches
+        topology["links"] = links
+
+    return topology

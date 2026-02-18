@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import polars as pl
 from shared.models.embedding_graph import EmbeddingGraph
-from shared.models.topology import Topology
+from shared.models.topology import Host, Topology
 from shared.models.traffic_design import TrafficDesign
 import tensorflow as tf
 from algorithms.models.embedding import DecodedIndividual, EmbeddingData
@@ -21,7 +21,9 @@ from algorithms.hybrid.models.traffic import TimeSFCRequests
 from algorithms.hybrid.utils.demand_predictions import DemandPredictions
 from algorithms.hybrid.utils.scorer import Scorer
 from algorithms.hybrid.surrogate.surrogate import getSurrogateModel
+from mano.telemetry import Telemetry
 from models.calibrate import ResourceDemand
+from models.telemetry import HostData
 from sfc.traffic_generator import TrafficGenerator
 from utils.traffic_design import (
     calculateTrafficDuration,
@@ -37,6 +39,7 @@ class HybridEvaluation:
 
     _demandPredictions: DemandPredictions = DemandPredictions()
     _latencyPrediction: np.array = None
+    _powerUsage: np.array = None
     _surrogateModel: tf.keras.Sequential = getSurrogateModel()
 
     @staticmethod
@@ -59,15 +62,16 @@ class HybridEvaluation:
             TimeSFCRequests: A list of dictionaries containing the traffic data for each embedding graph.
         """
 
-        memoryData: TimeSFCRequests = [
-            {
-                eg["sfcID"]: float(
-                    max(trafficDesign[0], key=lambda x: x["target"])["target"]
-                )
-                for eg in egs
-            }
-        ]
         if isMaxOnly:
+            memoryData: TimeSFCRequests = [
+                {
+                    eg["sfcID"]: float(
+                        max(trafficDesign[0], key=lambda x: x["target"])["target"]
+                    )
+                    for eg in egs
+                }
+            ]
+
             return memoryData
         else:
             duration: int = calculateTrafficDuration(trafficDesign[0])
@@ -85,7 +89,7 @@ class HybridEvaluation:
                     {eg["sfcID"]: reqps for eg in egs} for reqps in simTrafficDesign
                 ]
 
-            return simulationData + memoryData
+            return simulationData
 
     @staticmethod
     def _combineEGs(inds: "list[DecodedIndividual]") -> "list[EmbeddingGraph]":
@@ -179,7 +183,7 @@ class HybridEvaluation:
 
         scores: "dict[str, ResourceDemand]" = Scorer.getHostScores(
             data, topology, embeddingData, HybridEvaluation._demandPredictions
-        )
+        )[1]
         maxMemory: float = max(
             [score["memory"] for score in scores.values()], default=0
         )
@@ -193,7 +197,7 @@ class HybridEvaluation:
         topology: Topology,
         embeddingData: EmbeddingData,
         trafficDesign: "list[TrafficDesign]",
-        maxMemoryDemand: int,
+        maxMemoryDemand: float,
     ) -> bool:
         """
         Check if the memory limit is exceeded.
@@ -203,7 +207,7 @@ class HybridEvaluation:
             topology (Topology): The topology to use for checking memory limits.
             embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): Embedding data containing VNF and depth information.
             trafficDesign (list[TrafficDesign]): Traffic design to use for checking memory limits.
-            maxMemoryDemand (int): The maximum memory demand allowed.
+            maxMemoryDemand (float): The maximum memory demand allowed.
 
         Returns:
             bool: True if the memory limit is exceeded, False otherwise.
@@ -241,7 +245,7 @@ class HybridEvaluation:
             np.array: A numpy array containing the generated scores.
         """
 
-        simulationData: pl.DataFrame = HybridEvaluation._generateTrafficData(
+        simulationData: TimeSFCRequests = HybridEvaluation._generateTrafficData(
             egs, trafficDesign, isMaxOnly=False, isAvgOnly=isAvgOnly
         )
 
@@ -255,6 +259,76 @@ class HybridEvaluation:
         )
 
         return scores
+
+    @staticmethod
+    def _generateHostResourceUsage(
+        egs: "list[EmbeddingGraph]",
+        topology: Topology,
+        embeddingData: EmbeddingData,
+        trafficDesign: "list[TrafficDesign]",
+    ) -> np.array:
+        """
+        Generate host resource usage scores for the given embedding graphs.
+
+        Parameters:
+            egs (list[EmbeddingGraph]): List of embedding graphs to generate host resource usage for.
+            topology (Topology): The topology to use for generating host resource usage.
+            embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): Embedding data containing VNF and depth information.
+            trafficDesign (list[TrafficDesign]): Traffic design to use for generating host resource usage.
+
+        Returns:
+            np.array: A numpy array containing the generated host resource usage scores.
+        """
+
+        simulationData: TimeSFCRequests = HybridEvaluation._generateTrafficData(
+            egs, trafficDesign, isMaxOnly=False, isAvgOnly=True
+        )
+
+        hostResourceUsage: pl.DataFrame = Scorer.getHostResourceUsage(
+            simulationData, topology, embeddingData, HybridEvaluation._demandPredictions
+        )
+
+        return hostResourceUsage
+
+    @staticmethod
+    def _generateTotalResourceUsage(
+        gen: int,
+        individualIndex: int,
+        egs: "list[EmbeddingGraph]",
+        topology: Topology,
+        embeddingData: EmbeddingData,
+        trafficDesign: "list[TrafficDesign]",
+    ) -> np.array:
+        """
+        Generate total resource usage scores for the given embedding graphs.
+
+        Parameters:
+            gen (int): The generation number.
+            individualIndex (int): The index of the individual.
+            egs (list[EmbeddingGraph]): List of embedding graphs to generate total resource usage for.
+            topology (Topology): The topology to use for generating total resource usage.
+            embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): Embedding data containing VNF and depth information.
+            trafficDesign (list[TrafficDesign]): Traffic design to use for generating total resource usage.
+
+        Returns:
+            np.array: A numpy array containing the generated total resource usage scores.
+        """
+
+        hostResourceUsage: np.array = HybridEvaluation._generateHostResourceUsage(
+            egs, topology, embeddingData, trafficDesign
+        )
+
+        totalPower: float = hostResourceUsage[:]["power_usage"].sum()
+
+        dt: np.dtype = np.dtype(
+            [
+                ("generation", np.int32),
+                ("individual", np.int32),
+                ("total_power", np.float64),
+            ]
+        )
+
+        return np.array([(gen, individualIndex, totalPower)], dtype=dt)
 
     @staticmethod
     def _generateMeanScores(
@@ -283,24 +357,6 @@ class HybridEvaluation:
             np.array: A numpy array containing the generation index, individual index, mean link score and CPU score.
         """
 
-        try:
-            scores: np.array = HybridEvaluation._generateScores(
-                trafficDesign,
-                egs,
-                topology,
-                embeddingData,
-                linkData,
-                isAvgOnly=True,
-            )
-        except Exception as e:
-            TUI.appendToSolverLog(f"Error generating scores: {e}")
-            return pl.DataFrame()
-
-        mean_max_link = np.mean(scores[:]["max_link_score"])
-        mean_total_link = np.mean(scores[:]["total_link_score"])
-        mean_total_delay = np.mean(scores[:]["total_delay"])
-        mean_cpu = np.mean(scores[:]["max_cpu"])
-
         dt = np.dtype(
             [
                 ("generation", np.int32),
@@ -312,7 +368,94 @@ class HybridEvaluation:
                 ("latency", np.float64),
             ]
         )
+
+        try:
+            scores: np.array = HybridEvaluation._generateScores(
+                trafficDesign,
+                egs,
+                topology,
+                embeddingData,
+                linkData,
+                isAvgOnly=True,
+            )
+        except Exception as e:
+            TUI.appendToSolverLog(f"Error generating scores: {e}")
+            return np.array([(gen, individualIndex, 0.0, 0.0, 0.0, 0.0, 0.0)], dtype=dt)
+
+        mean_max_link = np.mean(scores[:]["max_link_score"])
+        mean_total_link = np.mean(scores[:]["total_link_score"])
+        mean_total_delay = np.mean(scores[:]["total_delay"])
+        mean_cpu = np.mean(scores[:]["max_cpu"])
+
         return np.array([(gen, individualIndex, mean_max_link, mean_total_link, mean_total_delay, mean_cpu, 0.0)], dtype=dt)
+
+    @staticmethod
+    def _getPowerUsage(gen: int, inds: "list[DecodedIndividual]", topology: Topology, trafficDesign: "list[TrafficDesign]", ) -> np.array:
+        """
+        Get the power usage for the given individuals.
+
+        Parameters:
+            gen (int): The generation number.
+            inds (list[IndividualEG]): List of individuals to get power usage for.
+            topology (Topology): The topology to use for getting power usage.
+            trafficDesign (list[TrafficDesign]): Traffic design to use for getting power usage.
+
+        Returns:
+            np.array: A numpy array containing the power usage for each individual.
+        """
+
+        powerUsage: np.array = None
+
+        with ProcessPoolExecutor() as executor:
+            try:
+                futures = [
+                    executor.submit(
+                        HybridEvaluation._generateTotalResourceUsage,
+                        gen=gen,
+                        individualIndex=ind[0],
+                        egs=ind[1],
+                        topology=topology,
+                        embeddingData=ind[2],
+                        trafficDesign=trafficDesign,
+                    )
+                    for ind in inds
+                    if len(ind[1]) > 0
+                ]
+            except Exception as e:
+                TUI.appendToSolverLog(f"Error generating total resource usage: {e}")
+
+            for future in as_completed(futures):
+                if powerUsage is None:
+                    powerUsage = future.result()
+                else:
+                    powerUsage = np.concatenate((powerUsage, future.result()))
+
+        HybridEvaluation._powerUsage = powerUsage
+
+        return powerUsage
+
+    @staticmethod
+    def getIndividualPowerUsage(gen: int, ind: int) -> float:
+        """
+        Get the power usage for the specified generation and individual.
+
+        Parameters:
+            gen (int): The generation number.
+            ind (int): The index of the individual.
+
+        Returns:
+            float: The power usage for the specified generation and individual.
+        """
+
+        if HybridEvaluation._powerUsage is None:
+            return None
+
+        mask = (HybridEvaluation._powerUsage[:]["generation"] == gen) & (
+            HybridEvaluation._powerUsage[:]["individual"] == ind
+        )
+        rows = HybridEvaluation._powerUsage[mask]
+
+        return rows[0]["total_power"] if rows.shape[0] > 0 else 0.0
 
     @staticmethod
     def _predictLatency(
@@ -454,6 +597,31 @@ class HybridEvaluation:
             TUI.appendToSolverLog("No cached latency predictions to save.")
 
     @staticmethod
+    def cacheForOfflinePowerUsage(
+        pop: "list[DecodedIndividual]",
+        trafficDesign: "list[TrafficDesign]",
+        topology: Topology,
+        gen: int,
+        isAvgOnly: bool = False
+    ) -> None:
+        """
+        Evaluate the offline performance of the population for power usage.
+
+        Parameters:
+            pop (list[IndividualEG]): The population to evaluate.
+            trafficDesign (list[TrafficDesign]): The traffic design to use for evaluation.
+            topology (Topology): The topology to use for evaluation.
+            gen (int): The generation number.
+            isAvgOnly (bool): If True, only generate average traffic data.
+
+        Returns:
+            None
+        """
+
+        HybridEvaluation._cacheDemand(pop, trafficDesign, isAvgOnly=isAvgOnly)
+        HybridEvaluation._getPowerUsage(gen, pop, topology, trafficDesign)
+
+    @staticmethod
     def cacheForOnline(
         pop: "list[DecodedIndividual]", trafficDesign: "list[TrafficDesign]"
     ) -> None:
@@ -471,13 +639,61 @@ class HybridEvaluation:
         HybridEvaluation._cacheDemand(pop, trafficDesign, isMemoryOnly=True)
 
     @staticmethod
+    def evaluationOnSurrogatePowerUsage(
+        individual: DecodedIndividual,
+        gen: int,
+        ngen: int,
+        topology: Topology,
+        trafficDesign: "list[TrafficDesign]",
+        maxMemoryDemand: float,
+    ) -> "tuple[int, float, float]":
+        """
+        Evaluate the individual using the the NN models for energy-aware optimisation.
+
+        Parameters:
+            individual (DecodedIndividual): The individual to evaluate.
+            gen (int): The current generation number.
+            ngen (int): The total number of generations.
+            topology (Topology): The topology to use for evaluation.
+            trafficDesign (list[TrafficDesign]): The traffic design to use for evaluation.
+            maxMemoryDemand (float): The maximum memory demand allowed.
+
+        Returns:
+            tuple[int, float, float]: the fitness values (individual index, acceptance ratio and power usage).
+        """
+
+        penaltyPower: int = 50000
+        egs: "list[EmbeddingGraph]" = individual[1]
+        acceptanceRatio: float = individual[4]
+
+        power: float = 0
+
+        if len(egs) > 0:
+            if HybridEvaluation.doesExceedMemoryLimit(
+                individual[1], topology, individual[2], trafficDesign, maxMemoryDemand
+            ):
+                penalty: float = gen / ngen
+                acceptanceRatio = (
+                    acceptanceRatio - penalty if len(egs) > 0 else acceptanceRatio
+                )
+                power = penaltyPower * penalty if len(egs) > 0 else penaltyPower
+
+                return (individual[0], acceptanceRatio, power)
+
+            power: float = HybridEvaluation.getIndividualPowerUsage(gen, individual[0])
+        else:
+            power = penaltyPower
+
+        return (individual[0], acceptanceRatio, round(power))
+
+    @staticmethod
     def evaluationOnSurrogate(
         individual: DecodedIndividual,
         gen: int,
         ngen: int,
         topology: Topology,
         trafficDesign: "list[TrafficDesign]",
-        maxMemoryDemand: int,
+        maxMemoryDemand: float,
     ) -> "tuple[int, float, float]":
         """
         Evaluate the individual using the BeNNS.
@@ -488,7 +704,7 @@ class HybridEvaluation:
             ngen (int): The total number of generations.
             topology (Topology): The topology to use for evaluation.
             trafficDesign (list[TrafficDesign]): The traffic design to use for evaluation.
-            maxMemoryDemand (int): The maximum memory demand allowed.
+            maxMemoryDemand (float): The maximum memory demand allowed.
 
         Returns:
             tuple[int, float, float]: the fitness values (individual index, acceptance ratio and latency).
@@ -529,7 +745,7 @@ class HybridEvaluation:
         trafficDesign: "list[TrafficDesign]",
         trafficGenerator: TrafficGenerator,
         topology: Topology,
-        maxMemoryDemand: int,
+        maxMemoryDemand: float,
     ) -> "tuple[float, float]":
         """
         Evaluate the individual.
@@ -544,7 +760,7 @@ class HybridEvaluation:
             trafficDesign (list[TrafficDesign]): The Traffic Design.
             trafficGenerator (TrafficGenerator): The Traffic Generator.
             topology (Topology): The Topology.
-            maxMemoryDemand (int): The maximum memory demand.
+            maxMemoryDemand (float): The maximum memory demand.
 
         Returns:
             tuple[float, float]: the fitness values (acceptance ratio and latency).
@@ -615,6 +831,103 @@ class HybridEvaluation:
         TUI.appendToSolverLog(f"Latency: {latency}ms")
 
         return (acceptanceRatio, round(latency))
+
+    @staticmethod
+    def evaluationOnEmulatorPowerUsage(
+        individual: DecodedIndividual,
+        fgrs: "list[EmbeddingGraph]",
+        gen: int,
+        ngen: int,
+        sendEGs: "Callable[[list[EmbeddingGraph]], None]",
+        deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
+        trafficDesign: "list[TrafficDesign]",
+        telemetry: Telemetry,
+        topology: Topology,
+        maxMemoryDemand: float
+    ) -> "tuple[float, float]":
+        """
+        Evaluate the individual for power usage.
+
+        Parameters:
+            individual (list[list[int]]): the individual to evaluate.
+            fgrs (list[EmbeddingGraph]): The SFC Requests.
+            gen (int): the generation.
+            ngen (int): the number of generations.
+            sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
+            deleteEGs (Callable[[list[EmbeddingGraph]], None]): the function to delete the Embedding Graphs.
+            trafficDesign (list[TrafficDesign]): The Traffic Design.
+            telemetry (Telemetry): The Telemetry.
+            topology (Topology): The Topology.
+            maxMemoryDemand (float): The maximum memory demand.
+
+        Returns:
+            tuple[float, float]: the fitness values (acceptance ratio and latency).
+        """
+
+        acceptanceRatio: float = individual[4]
+
+        TUI.appendToSolverLog(
+            f"Acceptance Ratio: {len(individual[1])}/{len(fgrs)} = {acceptanceRatio}"
+        )
+
+        penaltyPower: int = 50000
+        power: float = 0
+
+        if len(individual[1]) > 0:
+            if HybridEvaluation.doesExceedMemoryLimit(
+                individual[1], topology, individual[2], trafficDesign, maxMemoryDemand
+            ):
+                penalty: float = gen / ngen
+                acceptanceRatio = (
+                    acceptanceRatio - penalty
+                    if len(individual[1]) > 0
+                    else acceptanceRatio
+                )
+                power = (
+                    penaltyPower * penalty
+                    if len(individual[1]) > 0
+                    else penaltyPower
+                )
+
+                return (acceptanceRatio, power)
+
+            sendEGs(individual[1])
+
+            duration: int = calculateTrafficDuration(trafficDesign[0])
+            TUI.appendToSolverLog(f"Traffic Duration: {duration}s")
+            TUI.appendToSolverLog(f"Waiting for {duration}s...")
+            time: float = 0
+            hostDataList: list[HostData] = []
+
+            while time < duration:
+                start: float = timeit.default_timer()
+                hostData: HostData = telemetry.getHostData()
+                end: float = timeit.default_timer()
+                if hostData is not None:
+                    hostDataList.append(hostData)
+                time += end - start
+
+            TUI.appendToSolverLog(f"Done waiting for {duration}s.")
+
+            for host in hostDataList:
+                for key, value in host["hostData"].items():
+                    topoHost: Host = [h for h in topology["hosts"] if h["id"] == key][0]
+                    topoCPU: float = topoHost["cpu"]
+                    cpuUsage: float = value["cpuUsage"][0]
+                    powerUsage: float = Scorer.getPowerUsage(cpuUsage, topoCPU)
+                    if value["vnfs"] != {}:
+                        power += powerUsage
+
+            power = power / len(hostDataList)
+
+            TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
+            deleteEGs(individual[1])
+        else:
+            power = penaltyPower
+
+        TUI.appendToSolverLog(f"Power: {round(power)} W")
+
+        return (acceptanceRatio, round(power))
 
     @staticmethod
     def generateScoresForRealTrafficData(

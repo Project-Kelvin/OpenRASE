@@ -225,6 +225,7 @@ class Telemetry(Subscriber):
 
         with ThreadPoolExecutor() as executor:
             startTime: int = int(time.time())
+            hostData["startTime"] = startTime
             for host in hosts:
                 thread: Thread = Thread(target=createHostThread, args=(host,))
                 thread.start()
@@ -233,13 +234,12 @@ class Telemetry(Subscriber):
             for thread in threads:
                 thread.join()
 
+            endTime: int = int(time.time())
+            hostData["endTime"] = endTime
             for hostKey, host in hostDataFutures.items():
                 stats: HostStats = hostDataFutures[hostKey]["stats"].result()
-                endTime: int = int(time.time())
-
-                hostData["startTime"] = startTime
-                hostData["endTime"] = endTime
-                hostData["hostData"] = {}
+                if "hostData" not in hostData:
+                    hostData["hostData"] = {}
                 hostData["hostData"][hostKey] = {
                     "cpuUsage": stats[0],
                     "memoryUsage": stats[1],

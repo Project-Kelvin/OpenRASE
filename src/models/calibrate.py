@@ -9,3 +9,4 @@ class ResourceDemand(dict):
 
     cpu: float
     memory: float
+    power: float

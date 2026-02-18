@@ -14,6 +14,7 @@ from algorithms.ga_dijkstra_algorithm.ga_utils import (
     mutate,
 )
 from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution
+from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 
 POP_SIZE: int = 100
@@ -33,8 +34,26 @@ def solve(
     deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
     trafficDesign: "list[TrafficDesign]",
     trafficGenerator: TrafficGenerator,
+    telemetry: Telemetry,
     experiment: str
 ) -> None:
+    """
+    Solves the problem using a GA for VNF embedding and Dijkstra for link embedding.
+
+    Parameters:
+        topology (Topology): the topology to use for solving.
+        fgrs (list[EmbeddingGraph]): the list of Forwarding Graphs to embed.
+        sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
+        deleteEGs (Callable[[list[EmbeddingGraph]], None]): the function to delete the Embedding Graphs.
+        trafficDesign (list[TrafficDesign]): the traffic design to use for solving.
+        trafficGenerator (TrafficGenerator): the traffic generator to use for solving.
+        telemetry (Telemetry): telemetry instance.
+        experiment (str): the experiment name.
+
+    Returns:
+        None
+    """
+
     hybridEvolution.hybridSolve(
         topology,
         fgrs,
@@ -42,6 +61,7 @@ def solve(
         deleteEGs,
         trafficDesign,
         trafficGenerator,
+        telemetry,
         POP_SIZE,
         experiment
     )

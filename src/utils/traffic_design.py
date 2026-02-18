@@ -3,7 +3,8 @@ This defines utils associated with traffic design.
 """
 
 import numpy as np
-from shared.models.traffic_design import TrafficDesign
+import polars as pl
+from shared.models.traffic_design import TrafficDesign, TrafficStep
 
 def generateTrafficDesign(start: int, end: int, duration: int) -> "TrafficDesign":
     """
@@ -29,14 +30,14 @@ def generateTrafficDesign(start: int, end: int, duration: int) -> "TrafficDesign
 
     return rate
 
-def generateTrafficDesignFromFile(dataFile: str, scale: float = 1, hourDuration: float = 4, minimal: bool = False, type2: bool = False) -> "TrafficDesign":
+def generateTrafficDesignFromFile(dataFile: str, scale: int = 1, hourDuration: int = 4, minimal: bool = False, type2: bool = False) -> "TrafficDesign":
     """
     Generate the Traffic Design.
 
     Parameters:
         dataFile (str): the CSV data file.
-        scale (float): the scale factor.
-        hourDuration (float): the simulated duration of the hour in seconds.
+        scale (int): the scale factor.
+        hourDuration (int): the simulated duration of the hour in seconds.
         minimal (bool): whether to generate minimal traffic design.
         type2 (bool): whether to generate type 2 traffic design.
 
@@ -122,3 +123,37 @@ def getTrafficDesignRate(trafficDesign: TrafficDesign, durations: "list[int]") -
         rate = rate[duration:]
 
     return reqps
+
+def generateTrafficDesignFromIoTTrace(dataFile: str, hourDuration: int = 5*60, scale: int = 1000) -> TrafficDesign:
+    """
+    Generate the Traffic Design from an IoT trace.
+
+    Parameters:
+        dataFile (str): the CSV data file.
+        hourDuration (int): the simulated duration of the hour in seconds.
+        scale (int): the scale factor.
+
+    Returns:
+        TrafficDesign: the Traffic Design.
+    """
+
+    df: pl.DataFrame = (
+        pl.read_csv(
+            dataFile,
+            has_header=False,
+            new_columns=["timestamp"],
+        )
+        .with_columns(pl.from_epoch(pl.col("timestamp"), time_unit="s").alias("datetime"))
+        .group_by_dynamic("datetime", every="1h")
+        .agg((pl.len() / scale).round(0).cast(pl.Int32).alias("count"))
+        .sort("datetime")
+    )
+
+    counts: list[int] = df["count"].to_list()
+    trafficDesign: TrafficDesign = []
+
+    for count in counts:
+        for _i in range(hourDuration):
+            trafficDesign.append(TrafficStep(target=round(count), duration="1s"))
+
+    return trafficDesign

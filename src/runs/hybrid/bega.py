@@ -195,6 +195,7 @@ def run(headless: bool) -> None:
                         self._orchestrator.deleteEmbeddingGraphs,
                         trafficDesign,
                         self._trafficGenerator,
+                        self._orchestrator.getTelemetry(),
                         exp["name"],
                     )
 

@@ -14,6 +14,7 @@ from shared.models.sfc_request import SFCRequest
 from shared.models.traffic_design import TrafficDesign
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
+from algorithms.hybrid.constants.gensis_objective import LATENCY
 from algorithms.models.embedding import DecodedIndividual, LinkData
 from algorithms.hybrid.constants.surrogate import (
     SURROGACY_PATH,
@@ -30,6 +31,7 @@ from algorithms.hybrid.utils.extract_weights import (
     getWeightsLength,
 )
 from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution, Individual
+from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 
@@ -61,11 +63,6 @@ def decodeIndividual(
     """
 
     global predefinedWeights
-
-    # predefinedIndividual = individual[:-getWeightsLength(NO_OF_NEURONS)] if NO_OF_NEURONS > 0 else individual
-    # predefinedWeights: "tuple[list[float], list[float], list[float]]" = getPredefinedWeights(
-    #     predefinedIndividual, sfcrs, topology, NO_OF_NEURONS
-    # )
 
     weights: "Tuple[list[float], list[float], list[float]]" = getWeights(
         individual, NO_OF_NEURONS
@@ -124,7 +121,7 @@ def decodePop(
         for future in futures:
             decodedPop.append(future.result())
 
-    endTime: int = timeit.default_timer()
+    endTime: float = timeit.default_timer()
     TUI.appendToSolverLog(
         f"Decoded {len(decodedPop)} individuals in {endTime - startTime:.2f} seconds."
     )
@@ -202,9 +199,11 @@ def solve(
     deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
     trafficDesign: list[TrafficDesign],
     trafficGenerator: TrafficGenerator,
+    telemetry: Telemetry,
     topology: Topology,
     dirName: str,
     experimentName: str,
+    type: str = LATENCY
 ) -> None:
     """
     Evolves the weights of the Neural Network.
@@ -215,9 +214,11 @@ def solve(
         deleteEGs (Callable[[list[EmbeddingGraph]], None]): the function to delete the Embedding Graphs.
         trafficDesign (list[TrafficDesign]): the traffic design.
         trafficGenerator (TrafficGenerator): the traffic generator.
+        telemetry (Telemetry): telemetry instance.
         topology (Topology): the topology.
         dirName (str): the directory name.
         experimentName (str): the name of the experiment.
+        type (str): the type of the objective function to optimize. Defaults to LATENCY.
 
     Returns:
         None
@@ -242,6 +243,8 @@ def solve(
         deleteEGs,
         trafficDesign,
         trafficGenerator,
+        telemetry,
         POP_SIZE,
         experimentName,
+        type,
     )

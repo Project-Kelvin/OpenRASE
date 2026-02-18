@@ -26,7 +26,7 @@ class Scorer:
         topology: Topology,
         embeddingData: EmbeddingData,
         demandPredictor: DemandPredictions,
-    ) -> "dict[str, ResourceDemand]":
+    ) -> "tuple[dict[str, ResourceDemand], dict[str, ResourceDemand]]":
         """
         Gets the host scores.
 
@@ -37,10 +37,11 @@ class Scorer:
             demandPredictor (Predictions): the demand predictor.
 
         Returns:
-            dict[str, ResourceDemand]: the host scores.
+            tuple[dict[str, ResourceDemand], dict[str, ResourceDemand]]: the host resource usage data, the host scores.
         """
 
-        hostResourceData: "dict[str, ResourceDemand]" = {}
+        hostResourceUsageData: "dict[str, ResourceDemand]" = {}
+        hostResourceScoreData: "dict[str, ResourceDemand]" = {}
         serverCPU, serverMemory = getAvailableCPUAndMemory()
         for host, sfcs in embeddingData.items():
             topoHost: Host = [h for h in topology["hosts"] if h["id"] == host][0]
@@ -59,19 +60,26 @@ class Scorer:
                     otherCPU += vnfCPU
                     otherMemory += vnfMemory
 
-            hostResourceData[host] = ResourceDemand(cpu=otherCPU, memory=otherMemory)
-            hostCPU: float = topoHost["cpu"]
-            hostMemory: float = topoHost["memory"]
-            hostResourceData[host]["cpu"] = Scorer._getScore(
-                hostResourceData[host]["cpu"],
-                hostCPU if hostCPU is not None else serverCPU,
+            hostResourceUsageData[host] = ResourceDemand(
+                cpu=otherCPU, memory=otherMemory
             )
-            hostResourceData[host]["memory"] = Scorer._getScore(
-                hostResourceData[host]["memory"],
-                hostMemory if hostMemory is not None else serverMemory
+            hostResourceUsageData[host]["power"] = Scorer.getPowerUsage(
+                otherCPU, topoHost["cpu"] if topoHost["cpu"] is not None else serverCPU
             )
 
-        return hostResourceData
+            hostResourceScoreData[host] = {}
+            hostCPU: float = topoHost["cpu"]
+            hostMemory: float = topoHost["memory"]
+            hostResourceScoreData[host]["cpu"] = Scorer._getScore(
+                hostResourceUsageData[host]["cpu"],
+                hostCPU if hostCPU is not None else serverCPU,
+            )
+            hostResourceScoreData[host]["memory"] = Scorer._getScore(
+                hostResourceUsageData[host]["memory"],
+                hostMemory if hostMemory is not None else serverMemory,
+            )
+
+        return hostResourceUsageData, hostResourceScoreData
 
     @staticmethod
     def getLinkScores(
@@ -127,10 +135,10 @@ class Scorer:
                         if f"{source}-{destination}" in checkedLinks:
                             continue
                         checkedLinks.add(f"{source}-{destination}")
-                        for key, pathData in linkData[f"{source}-{destination}"].items():
-                            reqps: float = (
-                                data[key] if key in data else 0
-                            )
+                        for key, pathData in linkData[
+                            f"{source}-{destination}"
+                        ].items():
+                            reqps: float = data[key] if key in data else 0
                             totalRequests += pathData[0] * reqps
 
                             if key == eg["sfcID"]:
@@ -139,10 +147,10 @@ class Scorer:
                         if f"{destination}-{source}" in checkedLinks:
                             continue
                         checkedLinks.add(f"{destination}-{source}")
-                        for key, pathData in linkData[f"{destination}-{source}"].items():
-                            reqps: float = (
-                                data[key] if key in data else 0
-                            )
+                        for key, pathData in linkData[
+                            f"{destination}-{source}"
+                        ].items():
+                            reqps: float = data[key] if key in data else 0
                             totalRequests += pathData[0] * reqps
 
                             if key == eg["sfcID"]:
@@ -153,7 +161,11 @@ class Scorer:
                     totalLinkScore += linkScore
                     linkScores.append(linkScore)
 
-            linkScoresData[eg["sfcID"]] = (totalLinkScore, max(linkScores), (2 * totalDelay))
+            linkScoresData[eg["sfcID"]] = (
+                totalLinkScore,
+                max(linkScores),
+                (2 * totalDelay),
+            )
 
         return linkScoresData
 
@@ -236,7 +248,7 @@ class Scorer:
                     float(maxMemory),
                     float(totalLinkScore),
                     float(maxLinkScore),
-                    int(totalDelay)
+                    int(totalDelay),
                 )
             ],
             dtype=dt,
@@ -267,7 +279,7 @@ class Scorer:
 
         hostScores: "dict[str, ResourceDemand]" = Scorer.getHostScores(
             timeData, topology, embeddingData, demandPredictor
-        )
+        )[1]
         linkScores: "dict[str, tuple[float, float, int ]]" = Scorer.getLinkScores(
             timeData, topology, egs, linkData
         )
@@ -282,6 +294,66 @@ class Scorer:
                 hostLinkScores = np.concatenate((hostLinkScores, hostLinkScore))
 
         return hostLinkScores
+
+    @staticmethod
+    def _getHostResourceUsageDataForEachTimeSlot(
+        time: int,
+        timeData: dict[str, float],
+        topology: Topology,
+        embeddingData: EmbeddingData,
+        demandPredictor: DemandPredictions,
+    ) -> np.array:
+        """
+        Gets the host resource usage data for each time slot.
+
+        Parameters:
+            time (int): the time slot.
+            timeData (dict[str, float]): the time data.
+            topology (Topology): the topology.
+            embeddingData (EmbeddingData): the embedding data.
+            demandPredictor (DemandPredictions): the demand predictor.
+
+        Returns:
+            np.array: A numpy array that contains CPU and memory usage per host.
+        """
+
+        dType: np.dtype = np.dtype(
+            [
+                ("time", np.int32),
+                ("host", "U", 20),
+                ("cpu_usage", np.float64),
+                ("memory_usage", np.float64),
+                ("power_usage", np.float64),
+            ]
+        )
+
+        hostResourceUsageData: "dict[str, ResourceDemand]" = Scorer.getHostScores(
+            timeData, topology, embeddingData, demandPredictor
+        )[0]
+        hostResourceUsageArray: np.array = None
+
+        for host, resourceUsage in hostResourceUsageData.items():
+            hostResourceUsage: np.array = np.array(
+                [
+                    (
+                        int(time),
+                        str(host),
+                        float(resourceUsage["cpu"]),
+                        float(resourceUsage["memory"]),
+                        float(resourceUsage["power"]),
+                    )
+                ],
+                dtype=dType,
+            )
+
+            if hostResourceUsageArray is None:
+                hostResourceUsageArray = hostResourceUsage
+            else:
+                hostResourceUsageArray = np.concatenate(
+                    (hostResourceUsageArray, hostResourceUsage)
+                )
+
+        return hostResourceUsageArray
 
     @staticmethod
     def getSFCScores(
@@ -326,6 +398,43 @@ class Scorer:
         return outputData
 
     @staticmethod
+    def getHostResourceUsage(
+        data: TimeSFCRequests,
+        topology: Topology,
+        embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]",
+        demandPredictor: DemandPredictions,
+    ) -> np.array:
+        """
+        Gets the host resource usage.
+
+        Parameters:
+            data (TimeSFCRequests): the data.
+            topology (Topology): the topology.
+            embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): the embedding data.
+            demandPredictor (Predictions): the demand predictor.
+
+        Returns:
+            np.array: the host resource usage (time, host ID, CPU usage, memory usage).
+        """
+
+        outputData: np.array = None
+
+        for time, timeData in enumerate(data):
+            timeSlotData: np.array = Scorer._getHostResourceUsageDataForEachTimeSlot(
+                time,
+                timeData,
+                topology,
+                embeddingData,
+                demandPredictor,
+            )
+            if outputData is None:
+                outputData = timeSlotData
+            else:
+                outputData = np.concatenate((outputData, timeSlotData))
+
+        return outputData
+
+    @staticmethod
     def _getScore(demand: float, resource: float) -> float:
         """
         Gets the resource score.
@@ -358,3 +467,26 @@ class Scorer:
             if resource is not None and totalDemand is not None
             else 0
         )
+
+    @staticmethod
+    def getPowerUsage(cpuUsage: float, totalCPU: float) -> float:
+        """
+        Gets the power usage.
+
+        Parameters:
+            cpuUsage (float): the CPU usage.
+            totalCPU (float): the total CPU.
+
+        Returns:
+            float: the power usage.
+        """
+
+        pMin: float = 8 # 8 W
+        pMax: float = 11 * totalCPU # 11 W for 1 CPU
+        usage: float = (
+            (cpuUsage / totalCPU)
+            if totalCPU is not None and cpuUsage is not None
+            else 0
+        )
+
+        return pMin + (pMax - pMin) * usage

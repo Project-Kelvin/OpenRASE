@@ -11,12 +11,15 @@ from typing import Callable, Tuple
 from uuid import UUID, uuid4
 from deap import base, creator, tools
 import numpy as np
+from shared.models.sfc_request import SFCRequest
 from shared.models.traffic_design import TrafficDesign
 from shared.models.topology import Topology
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.utils.config import getConfig
+from algorithms.hybrid.constants.gensis_objective import LATENCY, POWER
 from algorithms.models.embedding import DecodedIndividual
 from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
+from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 
@@ -196,7 +199,7 @@ class HybridEvolution:
         parent: list[Individual],
         pop: list[Individual],
         topology: Topology,
-        fgrs: list[EmbeddingGraph],
+        fgrs: list[SFCRequest],
         trafficDesign: list[TrafficDesign],
         dirName: str,
         scoresDir: str,
@@ -208,9 +211,11 @@ class HybridEvolution:
         minQualifiedInds: int,
         popSize: int,
         trafficGenerator: TrafficGenerator,
+        telemetry: Telemetry,
         sendEGs: "Callable[[list[EmbeddingGraph]], None]",
         deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
         hof: tools.ParetoFront,
+        type: str = LATENCY,
     ) -> "tuple[list[Individual], list[Individual]]":
         """
         Perform the genetic operation.
@@ -219,7 +224,7 @@ class HybridEvolution:
             parent (list[Individual]): the parent population.
             pop (list[Individual]): the current population.
             topology (Topology): the topology.
-            fgrs (list[EmbeddingGraph]): the Forwarding Graph Requests.
+            fgrs (list[SFCRequest]): the SFC Requests.
             trafficDesign (list[TrafficDesign]): the traffic design.
             dirName (str): the directory name to save results.
             scoresDir (str): the directory name for scores.
@@ -231,41 +236,66 @@ class HybridEvolution:
             minQualifiedInds (int): minimum number of qualified individuals required.
             popSize (int): size of the population.
             trafficGenerator (TrafficGenerator): traffic generator instance.
+            telemetry (Telemetry): telemetry instance.
             sendEGs (Callable[[list[EmbeddingGraph]], None]): function to send Embedding Graphs.
             deleteEGs (Callable[[list[EmbeddingGraph]], None]): function to delete Embedding Graphs.
             hof (tools.ParetoFront): hall of fame for storing best individuals.
+            type (str): the optimisation objective type.
 
         Returns:
             tuple[list[Individual], list[Individual]: the updated population and qualified individuals.
         """
 
         populationEG: "list[DecodedIndividual]" = self._decodePop(pop, topology, fgrs)
-        HybridEvaluation.cacheForOffline(
-            populationEG, trafficDesign, topology, gen, isAvgOnly=True
-        )
-        HybridEvaluation.saveCachedLatency(
-            os.path.join(dirName, scoresDir, f"gen_{gen}.csv")
-        )
-        startTime: int = timeit.default_timer()
+
+        if type == POWER:
+            HybridEvaluation.cacheForOfflinePowerUsage(
+                populationEG, trafficDesign, topology, gen, isAvgOnly=True
+            )
+        else:
+            HybridEvaluation.cacheForOffline(
+                populationEG, trafficDesign, topology, gen, isAvgOnly=True
+            )
+            HybridEvaluation.saveCachedLatency(
+                os.path.join(dirName, scoresDir, f"gen_{gen}.csv")
+            )
+
+        startTime: float = timeit.default_timer()
         with ProcessPoolExecutor() as executor:
-            futures = [
-                executor.submit(
-                    HybridEvaluation.evaluationOnSurrogate,
-                    ind,
-                    gen,
-                    ngen,
-                    topology,
-                    trafficDesign,
-                    maxMemoryDemand,
-                )
-                for ind in populationEG
-            ]
+            futures = []
+
+            if type == POWER:
+                futures = [
+                    executor.submit(
+                        HybridEvaluation.evaluationOnSurrogatePowerUsage,
+                        ind,
+                        gen,
+                        ngen,
+                        topology,
+                        trafficDesign,
+                        maxMemoryDemand,
+                    )
+                    for ind in populationEG
+                ]
+            else:
+                futures = [
+                    executor.submit(
+                        HybridEvaluation.evaluationOnSurrogate,
+                        ind,
+                        gen,
+                        ngen,
+                        topology,
+                        trafficDesign,
+                        maxMemoryDemand,
+                    )
+                    for ind in populationEG
+                ]
 
             for future in as_completed(futures):
                 result: "tuple[int, float, float]" = future.result()
                 ind: "Individual" = pop[result[0]]
                 ind.fitness.values = (result[1], result[2])
-        endTime: int = timeit.default_timer()
+        endTime: float = timeit.default_timer()
         TUI.appendToSolverLog(
             f"Finished generation {gen} in {endTime - startTime} seconds."
         )
@@ -301,6 +331,15 @@ class HybridEvolution:
             # Start the online phase of the hybrid evolution
             # ---------------------------------------------------------------------------------------------
 
+            # If there are more than one individual, select the one with max AR and then min latency.
+
+            if len(qualifiedIndividuals) > 1:
+                qualifiedIndividuals.sort(
+                    key=lambda ind: (ind.fitness.values[0], -ind.fitness.values[1]),
+                    reverse=True,
+                )
+                qualifiedIndividuals = [qualifiedIndividuals[0]]
+
             for ind in qualifiedIndividuals:
                 del ind.fitness.values
 
@@ -310,23 +349,38 @@ class HybridEvolution:
                 qualifiedIndividuals, topology, fgrs
             )
             HybridEvaluation.cacheForOnline(populationEG, trafficDesign)
-            for ind in populationEG:
-                ar, latency = HybridEvaluation.evaluationOnEmulator(
-                    ind,
-                    fgrs,
-                    gen,
-                    ngen,
-                    sendEGs,
-                    deleteEGs,
-                    trafficDesign,
-                    trafficGenerator,
-                    topology,
-                    maxMemoryDemand,
-                )
-                qualifiedIndividuals[ind[0]].fitness.values = (ar, latency)
+            for decodedInd in populationEG:
+
+                if type == POWER:
+                    ar, latency = HybridEvaluation.evaluationOnEmulatorPowerUsage(
+                        decodedInd,
+                        fgrs,
+                        gen,
+                        ngen,
+                        sendEGs,
+                        deleteEGs,
+                        trafficDesign,
+                        telemetry,
+                        topology,
+                        maxMemoryDemand,
+                    )
+                else:
+                    ar, latency = HybridEvaluation.evaluationOnEmulator(
+                        decodedInd,
+                        fgrs,
+                        gen,
+                        ngen,
+                        sendEGs,
+                        deleteEGs,
+                        trafficDesign,
+                        trafficGenerator,
+                        topology,
+                        maxMemoryDemand,
+                    )
+                qualifiedIndividuals[decodedInd[0]].fitness.values = (ar, latency)
 
                 for p in pop:
-                    if p.id == qualifiedIndividuals[ind[0]].id:
+                    if p.id == qualifiedIndividuals[decodedInd[0]].id:
                         p.fitness.values = (ar, latency)
                         break
 
@@ -357,13 +411,15 @@ class HybridEvolution:
     def hybridSolve(
         self,
         topology: Topology,
-        fgrs: "list[EmbeddingGraph]",
+        fgrs: "list[SFCRequest]",
         sendEGs: "Callable[[list[EmbeddingGraph]], None]",
         deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
         trafficDesign: "list[TrafficDesign]",
         trafficGenerator: TrafficGenerator,
+        telemetry: Telemetry,
         popSize: int,
         experiment: str,
+        type=LATENCY,
     ) -> None:
         """
         Run the Genetic Algorithm + Dijkstra Algorithm.
@@ -375,8 +431,10 @@ class HybridEvolution:
             sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
             trafficDesign (list[TrafficDesign]): the traffic design.
             trafficGenerator (TrafficGenerator): the traffic generator.
+            telemetry (Telemetry): telemetry instance.
             popSize (int): the population size.
             experiment (str): the experiment name.
+            type (str): the optimisation objective type.
 
         Returns:
             None
@@ -386,15 +444,15 @@ class HybridEvolution:
             f"Running the hybrid online-offline solver for experiment: {experiment}"
         )
 
-        expStartTime: int = timeit.default_timer()
+        expStartTime: float = timeit.default_timer()
         NGEN: int = 500
         MAX_MEMORY_DEMAND: int = 2
-        MAX_LATENCY: int = 100
+        MAX_LATENCY: int = 1000
         MIN_AR: float = 1.0
         MIN_QUAL_IND: int = 1
         CXPB: float = 1.0
-        INDPB: float = 0.2
-        MUTPB: float = 0.8
+        INDPB: float = 0.5
+        MUTPB: float = 0.5
         SCORES_DIR: str = "scores"
 
         expDir: str = os.path.join(self._artifactsDir, experiment)
@@ -411,7 +469,7 @@ class HybridEvolution:
             encoding="utf8",
         ) as topologyFile:
             topologyFile.write(
-                "method, generation, average_ar, max_ar, min_ar, average_latency, max_latency, min_latency\n"
+                f"method, generation, average_ar, max_ar, min_ar, average_{type}, max_{type}, min_{type}\n"
             )
 
         with open(
@@ -419,14 +477,16 @@ class HybridEvolution:
             "w",
             encoding="utf8",
         ) as pf:
-            pf.write("method, generation, latency, ar\n")
+            pf.write(f"method, generation, {type}, ar\n")
 
         creator.create("MaxARMinLatency", base.Fitness, weights=(1.0, -1.0))
 
         self._toolbox.register(
             "individual", self._generateRandomIndividual, Individual, topology, fgrs
         )
-        self._toolbox.register("population", tools.initRepeat, list, self._toolbox.individual)
+        self._toolbox.register(
+            "population", tools.initRepeat, list, self._toolbox.individual
+        )
         self._toolbox.register("mate", self._crossover)
         self._toolbox.register("mutate", self._mutate, indpb=INDPB)
         self._toolbox.register("select", tools.selNSGA2)
@@ -451,17 +511,17 @@ class HybridEvolution:
             MIN_QUAL_IND,
             popSize,
             trafficGenerator,
+            telemetry,
             sendEGs,
             deleteEGs,
             hof,
+            type,
         )
 
         gen = gen + 1
 
         while len(qualifiedIndividuals) < MIN_QUAL_IND and gen <= NGEN:
-            offspring: "list[Individual]" = self._generateOffspring(
-                pop, CXPB, MUTPB
-            )
+            offspring: "list[Individual]" = self._generateOffspring(pop, CXPB, MUTPB)
             pop, qualifiedIndividuals = self._performGeneticOperation(
                 pop,
                 offspring,
@@ -478,13 +538,15 @@ class HybridEvolution:
                 MIN_QUAL_IND,
                 popSize,
                 trafficGenerator,
+                telemetry,
                 sendEGs,
                 deleteEGs,
                 hof,
+                type
             )
             gen = gen + 1
 
-        expEndTime: int = timeit.default_timer()
+        expEndTime: float = timeit.default_timer()
         TUI.appendToSolverLog(f"Time taken: {expEndTime - expStartTime:.2f}s")
 
         names: list[str] = experiment.split("_")

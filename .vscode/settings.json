@@ -35,6 +35,7 @@
         "precpu",
         "prob",
         "PYTHONHASHSEED",
+        "QUAL",
         "reqps",
         "reqpss",
         "reqs",
@@ -54,5 +55,11 @@
         "vnfs",
         "vsctl",
         "zlabel"
-    ]
+    ],
+    "python-envs.defaultEnvManager": "ms-python.python:poetry",
+    "python-envs.defaultPackageManager": "ms-python.python:poetry",
+    "python-envs.pythonProjects": [],
+    "chat.tools.terminal.autoApprove": {
+        "poetry": true
+    }
 }

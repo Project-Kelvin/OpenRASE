@@ -630,7 +630,7 @@ class MakGAUtils:
                     )
         scores: dict[str, ResourceDemand] = Scorer.getHostScores(
             data, self._topology, embeddingData, MakGAUtils._demandPredictions
-        )
+        )[1]
 
         if len(scores) == 0:
             return False

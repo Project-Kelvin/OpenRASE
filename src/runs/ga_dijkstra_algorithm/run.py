@@ -66,12 +66,12 @@ def run(headless: bool) -> None:
     """
 
     experiments: list[tuple[Any]] = [
-        (8, 0.1, False, 10, 2),
-        (8, 0.1, False, 10, 1),
-        (8, 0.1, False, 5, 2),
-        (8, 0.2, False, 10, 2),
-        (8, 0.1, True, 10, 2),
-        (16, 0.1, False, 10, 2),
+        (8, 0.1, False, 10, 2), #basic
+        (8, 0.1, False, 10, 1), #cpu
+        (8, 0.1, False, 5, 2), #bandwidth
+        (8, 0.2, False, 10, 2), #traffic scale
+        (8, 0.1, True, 10, 2), # traffic pattern
+        #(16, 0.1, False, 10, 2),
     ]
 
     for experiment in experiments:

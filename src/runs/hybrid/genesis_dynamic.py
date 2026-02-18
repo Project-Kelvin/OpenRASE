@@ -172,6 +172,7 @@ def run(headless: bool) -> None:
                         self._orchestrator.deleteEmbeddingGraphs,
                         [trafficSegments[segment]],
                         self._trafficGenerator,
+                        self._orchestrator.getTelemetry(),
                         topologyToUse,
                         "genesis_dynamic",
                         f"{len(allRequestsReceived)}_0.1_False_10_2_{segment}",

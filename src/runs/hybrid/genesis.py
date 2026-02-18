@@ -182,6 +182,7 @@ def run(headless: bool) -> None:
                         self._orchestrator.deleteEmbeddingGraphs,
                         trafficDesign,
                         self._trafficGenerator,
+                        self._orchestrator.getTelemetry(),
                         topology,
                         "genesis",
                         exp["name"],
