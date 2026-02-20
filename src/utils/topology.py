@@ -78,12 +78,16 @@ def generateFatTreeTopology(k: int, bandwidth: int, cpu: int, memory: int, delay
 
     return Topology(hosts=hosts, switches=coreSwitches + aggrSwitches + edgeSwitches, links=links)
 
-def generateTopologyFromEdgeList(edgeListFile: str) -> Topology:
+def generateTopologyFromEdgeList(edgeListFile: str, cpus: int, memory: int, bandwidth: int, delay: int = None) -> Topology:
     """
     Generate a topology from an edge list.
 
     Parameters:
         edgeListFile (str): the path to the edge list file.
+        cpus (int): the CPU of the hosts.
+        memory (int): the memory of the hosts.
+        bandwidth (int): the bandwidth of the links in Mbit/s.
+        delay (int): the delay of the links in ms.
 
     Returns:
         Topology: the generated topology.
@@ -96,10 +100,6 @@ def generateTopologyFromEdgeList(edgeListFile: str) -> Topology:
     hosts: list[Host] = []
     switches: list[Switch] = []
     topology: Topology = {}
-    bandwidth: int = 10
-    cpus: int = 1
-    memory: int = 5 * 1024
-    delay: int = 10
 
 
     with open(edgeListFile, "r") as f:

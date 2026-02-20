@@ -4,6 +4,7 @@ GA is used for VNf Embedding and Dijkstra is used for link embedding.
 """
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
+from copy import deepcopy
 import os
 import random
 import timeit
@@ -70,6 +71,7 @@ class HybridEvolution:
         self._artifactsDir: str = os.path.join(
             getConfig()["repoAbsolutePath"], "artifacts", "experiments", experimentName
         )
+        self._population: list[Individual] = []
 
     def _select(
         self,
@@ -246,8 +248,13 @@ class HybridEvolution:
             tuple[list[Individual], list[Individual]: the updated population and qualified individuals.
         """
 
+        TUI.appendToSolverLog(f"Decoding population for generation {gen}.")
         populationEG: "list[DecodedIndividual]" = self._decodePop(pop, topology, fgrs)
+        TUI.appendToSolverLog(
+            f"Population decoded for generation {gen}. Starting evaluation."
+        )
 
+        TUI.appendToSolverLog(f"Caching surrogate evaluations for generation {gen}.")
         if type == POWER:
             HybridEvaluation.cacheForOfflinePowerUsage(
                 populationEG, trafficDesign, topology, gen, isAvgOnly=True
@@ -261,6 +268,10 @@ class HybridEvolution:
             )
 
         startTime: float = timeit.default_timer()
+
+        TUI.appendToSolverLog(
+            f"Evaluating population using surrogate for generation {gen}."
+        )
         with ProcessPoolExecutor() as executor:
             futures = []
 
@@ -420,6 +431,7 @@ class HybridEvolution:
         popSize: int,
         experiment: str,
         type=LATENCY,
+        retainPopulation: bool = False,
     ) -> None:
         """
         Run the Genetic Algorithm + Dijkstra Algorithm.
@@ -435,6 +447,7 @@ class HybridEvolution:
             popSize (int): the population size.
             experiment (str): the experiment name.
             type (str): the optimisation objective type.
+            retainPopulation (bool): whether to retain the population for the next run.
 
         Returns:
             None
@@ -446,8 +459,8 @@ class HybridEvolution:
 
         expStartTime: float = timeit.default_timer()
         NGEN: int = 500
-        MAX_MEMORY_DEMAND: int = 2
-        MAX_LATENCY: int = 1000
+        MAX_MEMORY_DEMAND: int = 1
+        MAX_LATENCY: int = 300
         MIN_AR: float = 1.0
         MIN_QUAL_IND: int = 1
         CXPB: float = 1.0
@@ -491,8 +504,14 @@ class HybridEvolution:
         self._toolbox.register("mutate", self._mutate, indpb=INDPB)
         self._toolbox.register("select", tools.selNSGA2)
 
-        pop: "list[Individual]" = self._toolbox.population(n=popSize)
-
+        pop: "list[Individual]" = (
+            self._toolbox.population(n=popSize)
+            if not retainPopulation or len(self._population) == 0
+            else deepcopy(self._population)
+        )
+        TUI.appendToSolverLog(
+            f"Initial population of {popSize} individuals created. Starting evolution."
+        )
         gen: int = 1
         hof: tools.ParetoFront = tools.ParetoFront()
         pop, qualifiedIndividuals = self._performGeneticOperation(
@@ -517,11 +536,21 @@ class HybridEvolution:
             hof,
             type,
         )
+        self._population = deepcopy(pop)
 
         gen = gen + 1
 
         while len(qualifiedIndividuals) < MIN_QUAL_IND and gen <= NGEN:
+            TUI.appendToSolverLog(
+                f"Qualified individuals less than {MIN_QUAL_IND}. Continuing evolution."
+            )
+            TUI.appendToSolverLog(
+                f"Generation {gen} started. Performing genetic operations."
+            )
             offspring: "list[Individual]" = self._generateOffspring(pop, CXPB, MUTPB)
+            TUI.appendToSolverLog(
+                f"Offspring generated for generation {gen}. Evaluating offspring."
+            )
             pop, qualifiedIndividuals = self._performGeneticOperation(
                 pop,
                 offspring,
@@ -542,9 +571,10 @@ class HybridEvolution:
                 sendEGs,
                 deleteEGs,
                 hof,
-                type
+                type,
             )
             gen = gen + 1
+            self._population = deepcopy(pop)
 
         expEndTime: float = timeit.default_timer()
         TUI.appendToSolverLog(f"Time taken: {expEndTime - expStartTime:.2f}s")

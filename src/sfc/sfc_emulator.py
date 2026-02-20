@@ -87,11 +87,14 @@ class SFCEmulator(Subscriber):
         self._trafficGenerator.end()
         NotificationSystem.unsubscribeAll()
 
-        client: DockerClient = from_env()
-        client.containers.prune()
-        client.images.prune()
-        client.networks.prune()
-        client.volumes.prune()
+        try:
+            client: DockerClient = from_env()
+            client.containers.prune()
+            client.images.prune()
+            client.networks.prune()
+            client.volumes.prune()
+        except Exception as e:
+            TUI.appendToLog(f"Error while pruning Docker resources: {e}", True)
 
         TUI.exit()
 

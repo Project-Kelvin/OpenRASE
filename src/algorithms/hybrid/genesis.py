@@ -3,7 +3,6 @@ This defines the GA that evolves teh weights of the Neural Network.
 """
 
 from concurrent.futures import ProcessPoolExecutor
-import random
 import timeit
 from typing import Callable, Tuple
 from uuid import uuid4
@@ -16,10 +15,6 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from algorithms.hybrid.constants.gensis_objective import LATENCY
 from algorithms.models.embedding import DecodedIndividual, LinkData
-from algorithms.hybrid.constants.surrogate import (
-    SURROGACY_PATH,
-    SURROGATE_PATH,
-)
 from algorithms.hybrid.solvers.chain_composition import generateFGs
 from algorithms.hybrid.solvers.link_embedding import EmbedLinks
 from algorithms.hybrid.solvers.vnf_embedding import generateEGs
@@ -40,7 +35,7 @@ tf.keras.utils.disable_interactive_logging()
 
 predefinedWeights: tuple[list[float], list[float], list[float]] = None
 NO_OF_NEURONS: int = 2
-POP_SIZE: int = 100
+POP_SIZE: int =100
 
 
 def decodeIndividual(
@@ -64,32 +59,39 @@ def decodeIndividual(
 
     global predefinedWeights
 
-    weights: "Tuple[list[float], list[float], list[float]]" = getWeights(
-        individual, NO_OF_NEURONS
-    )
-
-    ccPDWeights: "list[float]" = predefinedWeights[0]
-    vnfPDWeights: "list[float]" = predefinedWeights[1]
-    linkPDWeights: "list[float]" = predefinedWeights[2]
-    ccWeights: list[float] = weights[0]
-    vnfWeights: list[float] = weights[1]
-    linkWeights: list[float] = weights[2]
-
-    fgs: dict[str, list[str]] = generateFGs(
-        sfcrs, ccPDWeights, ccWeights, NO_OF_NEURONS
-    )
-    egs, nodes, embedData = generateEGs(
-        fgs, topology, vnfPDWeights, vnfWeights, NO_OF_NEURONS
-    )
-    embedLinks: EmbedLinks = None
-    linkData: LinkData = None
-    if len(egs) > 0:
-        embedLinks = EmbedLinks(
-            topology, sfcrs, egs, linkPDWeights, linkWeights, NO_OF_NEURONS
+    try:
+        weights: "Tuple[list[float], list[float], list[float]]" = getWeights(
+            individual, NO_OF_NEURONS
         )
-        egs = embedLinks.embedLinks(nodes)
-        linkData = embedLinks.getLinkData()
-    ar: float = len(egs) / len(sfcrs)
+
+        ccPDWeights: "list[float]" = predefinedWeights[0]
+        vnfPDWeights: "list[float]" = predefinedWeights[1]
+        linkPDWeights: "list[float]" = predefinedWeights[2]
+        ccWeights: list[float] = weights[0]
+        vnfWeights: list[float] = weights[1]
+        linkWeights: list[float] = weights[2]
+
+        fgs: dict[str, list[str]] = generateFGs(
+            sfcrs, ccPDWeights, ccWeights, NO_OF_NEURONS
+        )
+        egs, nodes, embedData = generateEGs(
+            fgs, topology, vnfPDWeights, vnfWeights, NO_OF_NEURONS
+        )
+        embedLinks: EmbedLinks = None
+        linkData: LinkData = None
+        if len(egs) > 0:
+            embedLinks = EmbedLinks(
+                topology, sfcrs, egs, linkPDWeights, linkWeights, NO_OF_NEURONS
+            )
+            egs = embedLinks.embedLinks(nodes)
+            linkData = embedLinks.getLinkData()
+        ar: float = len(egs) / len(sfcrs)
+    except Exception as e:
+        TUI.appendToSolverLog(f"Error decoding individual {index}: {e}")
+        egs = []
+        embedData = None
+        linkData = None
+        ar = 0.0
 
     return (index, egs, embedData, linkData, ar)
 
@@ -203,7 +205,8 @@ def solve(
     topology: Topology,
     dirName: str,
     experimentName: str,
-    type: str = LATENCY
+    type: str = LATENCY,
+    retainPopulation: bool = False
 ) -> None:
     """
     Evolves the weights of the Neural Network.
@@ -219,6 +222,7 @@ def solve(
         dirName (str): the directory name.
         experimentName (str): the name of the experiment.
         type (str): the type of the objective function to optimize. Defaults to LATENCY.
+        retainPopulation (bool): specifies if the population should be retained in memory.
 
     Returns:
         None
@@ -247,4 +251,5 @@ def solve(
         POP_SIZE,
         experimentName,
         type,
+        retainPopulation
     )

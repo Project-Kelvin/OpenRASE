@@ -110,7 +110,11 @@ def run(headless: bool) -> None:
         topology: Topology = generateTopologyFromEdgeList(
             os.path.join(
                 getConfig()["repoAbsolutePath"], "src", "runs", "hybrid", "data", f"{mecTopo}.txt"
-            )
+            ),
+            1,
+            5 * 1024,
+            10,
+            10
         )
 
         def removeHost(topology: Topology, hostID: str) -> Topology:
@@ -151,6 +155,7 @@ def run(headless: bool) -> None:
                 allRequestsReceived: "list[SFCRequest]" = []
                 originalRequests: "list[SFCRequest]" = []
                 removedHosts: "list[int]" = []
+                COPIES: int = 1
                 try:
                     topologyToUse: Topology = copy.deepcopy(topology)
                     while self._requests.empty():
@@ -161,10 +166,12 @@ def run(headless: bool) -> None:
                         sleep(0.1)
 
                     for segment in range(segments):
-                        for request in originalRequests:
-                            requestCopy: SFCRequest = copy.deepcopy(request)
-                            requestCopy["sfcrID"] = f"{request['sfcrID']}-{segment}"
-                            allRequestsReceived.append(requestCopy)
+                        remainder: int = segment % 2
+                        for request in originalRequests[remainder::2]:
+                            for copyIndex in range(COPIES):
+                                requestCopy: SFCRequest = copy.deepcopy(request)
+                                requestCopy["sfcrID"] = f"{request['sfcrID']}-{segment}-{copyIndex}"
+                                allRequestsReceived.append(requestCopy)
 
                         if segment > int(segments * 0.75):
                             # Simulate a host failure
@@ -190,9 +197,10 @@ def run(headless: bool) -> None:
                             self._trafficGenerator,
                             self._orchestrator.getTelemetry(),
                             topologyToUse,
-                            "genesis__power",
-                            f"{len(allRequestsReceived)}_0.1_False_10_1_{segment}_milan",
-                            POWER
+                            "genesis_power",
+                            f"{len(allRequestsReceived)}_0.1_False_10_1_{segment}_{mecTopo}",
+                            POWER,
+                            retainPopulation=True
                         )
 
                 except Exception as e:
