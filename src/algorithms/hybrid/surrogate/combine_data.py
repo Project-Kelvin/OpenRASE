@@ -36,7 +36,7 @@ def combineData() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     files = [f for f in files if f not in filesToIgnore]
     data: list[pd.DataFrame] = [
         pd.read_csv(
-            os.path.join(SURROGATE_DATA_PATH, f), sep=r"\s*,\s*", engine="python"
+            os.path.join(SURROGATE_DATA_PATH, f), sep=r"\s*,\s*", engine="python", header=0
         )
         for f in files
     ]
@@ -45,6 +45,13 @@ def combineData() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     testData: pd.DataFrame = pd.DataFrame()
     allData: pd.DataFrame = pd.DataFrame()
     for i, dataset in enumerate(data):
+        dataset = dataset[dataset[OUTPUT] != OUTPUT] # remove duplicated column header in the csv files
+        dataset[OUTPUT] = dataset[OUTPUT].astype(float)
+        dataset["total_delay"] = dataset["total_delay"].astype(float)
+        dataset["max_cpu"] = dataset["max_cpu"].astype(float)
+        dataset["total_link_score"] = dataset["total_link_score"].astype(float)
+        dataset["max_link_score"] = dataset["max_link_score"].astype(float)
+
         dataset = dataset.dropna()
         dataset = dataset[dataset[OUTPUT] != 0]
         dataset[OUTPUT] = dataset[OUTPUT] - dataset["total_delay"]  # Deduct delay
