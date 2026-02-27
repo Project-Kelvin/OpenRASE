@@ -6,6 +6,7 @@ import copy
 import json
 import os
 from time import sleep
+import timeit
 from typing import Union
 import click
 from shared.models.config import Config
@@ -14,7 +15,7 @@ from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
-from algorithms.hybrid.constants.surrogate import SURROGACY_PATH
+from algorithms.hybrid.constants.surrogate import SURROGACY_PATH, SURROGATE_PATH
 from algorithms.hybrid.surrogate.data_generator.evolver import evolveWeights
 from algorithms.hybrid.surrogate.gaussian_process import trainGP
 from algorithms.hybrid.surrogate.linear_regression import trainLR
@@ -38,6 +39,13 @@ config: Config = getConfig()
 configPath: str = f"{config['repoAbsolutePath']}/src/runs/hybrid/configs"
 
 directory = SURROGACY_PATH
+timeDirectory: str = os.path.join(SURROGATE_PATH, "time.csv")
+
+if not os.path.exists(SURROGATE_PATH):
+    os.makedirs(SURROGATE_PATH)
+
+with open(timeDirectory, "w") as file:
+    file.write("type,id,time\n")
 
 if not os.path.exists(directory):
     os.makedirs(directory)
@@ -63,7 +71,12 @@ def trainModel() -> None:
     Runs the surrogate model.
     """
 
+    startTime: float = timeit.default_timer()
     train()
+    endTime: float = timeit.default_timer()
+    totalTime: float = endTime - startTime
+    with open(timeDirectory, "a") as file:
+        file.write(f"training,0,{totalTime:.2f}\n")
 
 
 @click.command()
@@ -137,6 +150,7 @@ def generateData(headless: bool) -> None:
 
         print(f"Generating data for experiment type {expName}.")
 
+        startExpTime: float = timeit.default_timer()
         class FGR(FGRequestGenerator):
             """
             FG Request Generator.
@@ -201,6 +215,7 @@ def generateData(headless: bool) -> None:
                         requests.append(self._requests.get())
                         sleep(0.1)
 
+                    startTime: float = timeit.default_timer()
                     evolveWeights(
                         requests,
                         self._orchestrator.sendEmbeddingGraphs,
@@ -210,6 +225,10 @@ def generateData(headless: bool) -> None:
                         self._topology,
                         expName
                     )
+                    endTime: float = timeit.default_timer()
+                    totalTime: float = endTime - startTime
+                    with open(timeDirectory, "a") as file:
+                        file.write(f"data_generation,{expName},{totalTime:.2f}\n")
                     print("Finished experiment.")
                 except Exception as e:
                     print(str(e), True)
@@ -222,3 +241,7 @@ def generateData(headless: bool) -> None:
         except Exception as e:
             print(str(e), True)
         sfcEm.end()
+        endExpTime: float = timeit.default_timer()
+        totalExpTime: float = endExpTime - startExpTime
+        with open(timeDirectory, "a") as file:
+            file.write(f"total_experiment,{expName},{totalExpTime:.2f}\n")

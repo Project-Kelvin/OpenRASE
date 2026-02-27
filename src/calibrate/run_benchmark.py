@@ -61,12 +61,29 @@ class Calibrate:
             "reqps",
         ]
         self._cache: "dict[str, dict[str, ResourceDemand]]" = {}
-
+        self._timeDataPath: str = os.path.join(
+            self._config["repoAbsolutePath"], "artifacts", "calibrations", "time.csv"
+        )
 
         if not os.path.exists(
             f"{self._config['repoAbsolutePath']}/artifacts/calibrations"
         ):
             os.makedirs(f"{self._config['repoAbsolutePath']}/artifacts/calibrations")
+        with open(self._timeDataPath, "w") as file:
+            file.write("vnf,type,time\n")
+
+    def _writeTimeData(self, vnf: str, type: str, time: str) -> None:
+        """
+        Write the time data to a file.
+
+        Parameters:
+            vnf (str): The VNF for which the time data is being written.
+            type (str): The type of time data being written (e.g., "training", "inference").
+            time (str): The time taken for the operation in seconds.
+        """
+
+        with open(self._timeDataPath, "a") as file:
+            file.write(f"{vnf},{type},{time}\n")
 
     def _trainModel(self, metric: str, vnf: str, epochs: int = EPOCHS) -> float:
         """
@@ -171,7 +188,7 @@ class Calibrate:
         return testResult
 
     def _calibrateVNF(
-        self,
+        calibrateSelf,
         vnf: str,
         trafficDesignFile: str = "",
         metric: str = "",
@@ -195,13 +212,13 @@ class Calibrate:
         if not train:
 
             if not os.path.exists(
-                f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"
+                f"{calibrateSelf._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"
             ):
                 os.makedirs(
-                    f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"
+                    f"{calibrateSelf._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"
                 )
             directory: str = (
-                f"{self._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"
+                f"{calibrateSelf._config['repoAbsolutePath']}/artifacts/calibrations/{vnf}"
             )
             filename = f"{directory}/calibration_data.csv"
 
@@ -210,7 +227,7 @@ class Calibrate:
                     trafficDesign: "list[TrafficDesign]" = [json.load(file)]
             else:
                 with open(
-                    f"{self._config['repoAbsolutePath']}/src/calibrate/traffic-design.json",
+                    f"{calibrateSelf._config['repoAbsolutePath']}/src/calibrate/traffic-design.json",
                     "r",
                     encoding="utf8",
                 ) as file:
@@ -265,7 +282,7 @@ class Calibrate:
                 ],
             }
 
-            if vnf in self._config["vnfs"]["splitters"]:
+            if vnf in calibrateSelf._config["vnfs"]["splitters"]:
                 nextVNF: VNF = deepcopy(eg["vnfs"]["next"])
                 eg["vnfs"]["next"] = [nextVNF, nextVNF]
 
@@ -292,7 +309,7 @@ class Calibrate:
                     """
 
                     maxRound: int = 1
-
+                    startTime: float = default_timer()
                     for i in range(maxRound):
                         TUI.appendToSolverLog(f"Round {i + 1}")
                         self._orchestrator.sendEmbeddingGraphs([eg])
@@ -320,6 +337,7 @@ class Calibrate:
                             )
                             hostData: DataFrame = hostDataToFrame(hostDataList)
                             hostData = mergeHostAndTrafficData(hostData, trafficData)
+                            print(hostData)
                             if i == 0:
                                 hostData.to_csv(filename, index=False)
                             else:
@@ -328,6 +346,10 @@ class Calibrate:
                             TUI.appendToSolverLog(str(e), True)
                         self._orchestrator.deleteEmbeddingGraphs([eg])
                         TUI.appendToSolverLog(f"Round {i + 1} finished.")
+                    endTime: float = default_timer()
+                    totalTime: float = endTime - startTime
+                    calibrateSelf._writeTimeData(vnf, "data_collection", f"{totalTime:.2f}")
+
                     sleep(2)
                     TUI.exit()
 
@@ -340,19 +362,22 @@ class Calibrate:
 
             print("Training the models.")
 
+            startTrainTime: float = default_timer()
             if metric != "":
-                self._trainModel(metric, vnf, epochs)
+                calibrateSelf._trainModel(metric, vnf, epochs)
             else:
-                self._trainModel(self._headers[0], vnf, epochs)  # cpu
-                self._trainModel(self._headers[1], vnf, epochs)  # memory
-
+                calibrateSelf._trainModel(calibrateSelf._headers[0], vnf, epochs)  # cpu
+                calibrateSelf._trainModel(calibrateSelf._headers[1], vnf, epochs)  # memory
+            endTrainTime: float = default_timer()
+            trainTime: float = endTrainTime - startTrainTime
+            calibrateSelf._writeTimeData(vnf, "training", f"{trainTime:.2f}")
             em.end()
         else:
             if metric != "":
-                self._trainModel(metric, vnf, epochs)
+                calibrateSelf._trainModel(metric, vnf, epochs)
             else:
-                self._trainModel(self._headers[0], vnf, epochs)  # cpu
-                self._trainModel(self._headers[1], vnf, epochs)  # memory
+                calibrateSelf._trainModel(calibrateSelf._headers[0], vnf, epochs)  # cpu
+                calibrateSelf._trainModel(calibrateSelf._headers[1], vnf, epochs)  # memory
 
     def calibrateVNFs(
         self,
@@ -376,11 +401,20 @@ class Calibrate:
         """
 
         print("Calibrating VNFs.")
+
         if vnf != "":
+            startTime: float = default_timer()
             self._calibrateVNF(vnf, trafficDesignFile, metric, headless, train, epochs)
+            endTime: float = default_timer()
+            totalTime: float = endTime - startTime
+            self._writeTimeData(vnf, "total", f"{totalTime:.2f}")
         else:
             for vnf in self._config["vnfs"]["names"]:
                 print("Calibrating VNF: " + vnf)
+                startTime: float = default_timer()
                 self._calibrateVNF(
                     vnf, trafficDesignFile, metric, headless, train, epochs
                 )
+                endTime: float = default_timer()
+                totalTime: float = endTime - startTime
+                self._writeTimeData(vnf, "total", f"{totalTime:.2f}")

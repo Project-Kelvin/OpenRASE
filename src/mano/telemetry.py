@@ -234,8 +234,6 @@ class Telemetry(Subscriber):
             for thread in threads:
                 thread.join()
 
-            endTime: int = int(time.time())
-            hostData["endTime"] = endTime
             for hostKey, host in hostDataFutures.items():
                 stats: HostStats = hostDataFutures[hostKey]["stats"].result()
                 if "hostData" not in hostData:
@@ -255,7 +253,8 @@ class Telemetry(Subscriber):
                             "memoryUsage": stats[1],
                             "networkUsage": stats[2]
                         }
-
+            endTime: int = int(time.time())
+            hostData["endTime"] = endTime
         return hostData
 
     def _getHostStats(self, host: str, container: Container)-> HostStats:
@@ -320,7 +319,6 @@ class Telemetry(Subscriber):
             return (usedCPU, remainingCPU, usagePercentage)
         else:
             return (0.0, 0.0, 0.0)
-
 
     def _calculateMemoryUsage(self, stats: Any) -> "tuple[float, float, float]":
         """
