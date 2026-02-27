@@ -160,6 +160,6 @@ If you use OpenRASE in your research, please cite:
   number={},
   pages={1-6},
   keywords={Service function chaining;Heuristic algorithms;Software algorithms;Dynamic scheduling;Computer networks;Software;Telecommunications;Resource management;Optimization;Genetic algorithms;Emulator;Network Function Virtualisation (NFV);Network Function Virtualisation Resource Allocation (NFV-RA);Service Function Chaining (SFC);Autonomous Network},
-  doi={}
+  doi={10.23919/SoftCOM66362.2025.11197454}
 }
 ```
