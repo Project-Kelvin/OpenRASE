@@ -53,6 +53,8 @@ class HybridEvolution:
     It uses a surrogate model for the offline phase and an emulator for the online phase.
     """
 
+    _population: list[Individual] = []
+
     def __init__(
         self,
         experimentName: str,
@@ -71,7 +73,6 @@ class HybridEvolution:
         self._artifactsDir: str = os.path.join(
             getConfig()["repoAbsolutePath"], "artifacts", "experiments", experimentName
         )
-        self._population: list[Individual] = []
 
     def _select(
         self,
@@ -506,8 +507,8 @@ class HybridEvolution:
 
         pop: "list[Individual]" = (
             self._toolbox.population(n=popSize)
-            if not retainPopulation or len(self._population) == 0
-            else deepcopy(self._population)
+            if not retainPopulation or len(HybridEvolution._population) == 0
+            else deepcopy(HybridEvolution._population)
         )
         TUI.appendToSolverLog(
             f"Initial population of {popSize} individuals created. Starting evolution."
@@ -536,7 +537,7 @@ class HybridEvolution:
             hof,
             type,
         )
-        self._population = deepcopy(pop)
+        HybridEvolution._population = deepcopy(pop)
 
         gen = gen + 1
 
@@ -574,7 +575,7 @@ class HybridEvolution:
                 type,
             )
             gen = gen + 1
-            self._population = deepcopy(pop)
+            HybridEvolution._population = deepcopy(pop)
 
         expEndTime: float = timeit.default_timer()
         TUI.appendToSolverLog(f"Time taken: {expEndTime - expStartTime:.2f}s")
