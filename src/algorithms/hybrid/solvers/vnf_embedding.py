@@ -16,6 +16,7 @@ from shared.utils.config import getConfig
 from utils.embedding_graph import traverseVNF
 import numpy as np
 
+
 def convertFGsToNP(fgs: dict[str, list[str]]) -> tuple[np.ndarray, list[str]]:
     """
     Converts a list of EmbeddingGraphs to a NumPy array.
@@ -53,7 +54,12 @@ def convertFGsToNP(fgs: dict[str, list[str]]) -> tuple[np.ndarray, list[str]]:
 
 
 def convertNPtoEGs(
-    data: np.ndarray, fgs: dict[str, list[str]], topology: Topology, indices: list[str]
+    data: np.ndarray,
+    fgs: dict[str, list[str]],
+    topology: Topology,
+    indices: list[str],
+    rejectionRate: float = 0.05,
+    sigma: float = 2.0,
 ) -> "Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]":
     """
     Generates the Embedding Graphs.
@@ -63,6 +69,9 @@ def convertNPtoEGs(
         fgs (dict[str, list[str]]): the dictionary of Embedding Graphs.
         topology (Topology): the topology.
         indices (list[str]): the list of indices.
+        rejectionRate (float): the rejection rate for the VNFs.
+        sigma (float): the standard deviation for the Gaussian distribution used for host selection.
+
     Returns:
         Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
     """
@@ -118,8 +127,6 @@ def convertNPtoEGs(
             index: int = indices.index(f"{sfcrID}_{vnf}_{instance}")
             cl: float = data[index, 0]
 
-            # Reject 5% of the VNFs
-            rejectionRate: float = 0.05
             absCL: float = abs(cl)
             acceptanceValue: float = absCL % int(absCL) if int(absCL) != 0 else absCL
 
@@ -128,7 +135,7 @@ def convertNPtoEGs(
 
                 return
             else:
-                hostIndex = abs(int(random.gauss(cl, 2)))
+                hostIndex = abs(int(random.gauss(cl, sigma)))
                 hostIndex = hostIndex % noHosts
 
                 vnfDict["vnf"] = {"id": vnf}
@@ -172,7 +179,13 @@ def convertNPtoEGs(
     return (egs, nodes, embeddingData)
 
 
-def getConfidenceValues(data: np.ndarray, predefinedWeights: "list[float]", weights: "list[float]", noOfNeurons: int, topology: Topology) -> np.ndarray:
+def getConfidenceValues(
+    data: np.ndarray,
+    predefinedWeights: "list[float]",
+    weights: "list[float]",
+    noOfNeurons: int,
+    topology: Topology,
+) -> np.ndarray:
     """
     Gets the confidence values.
 
@@ -189,7 +202,9 @@ def getConfidenceValues(data: np.ndarray, predefinedWeights: "list[float]", weig
 
     noOfHosts: int = len(topology["hosts"])
     copiedData = data.copy()
-    npWeights = np.array(predefinedWeights, dtype=np.float64).reshape(-1, noOfNeurons if noOfNeurons > 0 else 1)
+    npWeights = np.array(predefinedWeights, dtype=np.float64).reshape(
+        -1, noOfNeurons if noOfNeurons > 0 else 1
+    )
     confidenceValues: np.ndarray = np.matmul(copiedData, npWeights)
     confidenceValues = activationFunction(confidenceValues)
     if noOfNeurons > 0:
@@ -199,9 +214,20 @@ def getConfidenceValues(data: np.ndarray, predefinedWeights: "list[float]", weig
 
     return confidenceValues
 
+
 def generateEGs(
-    fgs: dict[str, list[str]], topology: Topology, pdWeights: "list[float]", weights: "list[float]", noOfNeurons: int
-) -> Tuple["list[EmbeddingGraph]", dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]:
+    fgs: dict[str, list[str]],
+    topology: Topology,
+    pdWeights: "list[float]",
+    weights: "list[float]",
+    noOfNeurons: int,
+    rejectionRate: float = 0.05,
+    sigma: float = 2.0,
+) -> Tuple[
+    "list[EmbeddingGraph]",
+    dict[str, list[str]],
+    dict[str, dict[str, list[Tuple[str, int]]]],
+]:
     """
     Generates the Embedding Graphs.
 
@@ -211,6 +237,8 @@ def generateEGs(
         pdWeights (list[float]): the predefined weights.
         weights (list[float]): the weights.
         noOfNeurons (int): the number of neurons in the hidden layer.
+        rejectionRate (float): the rejection rate for the VNFs.
+        sigma (float): the standard deviation for the Gaussian distribution used for host selection.
 
     Returns:
         Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
@@ -218,6 +246,8 @@ def generateEGs(
 
     data, indices = convertFGsToNP(fgs)
     data = getConfidenceValues(data, pdWeights, weights, noOfNeurons, topology)
-    egs, nodes, embeddingData = convertNPtoEGs(data, fgs, topology, indices)
+    egs, nodes, embeddingData = convertNPtoEGs(
+        data, fgs, topology, indices, rejectionRate, sigma
+    )
 
     return egs, nodes, embeddingData

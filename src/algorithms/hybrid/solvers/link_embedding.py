@@ -2,17 +2,16 @@
 This defines the functions used for VNF link embedding.
 """
 
-from typing import Tuple
+from typing import cast
 import networkx as nx
 import heapq
-
 from shared.models.sfc_request import SFCRequest
-from algorithms.hybrid.constants.surrogate import BRANCH
 from algorithms.hybrid.utils.solvers import activationFunction
+from algorithms.models.embedding import LinkData
 from algorithms.utils.graphs import parseNodes
 from constants.topology import SERVER, SFCC
 from shared.models.topology import Link, Topology
-from shared.models.embedding_graph import EmbeddingGraph
+from shared.models.embedding_graph import EmbeddingGraph, Optional
 import numpy as np
 from utils.tui import TUI
 
@@ -188,7 +187,7 @@ class EmbedLinks:
         self._hCost: dict[str, dict[str, dict[str, float]]] = {}
         self._links: list[str] = []
         self._data: np.ndarray = self._predictCost()
-        self._linkData: dict[str, dict[str, float]] = {}
+        self._linkData: Optional[LinkData] = None
 
     def _isHost(self, node: str) -> bool:
         """
@@ -332,7 +331,7 @@ class EmbedLinks:
 
         return self._data[index]
 
-    def _findPath(self, sfcID: str, source: str, destination: str) -> "list[str]":
+    def _findPath(self, sfcID: str, source: str, destination: str) -> list[str]:
         """
         Finds the path using A*.
 
@@ -361,18 +360,18 @@ class EmbedLinks:
                 return path
 
             if index == 0 or not self._isHost(currentNode.name):
-                for neighbor in self._graph.adj[currentNode.name]:
-                    node: Node = Node(neighbor)
+                for neighbour in self._graph.adj[currentNode.name]:
+                    node: Node = Node(neighbour)
 
-                    if self._isHost(neighbor):
+                    if self._isHost(neighbour):
                         node.hCost = 0
                     else:
                         node.hCost = self._getHeuristicCost(
-                            sfcID, neighbor, destination
+                            sfcID, neighbour, destination
                         )
                     node.parent = currentNode
                     node.totalCost = currentNode.totalCost + self._getHeuristicCost(
-                        sfcID, currentNode.name, neighbor
+                        sfcID, currentNode.name, neighbour
                     )
 
                     if (
@@ -380,7 +379,7 @@ class EmbedLinks:
                             [
                                 closedSetNode
                                 for closedSetNode in closedSet
-                                if closedSetNode.name == neighbor
+                                if closedSetNode.name == neighbour
                                 and node.totalCost >= closedSetNode.totalCost
                             ]
                         )
@@ -391,13 +390,16 @@ class EmbedLinks:
             index += 1
             closedSet.append(currentNode)
 
-    def getLinkData(self) -> "dict[str, dict[str, float]]":
+    def getLinkData(self) -> LinkData:
         """
         Gets the link data.
 
         Returns:
-            dict[str, dict[str, float]] : the link data.
+            LinkData : the link data.
         """
+
+        if self._linkData is None:
+            raise Exception("Link data is not available. Please run embedLinks() first.")
 
         return self._linkData
 
@@ -447,7 +449,7 @@ class EmbedLinks:
                     path = paths[srcDst] if srcDst in paths else paths[dstSrc]
 
                     for p in range(len(path) - 1):
-                        link: Link = [
+                        links: list[Link] = [
                             topoLink
                             for topoLink in self._topology["links"]
                             if (
@@ -458,49 +460,59 @@ class EmbedLinks:
                                 topoLink["source"] == path[p + 1]
                                 and topoLink["destination"] == path[p]
                             )
-                        ][0]
-                        linkDelay: float = (
+                        ]
+                        if len(links) == 0:
+                            raise Exception(f"No link found between {path[p]} and {path[p + 1]}")
+
+                        link: Link = links[0]
+                        linkDelay: float = cast(float,(
                             (link["delay"] / divisor)
                             if "delay" in link and link["delay"] is not None
-                            else 0
-                        )
-                        if f"{path[p]}-{path[p + 1]}" in self._linkData:
-                            if (
-                                eg["sfcID"]
-                                in self._linkData[f"{path[p]}-{path[p + 1]}"]
-                            ):
-                                pathData: tuple[float, float] = self._linkData[
-                                    f"{path[p]}-{path[p + 1]}"
-                                ][eg["sfcID"]]
-                                divisors: float = pathData[0] + 1 / divisor
-                                delay: float = pathData[1] + linkDelay
-                                self._linkData[f"{path[p]}-{path[p + 1]}"][
-                                    eg["sfcID"]
-                                ] = (divisors, delay)
-                            else:
-                                self._linkData[f"{path[p]}-{path[p + 1]}"][
-                                    eg["sfcID"]
-                                ] = (1 / divisor, linkDelay)
-                        elif f"{path[p + 1]}-{path[p]}" in self._linkData:
-                            if (
-                                eg["sfcID"]
-                                in self._linkData[f"{path[p + 1]}-{path[p]}"]
-                            ):
-                                pathData: tuple[float, float] = self._linkData[
-                                    f"{path[p + 1]}-{path[p]}"
-                                ][eg["sfcID"]]
-                                divisors: float = pathData[0] + 1 / divisor
-                                delay: float = pathData[1] + linkDelay
-                                self._linkData[f"{path[p + 1]}-{path[p]}"][
-                                    eg["sfcID"]
-                                ] = (divisors, delay)
-                            else:
-                                self._linkData[f"{path[p + 1]}-{path[p]}"][
-                                    eg["sfcID"]
-                                ] = (1 / divisor, linkDelay)
+                            else 0.0
+                        ))
+
+                        if self._linkData is None:
+                            self._linkData = cast(LinkData, {
+                                f"{path[p]}-{path[p + 1]}": {str(eg["sfcID"]): (1.0 / float(divisor), linkDelay)}
+                            })
                         else:
-                            self._linkData[f"{path[p]}-{path[p + 1]}"] = {
-                                eg["sfcID"]: (1 / divisor, linkDelay)
-                            }
+                            if f"{path[p]}-{path[p + 1]}" in self._linkData:
+                                if (
+                                    eg["sfcID"]
+                                    in self._linkData[f"{path[p]}-{path[p + 1]}"]
+                                ):
+                                    pathData: tuple[float, float] = self._linkData[
+                                        f"{path[p]}-{path[p + 1]}"
+                                    ][eg["sfcID"]]
+                                    divisors: float = pathData[0] + 1 / divisor
+                                    delay: float = pathData[1] + linkDelay
+                                    self._linkData[f"{path[p]}-{path[p + 1]}"][
+                                        eg["sfcID"]
+                                    ] = (divisors, delay)
+                                else:
+                                    self._linkData[f"{path[p]}-{path[p + 1]}"][
+                                        eg["sfcID"]
+                                    ] = (1 / divisor, linkDelay)
+                            elif f"{path[p + 1]}-{path[p]}" in self._linkData:
+                                if (
+                                    eg["sfcID"]
+                                    in self._linkData[f"{path[p + 1]}-{path[p]}"]
+                                ):
+                                    pathData: tuple[float, float] = self._linkData[
+                                        f"{path[p + 1]}-{path[p]}"
+                                    ][eg["sfcID"]]
+                                    divisors: float = pathData[0] + 1 / divisor
+                                    delay: float = pathData[1] + linkDelay
+                                    self._linkData[f"{path[p + 1]}-{path[p]}"][
+                                        eg["sfcID"]
+                                    ] = (divisors, delay)
+                                else:
+                                    self._linkData[f"{path[p + 1]}-{path[p]}"][
+                                        eg["sfcID"]
+                                    ] = (1 / divisor, linkDelay)
+                            else:
+                                self._linkData[f"{path[p]}-{path[p + 1]}"] = {
+                                    eg["sfcID"]: (1 / divisor, linkDelay)
+                                }
 
         return self._egs

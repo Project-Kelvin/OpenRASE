@@ -83,7 +83,7 @@ class Orchestrator():
 
         self._solver = solver
 
-    def sendRequests(self, requests: "list[Union[SFCRequest, EmbeddingGraph]]") -> None:
+    def sendRequests(self, requests: list[Union[SFCRequest, EmbeddingGraph]]) -> None:
         """
         Send the SFC requests to the orchestrator.
 

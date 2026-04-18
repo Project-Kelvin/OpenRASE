@@ -11,7 +11,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
-from algorithms.hybrid.ga_hybrid import solve
+from algorithms.hybrid.bega import solve
 from mano.orchestrator import Orchestrator
 from sfc.fg_request_generator import FGRequestGenerator
 from sfc.sfc_emulator import SFCEmulator

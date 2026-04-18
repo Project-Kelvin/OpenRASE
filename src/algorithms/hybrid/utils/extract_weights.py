@@ -3,13 +3,14 @@ This defines the functions used to extract weight values from individuals.
 """
 
 import random
-from typing import Tuple
+from typing import Tuple, cast
 import numpy as np
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.utils.config import getConfig
-
+from algorithms.hybrid.models.weights import GenesisWeights
 from algorithms.hybrid.solvers.link_embedding import EmbedLinks
+
 
 def getCCWeightsLength(sfcrs: "list[SFCRequest]") -> int:
     """
@@ -23,6 +24,7 @@ def getCCWeightsLength(sfcrs: "list[SFCRequest]") -> int:
     """
 
     return len(sfcrs) + len(getConfig()["vnfs"]["names"])
+
 
 def getLinkWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
     """
@@ -38,6 +40,7 @@ def getLinkWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
 
     return len(sfcrs) + len(EmbedLinks.getLinks(topology))
 
+
 def getVNFWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
     """
     Gets the number of VNF weights.
@@ -52,7 +55,10 @@ def getVNFWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology) -> int:
 
     return len(sfcrs) + len(getConfig()["vnfs"]["names"]) + 2
 
-def getPredefinedWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology, noOfNeurons: int) -> int:
+
+def getPredefinedWeightsLength(
+    sfcrs: "list[SFCRequest]", topology: Topology, noOfNeurons: int
+) -> int:
     """
     Gets the number of weights.
 
@@ -74,6 +80,7 @@ def getPredefinedWeightsLength(sfcrs: "list[SFCRequest]", topology: Topology, no
         + getVNFWeightsLength(sfcrs, topology)
     )
 
+
 def getWeightsLength(noOfNeurons: int) -> int:
     """
     Gets the total number of weights.
@@ -87,7 +94,10 @@ def getWeightsLength(noOfNeurons: int) -> int:
 
     return 3 * noOfNeurons
 
-def generatePredefinedWeights(sfcrs: "list[SFCRequest]", topology: Topology, noOfNeurons: int) -> "list[float]":
+
+def generatePredefinedWeights(
+    sfcrs: "list[SFCRequest]", topology: Topology, noOfNeurons: int
+) -> "list[float]":
     """
     Generates the predefined weights.
 
@@ -101,6 +111,7 @@ def generatePredefinedWeights(sfcrs: "list[SFCRequest]", topology: Topology, noO
     """
 
     totalWeights: int = getPredefinedWeightsLength(sfcrs, topology, noOfNeurons)
+
     return [generateRandomWeight() for _ in range(totalWeights)]
 
 
@@ -109,7 +120,7 @@ def getPredefinedWeights(
     sfcrs: "list[SFCRequest]",
     topology: Topology,
     noOfNeurons: int,
-) -> "Tuple[list[float], list[float], list[float]]":
+) -> GenesisWeights:
     """
     Gets the weights.
 
@@ -120,7 +131,7 @@ def getPredefinedWeights(
         noOfNeurons (int): the number of neurons in the hidden layer.
 
     Returns:
-        tuple[list[float], list[float], list[float]]: VNF weights, VNF bias, link weights.
+        GenesisWeights: VNF weights, VNF bias, link weights.
     """
 
     if noOfNeurons == 0:
@@ -134,16 +145,17 @@ def getPredefinedWeights(
     vnfWeightUpper: int = ccWeightUpper + vnfWeights
     linkWeightUpper: int = vnfWeightUpper + linkWeights
 
-    return (
-        predefinedWeights[0:ccWeightUpper],
-        predefinedWeights[ccWeightUpper:vnfWeightUpper],
-        predefinedWeights[vnfWeightUpper:linkWeightUpper],
+    return cast(
+        GenesisWeights,
+        (
+            predefinedWeights[0:ccWeightUpper],
+            predefinedWeights[ccWeightUpper:vnfWeightUpper],
+            predefinedWeights[vnfWeightUpper:linkWeightUpper],
+        ),
     )
 
 
-def getWeights(
-    individual: "list[float]", noOfNeurons: int
-) -> "Tuple[list[float], list[float], list[float]]":
+def getWeights(individual: "list[float]", noOfNeurons: int) -> GenesisWeights:
     """
     Gets the weights.
 
@@ -152,17 +164,22 @@ def getWeights(
         noOfNeurons (int): the number of neurons in the hidden layer.
 
     Returns:
-        tuple[list[float], list[float], list[float]]: CC weights, VNF weights, link weights.
+        GenesisWeights: CC weights, VNF weights, link weights or and rejection rate and sigma.
     """
 
     ccWeightUpper: int = noOfNeurons
     vnfWeightUpper: int = ccWeightUpper + noOfNeurons
     linkWeightUpper: int = vnfWeightUpper + noOfNeurons
-    return (
-        individual[0:ccWeightUpper],
-        individual[ccWeightUpper:vnfWeightUpper],
-        individual[vnfWeightUpper:linkWeightUpper],
+
+    return cast(
+        GenesisWeights,
+        (
+            individual[0:ccWeightUpper],
+            individual[ccWeightUpper:vnfWeightUpper],
+            individual[vnfWeightUpper:linkWeightUpper],
+        ),
     )
+
 
 def generateRandomWeight() -> float:
     """

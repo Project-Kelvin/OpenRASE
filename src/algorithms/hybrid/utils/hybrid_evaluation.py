@@ -8,11 +8,12 @@ import os
 import random
 from time import sleep
 import timeit
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Union
 import numpy as np
 import pandas as pd
 import polars as pl
 from shared.models.embedding_graph import EmbeddingGraph
+from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Host, Topology
 from shared.models.traffic_design import TrafficDesign
 import tensorflow as tf
@@ -737,7 +738,7 @@ class HybridEvaluation:
     @staticmethod
     def evaluationOnEmulator(
         individual: DecodedIndividual,
-        fgrs: "list[EmbeddingGraph]",
+        fgrs: "Union[list[EmbeddingGraph], list[SFCRequest]]",
         gen: int,
         ngen: int,
         sendEGs: "Callable[[list[EmbeddingGraph]], None]",
@@ -835,7 +836,7 @@ class HybridEvaluation:
     @staticmethod
     def evaluationOnEmulatorPowerUsage(
         individual: DecodedIndividual,
-        fgrs: "list[EmbeddingGraph]",
+        fgrs: "Union[list[EmbeddingGraph], list[SFCRequest]]",
         gen: int,
         ngen: int,
         sendEGs: "Callable[[list[EmbeddingGraph]], None]",

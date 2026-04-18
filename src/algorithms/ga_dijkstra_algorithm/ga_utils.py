@@ -6,7 +6,7 @@ from copy import deepcopy
 import copy
 import random
 from time import sleep
-from typing import Callable, Tuple
+from typing import Callable, Tuple, Type
 from uuid import uuid4
 from dijkstar import Graph, find_path
 import pandas as pd
@@ -30,13 +30,13 @@ from utils.tui import TUI
 demandPredictor: DemandPredictor = DemandPredictor()
 
 def generateRandomIndividual(
-    container: Individual, topo: Topology, fgrs: "list[EmbeddingGraph]", alpha: float = 0.1
+    container: Type[Individual], topo: Topology, fgrs: "list[EmbeddingGraph]", alpha: float = 0.1
 ) -> "list[list[int]]":
     """
     Generate a random individual.
 
     Parameters:
-        container (Individual): the container.
+        container (Type[Individual]): the container type for the individual.
         topo (Topology): the topology.
         fgrs (EmbeddingGraph): the FG Request.
         alpha (float): the probability of a VNF being deployed on a host.

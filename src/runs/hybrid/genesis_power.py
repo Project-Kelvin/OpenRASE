@@ -14,7 +14,7 @@ from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
-from algorithms.hybrid.constants.gensis_objective import POWER
+from algorithms.hybrid.constants.genesis_objective import POWER
 from algorithms.hybrid.genesis import solve
 from mano.orchestrator import Orchestrator
 from sfc.fg_request_generator import FGRequestGenerator

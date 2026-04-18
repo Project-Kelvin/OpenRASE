@@ -8,7 +8,7 @@ from copy import deepcopy
 import os
 import random
 import timeit
-from typing import Callable, Tuple
+from typing import Callable, Sequence, Tuple, Type
 from uuid import UUID, uuid4
 from deap import base, creator, tools
 import numpy as np
@@ -17,34 +17,33 @@ from shared.models.traffic_design import TrafficDesign
 from shared.models.topology import Topology
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.utils.config import getConfig
-from algorithms.hybrid.constants.gensis_objective import LATENCY, POWER
+from algorithms.hybrid.constants.genesis_objective import LATENCY, POWER
+from algorithms.hybrid.models.individuals import Individual
 from algorithms.models.embedding import DecodedIndividual
 from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
 from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 
-
-class Individual(list):
-    """
-    Individual class for DEAP.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.id: UUID = uuid4()
-        self.fitness: base.Fitness = creator.MaxARMinLatency()
+MAX_MEMORY_DEMAND: int = 1
+MAX_LATENCY: int = 100
+MAX_POWER: int = 300
+MIN_AR: float = 1.0
+MIN_QUAL_IND: int = 1
+CXPB: float = 1.0
+INDPB: float = 0.5
+MUTPB: float = 0.5
 
 
 DecodePop = Callable[
-    [list[Individual], Topology, list[EmbeddingGraph]], list[DecodedIndividual]
+    [list[Individual], Topology, list[SFCRequest]], list[DecodedIndividual]
 ]
-GenerateRandomIndividual = Callable[[Topology, list[EmbeddingGraph]], Individual]
+GenerateRandomIndividual = Callable[[Type[Individual], Topology, list[SFCRequest]], Individual]
 Crossover = Callable[
     [Individual, Individual],
     Tuple[Individual, Individual],
 ]
-Mutate = Callable[[Individual, float], Individual]
+Mutate = Callable[[Individual, float], tuple[Individual]]
 
 
 class HybridEvolution:
@@ -62,6 +61,7 @@ class HybridEvolution:
         generateRandomIndividual: GenerateRandomIndividual,
         crossover: Crossover,
         mutate: Mutate,
+        individualContainer: Type[Individual],
     ):
         self._decodePop: DecodePop = decodePop
         self._generateRandomIndividual: GenerateRandomIndividual = (
@@ -73,6 +73,7 @@ class HybridEvolution:
         self._artifactsDir: str = os.path.join(
             getConfig()["repoAbsolutePath"], "artifacts", "experiments", experimentName
         )
+        self._individualContainer: Type[Individual] = individualContainer
 
     def _select(
         self,
@@ -160,23 +161,23 @@ class HybridEvolution:
 
     def _generateOffspring(
         self,
-        pop: "list[list[list[int]]]",
+        pop: "list[Individual]",
         CXPB: float,
         MUTPB: float,
-    ) -> "list[list[list[int]]]":
+    ) -> "list[Individual]":
         """
         Generate offspring from the population.
 
         Parameters:
-            pop (list[list[list[int]]]): the population.
+            pop (list[Individual]): the population.
             CXPB (float): the crossover probability.
             MUTPB (float): the mutation probability.
 
         Returns:
-            offspring (list[list[list[int]]]): the offspring.
+            offspring (list[Individual]): the offspring.
         """
 
-        offspring: "list[list[list[int]]]" = list(map(self._toolbox.clone, pop))
+        offspring: "list[Individual]" = list(map(self._toolbox.clone, pop))
         random.shuffle(offspring)
 
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
@@ -210,7 +211,7 @@ class HybridEvolution:
         ngen: int,
         maxMemoryDemand: float,
         minAR: float,
-        maxLatency: float,
+        maxObjective: float,
         minQualifiedInds: int,
         popSize: int,
         trafficGenerator: TrafficGenerator,
@@ -264,9 +265,9 @@ class HybridEvolution:
             HybridEvaluation.cacheForOffline(
                 populationEG, trafficDesign, topology, gen, isAvgOnly=True
             )
-            HybridEvaluation.saveCachedLatency(
-                os.path.join(dirName, scoresDir, f"gen_{gen}.csv")
-            )
+            # HybridEvaluation.saveCachedLatency(
+            #     os.path.join(dirName, scoresDir, f"gen_{gen}.csv")
+            # )
 
         startTime: float = timeit.default_timer()
 
@@ -321,10 +322,12 @@ class HybridEvolution:
         self._writeData(gen, ars, latencies, "surrogate", dirName)
         self._writePFs(gen, hof, "surrogate", dirName)
 
+        maxSecondObjective: float = maxObjective
+
         qualifiedIndividuals = [
             ind
             for ind in hof
-            if ind.fitness.values[0] >= minAR and ind.fitness.values[1] <= maxLatency
+            if ind.fitness.values[0] >= minAR and ind.fitness.values[1] <= maxSecondObjective
         ]
 
         TUI.appendToSolverLog(
@@ -362,7 +365,6 @@ class HybridEvolution:
             )
             HybridEvaluation.cacheForOnline(populationEG, trafficDesign)
             for decodedInd in populationEG:
-
                 if type == POWER:
                     ar, latency = HybridEvaluation.evaluationOnEmulatorPowerUsage(
                         decodedInd,
@@ -401,14 +403,14 @@ class HybridEvolution:
             ars = [ind.fitness.values[0] for ind in qualifiedIndividuals]
             latencies = [ind.fitness.values[1] for ind in qualifiedIndividuals]
 
-            self._writeData(gen + 0.1, ars, latencies, "emulator", dirName)
-            self._writePFs(gen + 0.1, emHof, "emulator", dirName)
+            self._writeData(gen + 1, ars, latencies, "emulator", dirName)
+            self._writePFs(gen + 1, emHof, "emulator", dirName)
 
             qualifiedIndividuals = [
                 ind
                 for ind in emHof
                 if ind.fitness.values[0] >= minAR
-                and ind.fitness.values[1] <= maxLatency
+                and ind.fitness.values[1] <= maxSecondObjective
             ]
 
             emMinAR = min(ars)
@@ -460,13 +462,6 @@ class HybridEvolution:
 
         expStartTime: float = timeit.default_timer()
         NGEN: int = 500
-        MAX_MEMORY_DEMAND: int = 1
-        MAX_LATENCY: int = 300
-        MIN_AR: float = 1.0
-        MIN_QUAL_IND: int = 1
-        CXPB: float = 1.0
-        INDPB: float = 0.5
-        MUTPB: float = 0.5
         SCORES_DIR: str = "scores"
 
         expDir: str = os.path.join(self._artifactsDir, experiment)
@@ -493,10 +488,9 @@ class HybridEvolution:
         ) as pf:
             pf.write(f"method, generation, {type}, ar\n")
 
-        creator.create("MaxARMinLatency", base.Fitness, weights=(1.0, -1.0))
 
         self._toolbox.register(
-            "individual", self._generateRandomIndividual, Individual, topology, fgrs
+            "individual", self._generateRandomIndividual, self._individualContainer, topology, fgrs
         )
         self._toolbox.register(
             "population", tools.initRepeat, list, self._toolbox.individual
@@ -527,7 +521,7 @@ class HybridEvolution:
             NGEN,
             MAX_MEMORY_DEMAND,
             MIN_AR,
-            MAX_LATENCY,
+            MAX_LATENCY if type == LATENCY else MAX_POWER,
             MIN_QUAL_IND,
             popSize,
             trafficGenerator,
@@ -564,7 +558,7 @@ class HybridEvolution:
                 NGEN,
                 MAX_MEMORY_DEMAND,
                 MIN_AR,
-                MAX_LATENCY,
+                MAX_LATENCY if type == LATENCY else MAX_POWER,
                 MIN_QUAL_IND,
                 popSize,
                 trafficGenerator,

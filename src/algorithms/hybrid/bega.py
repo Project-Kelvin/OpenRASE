@@ -13,7 +13,7 @@ from algorithms.ga_dijkstra_algorithm.ga_utils import (
     generateRandomIndividual,
     mutate,
 )
-from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution
+from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution, Individual
 from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 
@@ -24,7 +24,8 @@ hybridEvolution: HybridEvolution = HybridEvolution(
     decodePop,
     generateRandomIndividual,
     tools.cxTwoPoint,
-    mutate
+    mutate,
+    Individual
 )
 
 def solve(
