@@ -254,7 +254,10 @@ class HierarchicalEvolution:
             list[float]: the generated hyper-parameters.
         """
 
-        return [round(random.uniform(0, 1), 2), round(random.uniform(0, 10), 2)]
+        return [
+            abs(round(random.gauss(1 - self._minAR, 0.1), 2)),
+            round(random.uniform(0, 10), 2),
+        ]
 
     def _generateRandomMetaIndividual(self) -> Individual:
         """
@@ -353,6 +356,18 @@ class HierarchicalEvolution:
                     [children for children in offspring if children.id != child.id]
                 )
                 self._toolbox.metaMate(child, child2)
+
+                if child[0] < 0:
+                    child[0] = abs(child[0])
+
+                if child[1] < 0:
+                    child[1] = abs(child[1])
+
+                if child2[0] < 0:
+                    child2[0] = abs(child2[0])
+
+                if child2[1] < 0:
+                    child2[1] = abs(child2[1])
 
                 del child.fitness.values
                 del child2.fitness.values
@@ -521,8 +536,8 @@ class HierarchicalEvolution:
 
         return offspring
 
-    def _evaluateGenesisFitness(
-        self, metaGen: int, genesisGen: int, genesisPopulation: list[Individual]
+    def _performGAOperationsGenesis(
+        self, metaGen: int, genesisGen: int, genesisPopulation: list[Individual], parentPopulation: list[Individual]
     ) -> tuple[list[Individual], list[Individual]]:
         """
         Evaluates the fitness of the genesis individuals.
@@ -531,6 +546,7 @@ class HierarchicalEvolution:
             metaGen (int): the current meta-generation.
             genesisGen (int): the current generation.
             genesisPopulation (list[Individual]): the genesis population to evaluate.
+            parentPopulation (list[Individual]): the parent genesis population.
 
         Returns:
             tuple[list[Individual], list[Individual]]: the evaluated genesis population and the qualified individuals
@@ -610,11 +626,22 @@ class HierarchicalEvolution:
             f"Finished generation {genesisGen} in {endTime - startTime} seconds."
         )
 
-        hof: tools.ParetoFront = tools.ParetoFront()
-        hof.update(genesisPopulation)
+        genesisNewPop: list[GenesisIndividual] = []
+        if len(parentPopulation) > 0:
+            genesisNewPop: list[GenesisIndividual] = self._genesisSelect(
+                    cast(
+                        list[GenesisIndividual],
+                        parentPopulation,
+                    ),
+                    cast(list[GenesisIndividual], genesisPopulation),
+                )
+        else:
+            genesisNewPop = cast(list[GenesisIndividual], genesisPopulation)
 
-        ars = [ind.fitness.values[0] for ind in genesisPopulation]
-        latencies = [ind.fitness.values[1] for ind in genesisPopulation]
+        ars = [ind.fitness.values[0] for ind in genesisNewPop]
+        latencies = [ind.fitness.values[1] for ind in genesisNewPop]
+        hof: tools.ParetoFront = tools.ParetoFront()
+        hof.update(genesisNewPop)
 
         self._writeFitnessLog(metaGen, genesisGen, ars, latencies, "surrogate")
         self._writePFLog(metaGen, genesisGen, hof, "surrogate")
@@ -693,7 +720,7 @@ class HierarchicalEvolution:
                     )
                 qualifiedIndividuals[decodedInd[0]].fitness.values = (ar, latency)
 
-                for p in genesisPopulation:
+                for p in genesisNewPop:
                     if p.id == qualifiedIndividuals[decodedInd[0]].id:
                         p.fitness.values = (ar, latency)
                         break
@@ -720,11 +747,10 @@ class HierarchicalEvolution:
                 f"Generation {genesisGen}: Min AR: {emMinAR}, Max Latency: {emMaxLatency}"
             )
 
-        return genesisPopulation, qualifiedIndividuals
+        return cast(list[Individual], genesisNewPop), qualifiedIndividuals
 
     def _genesisSelect(
         self,
-        metaPopulation: list[Individual],
         genesisParentPopulation: list[GenesisIndividual],
         genesisOffspring: list[GenesisIndividual],
     ) -> list[GenesisIndividual]:
@@ -732,7 +758,6 @@ class HierarchicalEvolution:
         Selects the genesis population for the next generation.
 
         Parameters:
-            metaPopulation (list[Individual]): the meta-population.
             genesisParentPopulation (list[GenesisIndividual]): the parent genesis population.
             genesisOffspring (list[GenesisIndividual]): the offspring genesis population.
 
@@ -740,13 +765,13 @@ class HierarchicalEvolution:
             list[GenesisIndividual]: the selected genesis population for the next generation.
         """
 
-        metaPopSize: int = len(metaPopulation)
+        metaPopSize: int = self._metaPopSize
         genesisPopSize: int = len(genesisParentPopulation)
         genesisPopPerMetaInd: int = genesisPopSize // metaPopSize
         genesisPopMetaBoundary: int = genesisPopPerMetaInd
         newPop: list[GenesisIndividual] = []
 
-        for metaIndex, _ in enumerate(metaPopulation):
+        for metaIndex in range(metaPopSize):
             newPop.extend(
                 self._toolbox.select(
                     genesisParentPopulation[
@@ -797,14 +822,15 @@ class HierarchicalEvolution:
                 )
                 HierarchicalEvolution._genesisPopulation.extend(genesisPopulation)
 
-        metaGen: int = 1
-        genesisGen: int = 1
+        metaGen: int = 0
+        genesisGen: int = 0
         qualifiedIndividuals: list[Individual] = []
 
-        evaluatedPop, qualInd = self._evaluateGenesisFitness(
+        evaluatedPop, qualInd = self._performGAOperationsGenesis(
             metaGen,
             genesisGen,
             cast(list[Individual], HierarchicalEvolution._genesisPopulation),
+            []
         )
 
         qualifiedIndividuals.extend(qualInd)
@@ -821,64 +847,74 @@ class HierarchicalEvolution:
         self._writeMetaLog(metaGen, HierarchicalEvolution._metaPopulation)
 
         while (
-            len(qualifiedIndividuals) < self._minQualInd and metaGen <= self._metaMaxGen
+            len(qualifiedIndividuals) < self._minQualInd and metaGen < self._metaMaxGen
         ):
             metaGen += 1
-            metaOffspring: list[Individual] = self._generateMetaOffspring(
-                cast(list[Individual], HierarchicalEvolution._metaPopulation),
-                self._metaCxPb,
-                self._metaMutPb,
+            metaPopulation: list[Individual] = deepcopy(
+                cast(list[Individual], HierarchicalEvolution._metaPopulation)
             )
-            HierarchicalEvolution._genesisPopulation = (
-                self._updateMetaIndividualOfGenesisPopulation(
-                    metaOffspring,
-                    cast(
-                        list[GenesisIndividual],
-                        HierarchicalEvolution._genesisPopulation,
-                    ),
-                )
-            )
+            metaOffspring: list[Individual] = []
 
-            while (
-                len(qualifiedIndividuals) < self._minQualInd
-                and genesisGen <= self._genesisMaxGen
-            ):
-                genesisGen += 1
-                genesisOffspring: list[GenesisIndividual] = (
-                    self._generateGenesisOffspring(
-                        HierarchicalEvolution._genesisPopulation, metaOffspring
+            if self._metaPopSize > 1:
+                metaOffspring = self._generateMetaOffspring(
+                    cast(list[Individual], metaPopulation),
+                    self._metaCxPb,
+                    self._metaMutPb,
+                )
+                HierarchicalEvolution._genesisPopulation = (
+                    self._updateMetaIndividualOfGenesisPopulation(
+                        metaOffspring,
+                        cast(
+                            list[GenesisIndividual],
+                            HierarchicalEvolution._genesisPopulation,
+                        ),
                     )
                 )
-                evaluatedPop, qualInd = self._evaluateGenesisFitness(
-                    metaGen, genesisGen, cast(list[Individual], genesisOffspring)
+            else:
+                metaOffspring = deepcopy(metaPopulation)
+
+            genesisGen = 0
+            while (
+                len(qualifiedIndividuals) < self._minQualInd
+                and genesisGen < self._genesisMaxGen
+            ):
+                genesisGen += 1
+
+                genesisPopulation: list[GenesisIndividual] = deepcopy(
+                    cast(list[GenesisIndividual], HierarchicalEvolution._genesisPopulation)
                 )
+
+                genesisOffSpring: list[GenesisIndividual] = []
+
+                if self._genesisPopSize > 1:
+                    genesisOffSpring = (
+                        self._generateGenesisOffspring(
+                            genesisPopulation, metaOffspring
+                        )
+                    )
+                else:
+                    genesisOffSpring = deepcopy(genesisPopulation)
+
+                evaluatedPop, qualInd = self._performGAOperationsGenesis(
+                    metaGen, genesisGen, cast(list[Individual], genesisOffSpring), cast(list[Individual], HierarchicalEvolution._genesisPopulation))
 
                 qualifiedIndividuals.extend(qualInd)
-                genesisNewPop: list[GenesisIndividual] = self._genesisSelect(
-                    metaOffspring,
-                    cast(
-                        list[GenesisIndividual],
-                        HierarchicalEvolution._genesisPopulation,
-                    ),
-                    cast(list[GenesisIndividual], genesisOffspring),
-                )
                 HierarchicalEvolution._genesisPopulation = deepcopy(
-                    cast(list[GenesisIndividual], genesisNewPop)
+                    cast(list[GenesisIndividual], evaluatedPop)
                 )
 
-            if len(qualifiedIndividuals) < self._minQualInd:
-                metaOffspring = self._evaluateMetaFitness(
-                    metaOffspring,
-                    cast(
-                        list[GenesisIndividual],
-                        HierarchicalEvolution._genesisPopulation,
-                    ),
-                )
-                self._writeMetaLog(metaGen, metaOffspring)
-                HierarchicalEvolution._metaPopulation = self._selectMetaPopulation(
-                    HierarchicalEvolution._metaPopulation,
-                    metaOffspring,
-                )
+            metaOffspring = self._evaluateMetaFitness(
+                metaOffspring,
+                cast(
+                    list[GenesisIndividual],
+                    HierarchicalEvolution._genesisPopulation,
+                ),
+            )
+            self._writeMetaLog(metaGen, metaOffspring)
+            HierarchicalEvolution._metaPopulation = self._selectMetaPopulation(
+                HierarchicalEvolution._metaPopulation,
+                metaOffspring,
+            )
 
         expEndTime: float = timeit.default_timer()
 

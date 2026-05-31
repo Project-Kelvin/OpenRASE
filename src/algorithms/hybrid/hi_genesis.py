@@ -11,15 +11,17 @@ from algorithms.hybrid.constants.genesis_objective import LATENCY
 from algorithms.hybrid.utils.hierarchical_evolution import HierarchicalEvolution
 from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
+from utils.tui import TUI
 
 NO_OF_NEURONS: int = 2
 META_POP_SIZE: int = 10
+# GENESIS pop size per meta individual
 GENESIS_POP_SIZE: int = 10
-META_MAX_GEN: int = 100
-GENESIS_MAX_GEN: int = 5
+META_MAX_GEN: int = 10
+GENESIS_MAX_GEN: int = 10
 MAX_MEMORY_DEMAND: int = 1
-MIN_AR: float = 0.9
-MAX_LATENCY: int = 150
+MIN_AR: float = 0.95
+MAX_LATENCY: int = 100
 MAX_POWER: int = 300
 MIN_QUAL_IND: int = 1
 META_CXPB: float = 1.0
@@ -92,4 +94,7 @@ def solve(
         retainPopulation,
     )
 
-    hiGenesis.evolve()
+    try:
+        hiGenesis.evolve()
+    except Exception as e:
+        TUI.appendToSolverLog(str(e), True)

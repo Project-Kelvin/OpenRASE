@@ -101,7 +101,7 @@ def run(headless: bool) -> None:
             self._orchestrator.sendRequests(sfcrsToSend)
 
     topology: Topology = generateFatTreeTopology(
-        4, 10, 2, 5120, 1
+        4, 10, 1, 5120, 1
     )
 
     def removeHost(topology: Topology, hostID: str) -> Topology:
@@ -156,7 +156,7 @@ def run(headless: bool) -> None:
                             requestCopy["sfcrID"] = f"{request['sfcrID']}-{c}-{segment}"
                             allRequestsReceived.append(requestCopy)
 
-                    if segment > 4:
+                    if segment > 5:
                         # Simulate a host failure
                         hosts: list[int] = [i for i in range(len(topologyToUse["hosts"])) if i not in removedHosts]
                         hostIdToRemove: int = random.choice(hosts)
@@ -164,6 +164,9 @@ def run(headless: bool) -> None:
                         removedHosts.append(hostIdToRemove)
                         topologyToUse = removeHost(topologyToUse, hostToRemove)
                         TUI.appendToSolverLog(f"Simulated failure of host {hostToRemove}.")
+
+                    if segment != 9:
+                        continue
 
                     self._trafficGenerator.setDesign([trafficSegments[segment]])
                     solve(

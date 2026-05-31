@@ -8,9 +8,9 @@ from copy import deepcopy
 import os
 import random
 import timeit
-from typing import Callable, Sequence, Tuple, Type
-from uuid import UUID, uuid4
-from deap import base, creator, tools
+from typing import Callable, Tuple, Type
+from uuid import uuid4
+from deap import base, tools
 import numpy as np
 from shared.models.sfc_request import SFCRequest
 from shared.models.traffic_design import TrafficDesign
@@ -28,12 +28,12 @@ from utils.tui import TUI
 MAX_MEMORY_DEMAND: int = 1
 MAX_LATENCY: int = 100
 MAX_POWER: int = 300
-MIN_AR: float = 1.0
+MIN_AR: float = 0.95
 MIN_QUAL_IND: int = 1
 CXPB: float = 1.0
 INDPB: float = 0.5
 MUTPB: float = 0.5
-
+NGEN: int = 100
 
 DecodePop = Callable[
     [list[Individual], Topology, list[SFCRequest]], list[DecodedIndividual]
@@ -461,7 +461,6 @@ class HybridEvolution:
         )
 
         expStartTime: float = timeit.default_timer()
-        NGEN: int = 500
         SCORES_DIR: str = "scores"
 
         expDir: str = os.path.join(self._artifactsDir, experiment)

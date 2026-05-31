@@ -103,7 +103,7 @@ def run(headless: bool) -> None:
             self._orchestrator.sendRequests(sfcrsToSend)
 
     topology: Topology = generateFatTreeTopology(
-        4, 10, 2, 5120, 1
+        4, 10, 1, 5120, 1
     )
 
     def removeHost(topology: Topology, hostID: str) -> Topology:
@@ -152,11 +152,13 @@ def run(headless: bool) -> None:
 
                 for segment in range(segments):
                     for request in originalRequests:
-                        requestCopy: SFCRequest = copy.deepcopy(request)
-                        requestCopy["sfcrID"] = f"{request['sfcrID']}-{segment}"
-                        allRequestsReceived.append(requestCopy)
+                        copies: int = 20 if segment == 0 else 1
+                        for c in range(copies):
+                            requestCopy: SFCRequest = copy.deepcopy(request)
+                            requestCopy["sfcrID"] = f"{request['sfcrID']}-{c}-{segment}"
+                            allRequestsReceived.append(requestCopy)
 
-                    if segment > 4:
+                    if segment > 5:
                         # Simulate a host failure
                         hosts: list[int] = [i for i in range(len(topologyToUse["hosts"])) if i not in removedHosts]
                         hostIdToRemove: int = random.choice(hosts)
