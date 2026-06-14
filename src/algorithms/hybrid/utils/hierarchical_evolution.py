@@ -22,6 +22,7 @@ from algorithms.hybrid.constants.genesis_objective import LATENCY, POWER
 from algorithms.hybrid.models.individuals import GenesisIndividual, Individual
 from algorithms.hybrid.utils.genesis import GenesisUtils
 from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
+from algorithms.hybrid.utils.root_evolver import RootEvolver
 from algorithms.models.embedding import DecodedIndividual
 from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
@@ -36,18 +37,17 @@ class HierarchicalEvolution:
     _metaPopulation: list[Individual] = []
     _genesisPopulation: list[GenesisIndividual] = []
 
+
     def __init__(
         self,
-        metaPopSize: int,
-        genesisPopSize: int,
+        popSize: int,
+        maxGen: int,
         metaCxPb: float,
         genesisCxPb: float,
         metaMutPb: float,
         genesisMutPb: float,
         metaIndPb: float,
         genesisIndPb: float,
-        metaMaxGen: int,
-        genesisMaxGen: int,
         minAR: float,
         maxSecondObjective: int,
         noOfNeurons: int,
@@ -63,20 +63,19 @@ class HierarchicalEvolution:
         experimentName: str,
         sendEGs: Callable[[list[EmbeddingGraph]], None],
         deleteEGs: Callable[[list[EmbeddingGraph]], None],
+        dominanceThreshold: float,
         retainPopulation: bool = False,
     ) -> None:
         """
         Initializes the hierarchical evolution.
 
         Parameters:
-            metaPopSize (int): the size of the meta-population.
-            genesisPopSize (int): the size of the genesis population for each meta-individual.
+            popSize (int): the total population size for the hierarchical evolution.
+            maxGen (int): the maximum number of generations for the hierarchical evolution.
             metaCxPb (float): the probability of mating two meta-individuals.
             metaMutPb (float): the probability of mutating a meta-individual.
             metaIndPb (float): the independent probability for each attribute to be mutated in a meta-individual.
             genesisIndPb (float): the independent probability for each attribute to be mutated in a genesis individual.
-            metaMaxGen (int): the maximum number of generations for the meta-evolution.
-            genesisMaxGen (int): the maximum number of generations for the genesis evolution.
             minAR (float): the minimum AR to consider an individual qualified.
             maxSecondObjective (int): the maximum value for the second objective to consider an individual qualified.
             noOfNeurons (int): the number of neurons in the hidden layer of the Neural Network.
@@ -92,6 +91,7 @@ class HierarchicalEvolution:
             experimentName (str): the name of the experiment for logging.
             sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
             deleteEGs (Callable[[list[EmbeddingGraph]], None]): the function to delete the Embedding Graphs.
+            dominanceThreshold (float): the threshold for determining if a Pareto front is dominated by another.
             retainPopulation (bool): specifies if the population should be retained in memory after evolution.
 
         Returns:
@@ -103,14 +103,11 @@ class HierarchicalEvolution:
         self._fitness: str = ""
         self._meta: str = ""
         self._experimentDir: str = ""
-        self._metaPopSize: int = metaPopSize
-        self._genesisPopSize: int = genesisPopSize
+        self._popSize: int = popSize
         self._metaCxPb: float = metaCxPb
         self._metaMutPb: float = metaMutPb
         self._metaIndPb: float = metaIndPb
         self._genesisIndPb: float = genesisIndPb
-        self._metaMaxGen: int = metaMaxGen
-        self._genesisMaxGen: int = genesisMaxGen
         self._minAR: float = minAR
         self._maxSecondObjective: int = maxSecondObjective
         self._noOfNeurons: int = noOfNeurons
@@ -129,6 +126,144 @@ class HierarchicalEvolution:
         self._genesisCxPb: float = genesisCxPb
         self._sendEGs: Callable[[list[EmbeddingGraph]], None] = sendEGs
         self._deleteEGs: Callable[[list[EmbeddingGraph]], None] = deleteEGs
+        self._dominanceThreshold: float = dominanceThreshold
+        self._maxGen: int = maxGen
+        self._rootEvolver: RootEvolver = RootEvolver(popSize)
+        self._metaPopSize: int = 0
+        self._genesisPopSize: int = 0
+
+    def _computeMetaAndGenesisPopSize(self, root: int) -> tuple[int, int]:
+        """
+        Computes the meta and genesis population size based on the total population size and the number of meta-individuals.
+
+        Parameters:
+            root (int): the number of meta-individuals, which is also the root individual.
+
+        Returns:
+            tuple[int, int]: The computed meta and genesis population sizes.
+        """
+
+        metaPopSize: int = root
+        genesisPopSize: int = self._popSize // metaPopSize
+
+        return metaPopSize, genesisPopSize
+
+
+    def _calculateParetoDominatedPercentage(self, pf1: tools.ParetoFront, pf2: tools.ParetoFront) -> float:
+        """
+        Calculates the percentage of individuals in the first Pareto front that are dominated by the second Pareto front.
+
+        Parameters:
+            pf1 (tools.ParetoFront): The first Pareto front.
+            pf2 (tools.ParetoFront): The second Pareto front.
+
+        Returns:
+            float: The percentage of individuals in the first Pareto front that are dominated by the second Pareto front.
+        """
+
+        pf2length: int = len(pf2)
+        oldCount: int = 0
+
+        for ind2 in pf2:
+            for ind1 in pf1:
+                if ind2.id == ind1.id:
+                    oldCount += 1
+                    break
+
+        return (pf2length - oldCount) / pf2length if pf2length > 0 else 0
+
+    def _isParetoDominated(self, pf1: tools.ParetoFront, pf2: tools.ParetoFront) -> bool:
+        """
+        Determines if the first Pareto front is dominated by the second Pareto front based on a given threshold.
+
+        Parameters:
+            pf1 (tools.ParetoFront): The first Pareto front.
+            pf2 (tools.ParetoFront): The second Pareto front.
+
+        Returns:
+            bool: True if the first Pareto front is dominated by the second Pareto front, False otherwise.
+        """
+
+        dominatedPercentage: float = self._calculateParetoDominatedPercentage(pf1, pf2)
+        print("Dominated percentage: ", dominatedPercentage)
+
+        return dominatedPercentage > self._dominanceThreshold
+
+    def _recomposeEvolvers(self, prevRoot: int) -> None:
+        """
+        Recomposes the evolvers for the hierarchical evolution.
+
+        Parameters:
+            prevRoot (int): The previous root individual.
+
+        Returns:
+            None
+        """
+
+        prevMetaPopSize, prevGenesisPopSize = self._computeMetaAndGenesisPopSize(prevRoot)
+
+        if prevMetaPopSize == self._metaPopSize:
+            return
+
+        if self._metaPopSize > prevMetaPopSize:
+            TUI.appendToSolverLog("New meta population larger than previous meta population.")
+            genesisPopBoundary: int = prevGenesisPopSize
+
+            newGenesisPopulation: list[GenesisIndividual] = []
+            for i in range(prevMetaPopSize):
+                subGenesisPop: list[GenesisIndividual] = HierarchicalEvolution._genesisPopulation[i * prevGenesisPopSize : genesisPopBoundary]
+                selectedGenesisPop: list[GenesisIndividual] = self._toolbox.select(subGenesisPop, k=self._genesisPopSize)
+                if len(selectedGenesisPop) < self._genesisPopSize:
+                    diff: int = len(selectedGenesisPop) - self._genesisPopSize
+                    unSelectedGenesisPop: list[GenesisIndividual] = [ind for ind in subGenesisPop if ind.id not in [selected.id for selected in selectedGenesisPop]]
+                    selectedGenesisPop.extend(random.choices(unSelectedGenesisPop, k=abs(diff)))
+                newGenesisPopulation.extend(selectedGenesisPop)
+                genesisPopBoundary += prevGenesisPopSize
+            TUI.appendToSolverLog(f"Pruned GENESIS population to size: {len(newGenesisPopulation)}.")
+            HierarchicalEvolution._genesisPopulation = newGenesisPopulation
+
+            for _ in range(self._metaPopSize - prevMetaPopSize):
+                metaIndividual: Individual = self._toolbox.metaIndividual()
+                genesisPopulation: list[GenesisIndividual] = self._generateGenesisPopulation(metaIndividual)
+                TUI.appendToSolverLog(f"Generated new GENESIS population for meta individual: {metaIndividual.id}")
+                HierarchicalEvolution._metaPopulation.append(metaIndividual)
+                HierarchicalEvolution._genesisPopulation.extend(genesisPopulation)
+            TUI.appendToSolverLog(f"Total GENESIS population size after adding new meta individuals: {len(HierarchicalEvolution._genesisPopulation)}.")
+        elif self._metaPopSize < prevMetaPopSize:
+            TUI.appendToSolverLog("New meta population smaller than previous meta population.")
+            selectedMetaPop: list[Individual] = self._toolbox.select(HierarchicalEvolution._metaPopulation, k=self._metaPopSize)
+            if len(selectedMetaPop) < self._metaPopSize:
+                diff: int = len(selectedMetaPop) - self._metaPopSize
+                unSelectedMetaPop: list[Individual] = [ind for ind in HierarchicalEvolution._metaPopulation if ind.id not in [selected.id for selected in selectedMetaPop]]
+                selectedMetaPop.extend(random.choices(unSelectedMetaPop, k=abs(diff)))
+            selectedGenesisPop: list[GenesisIndividual] = []
+            genesisPopBoundary: int = prevGenesisPopSize
+            for i, metaInd in enumerate(HierarchicalEvolution._metaPopulation):
+                if len([selectedMetaInd for selectedMetaInd in selectedMetaPop if selectedMetaInd.id == metaInd.id]) == 1:
+                    selectedGenesisPop.extend(HierarchicalEvolution._genesisPopulation[i * prevGenesisPopSize : genesisPopBoundary])
+                genesisPopBoundary += prevGenesisPopSize
+
+            HierarchicalEvolution._metaPopulation = [metaInd for metaInd in HierarchicalEvolution._metaPopulation if metaInd.id in [selectedMetaInd.id for selectedMetaInd in selectedMetaPop]]
+            HierarchicalEvolution._genesisPopulation = selectedGenesisPop
+
+            TUI.appendToSolverLog(f"Pruned meta population to size: {len(HierarchicalEvolution._metaPopulation)}.")
+            TUI.appendToSolverLog(f"Total GENESIS population size after pruning meta individuals: {len(HierarchicalEvolution._genesisPopulation)}.")
+            newGenesisPopulation: list[GenesisIndividual] = []
+            genesisPopBoundary: int = prevGenesisPopSize
+            for i, metaInd in enumerate(HierarchicalEvolution._metaPopulation):
+                subGenesisPop: list[GenesisIndividual] = HierarchicalEvolution._genesisPopulation[i * prevGenesisPopSize : genesisPopBoundary]
+
+                for _ in range(self._genesisPopSize - prevGenesisPopSize):
+                    selectedGenesisInd: GenesisIndividual = cast(GenesisIndividual, GenesisUtils.generateRandomGenesisIndividual(GenesisIndividual, self._topology, self._sfcrs))
+                    selectedGenesisInd.metaIndividual = metaInd
+                    subGenesisPop.append(selectedGenesisInd)
+
+                newGenesisPopulation.extend(subGenesisPop)
+                genesisPopBoundary += prevGenesisPopSize
+
+            HierarchicalEvolution._genesisPopulation = newGenesisPopulation
+            TUI.appendToSolverLog(f"Recomposed GENESIS population to size: {len(HierarchicalEvolution._genesisPopulation)}.")
+
 
     def _createLogFiles(
         self, dirName: str, experimentName: str, secondObjective: str
@@ -164,34 +299,41 @@ class HierarchicalEvolution:
         self._pfs = os.path.join(experimentDir, "pfs.csv")
         self._fitness = os.path.join(experimentDir, "fitness.csv")
         self._meta = os.path.join(experimentDir, "meta.csv")
+        self._root = os.path.join(experimentDir, "root.csv")
 
         with open(self._pfs, "w") as pfFile:
             pfFile.write(
-                f"method,meta_generation,genesis_generation,ar,{secondObjective}\n"
+                f"method,generation,root_generation,meta_generation,genesis_generation,ar,{secondObjective}\n"
             )
         with open(self._fitness, "w") as fitnessFile:
             fitnessFile.write(
-                f"method,meta_generation,genesis_generation,average_ar,max_ar,min_ar,average_{secondObjective},max_{secondObjective},min_{secondObjective}\n"
+                f"method,generation,root_generation,meta_generation,genesis_generation,average_ar,max_ar,min_ar,average_{secondObjective},max_{secondObjective},min_{secondObjective}\n"
             )
         with open(self._meta, "w") as metaFile:
             metaFile.write(
-                "meta_generation,average_rejection_rate,max_rejection_rate,min_rejection_rate,average_sigma,max_sigma,min_sigma\n"
+                "root_generation,meta_generation,average_rejection_rate,max_rejection_rate,min_rejection_rate,average_sigma,max_sigma,min_sigma,dominance\n"
             )
+        with open(self._root, "w") as rootFile:
+            rootFile.write("root_generation,meta_pop_size,genesis_pop_size,dominance\n")
 
     def _writeFitnessLog(
         self,
+        gen: int,
         metaGen: int,
         genesisGen: int,
+        rootGen: int,
         ars: list[float],
         secondObjectives: list[float],
-        method: str,
+        method: str
     ) -> None:
         """
         Writes the fitness log for the hierarchical evolution.
 
         Parameters:
+            gen (int): the current generation.
             metaGen (int): the current meta-generation.
             genesisGen (int): the current genesis generation.
+            rootGen (int): the current root generation.
             ars (list[float]): the list of ARs of the population.
             secondObjectives (list[float]): the list of second objective values of the population.
             method (str): the method name.
@@ -202,18 +344,20 @@ class HierarchicalEvolution:
 
         with open(self._fitness, "a") as fitnessFile:
             fitnessFile.write(
-                f"{method},{metaGen},{genesisGen},{np.mean(ars)},{max(ars)},{min(ars)},{np.mean(secondObjectives)},{max(secondObjectives)},{min(secondObjectives)}\n"
+                f"{method},{gen},{rootGen},{metaGen},{genesisGen},{np.mean(ars)},{max(ars)},{min(ars)},{np.mean(secondObjectives)},{max(secondObjectives)},{min(secondObjectives)}\n"
             )
 
     def _writePFLog(
-        self, metaGen: int, genesisGen: int, hof: tools.ParetoFront, method: str
+        self, gen: int, metaGen: int, genesisGen: int, rootGen: int, hof: tools.ParetoFront, method: str
     ) -> None:
         """
         Writes the Pareto front log for the hierarchical evolution.
 
         Parameters:
+            gen (int): the current generation.
             metaGen (int): the current meta-generation.
             genesisGen (int): the current genesis generation.
+            rootGen (int): the current root generation.
             hof (tools.ParetoFront): the Pareto front of the population.
             method (str): the method name.
 
@@ -224,16 +368,18 @@ class HierarchicalEvolution:
         with open(self._pfs, "a") as pfFile:
             for individual in hof:
                 pfFile.write(
-                    f"{method},{metaGen},{genesisGen},{individual.fitness.values[0]},{individual.fitness.values[1]}\n"
+                    f"{method},{gen},{rootGen},{metaGen},{genesisGen},{individual.fitness.values[0]},{individual.fitness.values[1]}\n"
                 )
 
-    def _writeMetaLog(self, metaGen: int, metaPopulation: list[Individual]) -> None:
+    def _writeMetaLog(self, rootGen: int, metaGen: int, metaPopulation: list[Individual], dominance: float) -> None:
         """
         Writes the meta log for the hierarchical evolution.
 
         Parameters:
+            rootGen (int): the current root generation.
             metaGen (int): the current meta-generation.
             metaPopulation (list[Individual]): the meta-population.
+            dominance (float): the dominance value.
 
         Returns:
             None
@@ -243,8 +389,24 @@ class HierarchicalEvolution:
             rejectionRates: list[float] = [ind[0] for ind in metaPopulation]
             sigmas: list[float] = [ind[1] for ind in metaPopulation]
             metaFile.write(
-                f"{metaGen},{np.mean(rejectionRates)},{max(rejectionRates)},{min(rejectionRates)},{np.mean(sigmas)},{max(sigmas)},{min(sigmas)}\n"
+                f"{rootGen},{metaGen},{np.mean(rejectionRates)},{max(rejectionRates)},{min(rejectionRates)},{np.mean(sigmas)},{max(sigmas)},{min(sigmas)},{dominance}\n"
             )
+
+    def _writeRootLog(self, rootGen: int, dominance: float) -> None:
+        """
+        Writes the root log for the hierarchical evolution.
+
+        Parameters:
+            rootGen (int): the current root generation.
+            dominance (float): the dominance value.
+
+        Returns:
+            None
+        """
+
+        with open(self._root, "a") as rootFile:
+            rootFile.write(f"{rootGen},{self._metaPopSize},{self._genesisPopSize},{dominance}\n")
+
 
     def _generateHyperParameters(self) -> list[float]:
         """
@@ -537,12 +699,14 @@ class HierarchicalEvolution:
         return offspring
 
     def _performGAOperationsGenesis(
-        self, metaGen: int, genesisGen: int, genesisPopulation: list[Individual], parentPopulation: list[Individual]
+        self, gen: int, rootGen: int, metaGen: int, genesisGen: int, genesisPopulation: list[Individual], parentPopulation: list[Individual]
     ) -> tuple[list[Individual], list[Individual]]:
         """
         Evaluates the fitness of the genesis individuals.
 
         Parameters:
+            gen (int): the current generation.
+            rootGen (int): the current root generation.
             metaGen (int): the current meta-generation.
             genesisGen (int): the current generation.
             genesisPopulation (list[Individual]): the genesis population to evaluate.
@@ -596,7 +760,7 @@ class HierarchicalEvolution:
                         HybridEvaluation.evaluationOnSurrogatePowerUsage,
                         ind,
                         genesisGen,
-                        self._genesisMaxGen,
+                        100,
                         self._topology,
                         self._trafficDesign,
                         self._maxMemoryDemand,
@@ -609,7 +773,7 @@ class HierarchicalEvolution:
                         HybridEvaluation.evaluationOnSurrogate,
                         ind,
                         genesisGen,
-                        self._genesisMaxGen,
+                        100,
                         self._topology,
                         self._trafficDesign,
                         self._maxMemoryDemand,
@@ -623,7 +787,7 @@ class HierarchicalEvolution:
                 ind.fitness.values = (result[1], result[2])
         endTime: float = timeit.default_timer()
         TUI.appendToSolverLog(
-            f"Finished generation {genesisGen} in {endTime - startTime} seconds."
+            f"Finished meta generation {metaGen} and genesis generation {genesisGen} in {endTime - startTime} seconds."
         )
 
         genesisNewPop: list[GenesisIndividual] = []
@@ -643,8 +807,8 @@ class HierarchicalEvolution:
         hof: tools.ParetoFront = tools.ParetoFront()
         hof.update(genesisNewPop)
 
-        self._writeFitnessLog(metaGen, genesisGen, ars, latencies, "surrogate")
-        self._writePFLog(metaGen, genesisGen, hof, "surrogate")
+        self._writeFitnessLog(gen, metaGen, genesisGen, rootGen, ars, latencies, "surrogate")
+        self._writePFLog(gen, metaGen, genesisGen, rootGen, hof, "surrogate")
 
         qualifiedIndividuals = [
             ind
@@ -696,8 +860,8 @@ class HierarchicalEvolution:
                     ar, latency = HybridEvaluation.evaluationOnEmulatorPowerUsage(
                         decodedInd,
                         self._sfcrs,
-                        genesisGen,
-                        self._genesisMaxGen,
+                        gen,
+                        self._maxGen,
                         self._sendEGs,
                         self._deleteEGs,
                         self._trafficDesign,
@@ -709,8 +873,8 @@ class HierarchicalEvolution:
                     ar, latency = HybridEvaluation.evaluationOnEmulator(
                         decodedInd,
                         self._sfcrs,
-                        genesisGen,
-                        self._genesisMaxGen,
+                        gen,
+                        self._maxGen,
                         self._sendEGs,
                         self._deleteEGs,
                         self._trafficDesign,
@@ -730,8 +894,8 @@ class HierarchicalEvolution:
             ars = [ind.fitness.values[0] for ind in qualifiedIndividuals]
             latencies = [ind.fitness.values[1] for ind in qualifiedIndividuals]
 
-            self._writeFitnessLog(metaGen, genesisGen, ars, latencies, "emulator")
-            self._writePFLog(metaGen, genesisGen, emHof, "emulator")
+            self._writeFitnessLog(gen, metaGen, genesisGen, rootGen, ars, latencies, "emulator")
+            self._writePFLog(gen, metaGen, genesisGen, rootGen, emHof, "emulator")
 
             qualifiedIndividuals = [
                 ind
@@ -806,6 +970,18 @@ class HierarchicalEvolution:
 
         if (
             not self._retainPopulation
+            or RootEvolver.getRootIndividual() == -1
+        ):
+            TUI.appendToSolverLog("Root not retained. Generating random root.")
+            RootEvolver.setRootIndividual(self._rootEvolver.generateRandomRoot())
+        self._rootEvolver.addRootToExploredRoot(RootEvolver.getRootIndividual())
+
+        TUI.appendToSolverLog(f"Root is: {RootEvolver.getRootIndividual()}.")
+        self._metaPopSize, self._genesisPopSize = self._computeMetaAndGenesisPopSize(RootEvolver.getRootIndividual())
+        TUI.appendToSolverLog(f"Meta pop size: {self._metaPopSize}, Genesis pop size: {self._genesisPopSize}")
+
+        if (
+            not self._retainPopulation
             or len(HierarchicalEvolution._metaPopulation) == 0
         ):
             HierarchicalEvolution._metaPopulation: list[Individual] = (
@@ -824,97 +1000,175 @@ class HierarchicalEvolution:
 
         metaGen: int = 0
         genesisGen: int = 0
+        gen: int = 0
+        rootGen: int = -1
         qualifiedIndividuals: list[Individual] = []
 
-        evaluatedPop, qualInd = self._performGAOperationsGenesis(
-            metaGen,
-            genesisGen,
-            cast(list[Individual], HierarchicalEvolution._genesisPopulation),
-            []
-        )
-
-        qualifiedIndividuals.extend(qualInd)
-
-        HierarchicalEvolution._genesisPopulation = deepcopy(
-            cast(list[GenesisIndividual], evaluatedPop)
-        )
-
-        HierarchicalEvolution._metaPopulation = self._evaluateMetaFitness(
-            HierarchicalEvolution._metaPopulation,
-            HierarchicalEvolution._genesisPopulation,
-        )
-
-        self._writeMetaLog(metaGen, HierarchicalEvolution._metaPopulation)
+        rootPF: tools.ParetoFront = tools.ParetoFront()
+        metaPF: tools.ParetoFront = tools.ParetoFront()
+        genesisPF: tools.ParetoFront = tools.ParetoFront()
+        rootRadius: float = 0.0
+        shouldMetaGenContinue: bool = True
+        shouldGenesisGenContinue: bool = True
+        prevRootIndividual: int = RootEvolver.getRootIndividual()
 
         while (
-            len(qualifiedIndividuals) < self._minQualInd and metaGen < self._metaMaxGen
+            len(qualifiedIndividuals) < self._minQualInd and gen < self._maxGen
         ):
-            metaGen += 1
-            metaPopulation: list[Individual] = deepcopy(
-                cast(list[Individual], HierarchicalEvolution._metaPopulation)
-            )
-            metaOffspring: list[Individual] = []
-
-            if self._metaPopSize > 1:
-                metaOffspring = self._generateMetaOffspring(
-                    cast(list[Individual], metaPopulation),
-                    self._metaCxPb,
-                    self._metaMutPb,
-                )
-                HierarchicalEvolution._genesisPopulation = (
-                    self._updateMetaIndividualOfGenesisPopulation(
-                        metaOffspring,
-                        cast(
-                            list[GenesisIndividual],
-                            HierarchicalEvolution._genesisPopulation,
-                        ),
-                    )
-                )
-            else:
-                metaOffspring = deepcopy(metaPopulation)
-
+            metaGen = 0
             genesisGen = 0
-            while (
-                len(qualifiedIndividuals) < self._minQualInd
-                and genesisGen < self._genesisMaxGen
-            ):
-                genesisGen += 1
+            rootGen += 1
+            evaluatedPop, qualInd = self._performGAOperationsGenesis(
+                gen,
+                rootGen,
+                metaGen,
+                genesisGen,
+                cast(list[Individual], HierarchicalEvolution._genesisPopulation),
+                []
+            )
 
-                genesisPopulation: list[GenesisIndividual] = deepcopy(
-                    cast(list[GenesisIndividual], HierarchicalEvolution._genesisPopulation)
+            qualifiedIndividuals.extend(qualInd)
+
+            HierarchicalEvolution._genesisPopulation = deepcopy(
+                cast(list[GenesisIndividual], evaluatedPop)
+            )
+
+            HierarchicalEvolution._metaPopulation = self._evaluateMetaFitness(
+                HierarchicalEvolution._metaPopulation,
+                HierarchicalEvolution._genesisPopulation,
+            )
+
+            newRootPF: tools.ParetoFront = tools.ParetoFront()
+            newMetaPF: tools.ParetoFront = tools.ParetoFront()
+            newGenesisPF: tools.ParetoFront = tools.ParetoFront()
+            newRootPF.update(HierarchicalEvolution._genesisPopulation)
+            newMetaPF.update(HierarchicalEvolution._genesisPopulation)
+            newGenesisPF.update(HierarchicalEvolution._genesisPopulation)
+            rootDominance: float = self._calculateParetoDominatedPercentage(rootPF, newRootPF)
+            metaDominance: float = self._calculateParetoDominatedPercentage(metaPF, newMetaPF)
+            self._writeMetaLog(rootGen, metaGen, HierarchicalEvolution._metaPopulation, metaDominance)
+            self._writeRootLog(rootGen, rootDominance)
+            rootPF = newRootPF
+            metaPF = newMetaPF
+            genesisPF = newGenesisPF
+
+            while len(qualifiedIndividuals) < self._minQualInd and shouldMetaGenContinue and gen <= self._maxGen:
+                metaGen += 1
+                metaPopulation: list[Individual] = deepcopy(
+                    cast(list[Individual], HierarchicalEvolution._metaPopulation)
                 )
+                metaOffspring: list[Individual] = []
 
-                genesisOffSpring: list[GenesisIndividual] = []
-
-                if self._genesisPopSize > 1:
-                    genesisOffSpring = (
-                        self._generateGenesisOffspring(
-                            genesisPopulation, metaOffspring
+                if self._metaPopSize > 1:
+                    metaOffspring = self._generateMetaOffspring(
+                        cast(list[Individual], metaPopulation),
+                        self._metaCxPb,
+                        self._metaMutPb,
+                    )
+                    HierarchicalEvolution._genesisPopulation = (
+                        self._updateMetaIndividualOfGenesisPopulation(
+                            metaOffspring,
+                            cast(
+                                list[GenesisIndividual],
+                                HierarchicalEvolution._genesisPopulation,
+                            ),
                         )
                     )
                 else:
-                    genesisOffSpring = deepcopy(genesisPopulation)
+                    metaOffspring = deepcopy(metaPopulation)
 
-                evaluatedPop, qualInd = self._performGAOperationsGenesis(
-                    metaGen, genesisGen, cast(list[Individual], genesisOffSpring), cast(list[Individual], HierarchicalEvolution._genesisPopulation))
+                genesisGen = 0
+                while (
+                    len(qualifiedIndividuals) < self._minQualInd
+                    and shouldGenesisGenContinue and gen <= self._maxGen
+                ):
+                    gen += 1
+                    genesisGen += 1
 
-                qualifiedIndividuals.extend(qualInd)
-                HierarchicalEvolution._genesisPopulation = deepcopy(
-                    cast(list[GenesisIndividual], evaluatedPop)
+                    genesisPopulation: list[GenesisIndividual] = deepcopy(
+                        cast(list[GenesisIndividual], HierarchicalEvolution._genesisPopulation)
+                    )
+
+                    genesisOffSpring: list[GenesisIndividual] = []
+
+                    if self._genesisPopSize > 1:
+                        genesisOffSpring = (
+                            self._generateGenesisOffspring(
+                                genesisPopulation, metaOffspring
+                            )
+                        )
+                    else:
+                        genesisOffSpring = deepcopy(genesisPopulation)
+
+                    evaluatedPop, qualInd = self._performGAOperationsGenesis(
+                        gen, rootGen, metaGen, genesisGen, cast(list[Individual], genesisOffSpring), cast(list[Individual], HierarchicalEvolution._genesisPopulation))
+
+                    qualifiedIndividuals.extend(qualInd)
+                    newGenesisPF: tools.ParetoFront = tools.ParetoFront()
+                    newGenesisPF.update(evaluatedPop)
+                    shouldGenesisGenContinue = self._isParetoDominated(
+                        genesisPF, newGenesisPF
+                    )
+                    genesisPF = newGenesisPF
+                    HierarchicalEvolution._genesisPopulation = deepcopy(
+                        cast(list[GenesisIndividual], evaluatedPop)
+                    )
+                if len(qualifiedIndividuals) >= self._minQualInd:
+                    break
+
+                TUI.appendToSolverLog("Exiting GENESIS evolution and moving to the next generation of meta.")
+                metaOffspring = self._evaluateMetaFitness(
+                    metaOffspring,
+                    cast(
+                        list[GenesisIndividual],
+                        HierarchicalEvolution._genesisPopulation,
+                    ),
                 )
 
-            metaOffspring = self._evaluateMetaFitness(
-                metaOffspring,
-                cast(
-                    list[GenesisIndividual],
-                    HierarchicalEvolution._genesisPopulation,
-                ),
+                HierarchicalEvolution._metaPopulation = self._selectMetaPopulation(
+                    HierarchicalEvolution._metaPopulation,
+                    metaOffspring,
+                )
+                newMetaPF: tools.ParetoFront = tools.ParetoFront()
+                newMetaPF.update(HierarchicalEvolution._genesisPopulation)
+                shouldMetaGenContinue = self._isParetoDominated(
+                    metaPF, newMetaPF
+                )
+                dominance: float = self._calculateParetoDominatedPercentage(metaPF, newMetaPF)
+                self._writeMetaLog(rootGen, metaGen, metaOffspring, dominance)
+                metaPF = newMetaPF
+                shouldGenesisGenContinue = True
+
+            if len(qualifiedIndividuals) >= self._minQualInd:
+                break
+            TUI.appendToSolverLog("Exiting meta evolution and moving to the next generation of root.")
+            newRootPF: tools.ParetoFront = tools.ParetoFront()
+            newRootPF.update(HierarchicalEvolution._genesisPopulation)
+            isCurrentRootDominant = self._isParetoDominated(
+                rootPF, newRootPF
             )
-            self._writeMetaLog(metaGen, metaOffspring)
-            HierarchicalEvolution._metaPopulation = self._selectMetaPopulation(
-                HierarchicalEvolution._metaPopulation,
-                metaOffspring,
-            )
+            dominance: float = self._calculateParetoDominatedPercentage(rootPF, newRootPF)
+            self._writeRootLog(rootGen, dominance)
+            currentRootIndividual = RootEvolver.getRootIndividual()
+            if isCurrentRootDominant:
+                prevRootIndividual = RootEvolver.getRootIndividual()
+                rootRadius = 1 - dominance
+                RootEvolver.setRootIndividual(self._rootEvolver.selectRootNeighbour(
+                    RootEvolver.getRootIndividual(), rootRadius
+                ))
+            else:
+                TUI.appendToSolverLog("Root is not dominated by previous root.")
+                RootEvolver.setRootIndividual(self._rootEvolver.selectRootNeighbour(
+                    prevRootIndividual, rootRadius
+                ))
+            self._rootEvolver.addRootToExploredRoot(RootEvolver.getRootIndividual())
+            TUI.appendToSolverLog(f"New root: {RootEvolver.getRootIndividual()}")
+            self._metaPopSize, self._genesisPopSize = self._computeMetaAndGenesisPopSize(RootEvolver.getRootIndividual())
+            TUI.appendToSolverLog(f"Meta pop size: {self._metaPopSize}, Genesis pop size: {self._genesisPopSize}")
+            self._recomposeEvolvers(currentRootIndividual)
+
+            rootPF = newRootPF
+            shouldMetaGenContinue = True
 
         expEndTime: float = timeit.default_timer()
 
@@ -934,6 +1188,12 @@ class HierarchicalEvolution:
             expFile.write(f"No. of CPUs: {experimentNames[4]}\n")
             expFile.write(f"Time taken: {expEndTime - expStartTime:.2f}\n")
             expFile.write(f"Qualified Individuals: {len(qualifiedIndividuals)}\n")
+            expFile.write(
+                f"Meta Pop Size: {self._metaPopSize}\n"
+            )
+            expFile.write(
+                f"Genesis Pop Size: {self._genesisPopSize}\n"
+            )
             for ind in qualifiedIndividuals:
                 ind = cast(GenesisIndividual, ind)
                 expFile.write(

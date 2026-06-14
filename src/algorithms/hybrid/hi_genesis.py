@@ -14,11 +14,13 @@ from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 
 NO_OF_NEURONS: int = 2
-META_POP_SIZE: int = 10
+POP_SIZE: int = 100
+MAX_GEN: int = 100
+META_POP_SIZE: int = 20
 # GENESIS pop size per meta individual
-GENESIS_POP_SIZE: int = 10
-META_MAX_GEN: int = 10
-GENESIS_MAX_GEN: int = 10
+GENESIS_POP_SIZE: int = 5
+META_MAX_GEN: int = 20
+GENESIS_MAX_GEN: int = 5
 MAX_MEMORY_DEMAND: int = 1
 MIN_AR: float = 0.95
 MAX_LATENCY: int = 100
@@ -30,6 +32,7 @@ GENESIS_CXPB: float = 1.0
 GENESIS_MUTPB: float = 0.5
 META_INDPB: float = 0.5
 GENESIS_INDPB: float = 0.5
+DOMINANCE_THRESHOLD: float = 0.0
 
 
 def solve(
@@ -66,16 +69,14 @@ def solve(
     """
 
     hiGenesis: HierarchicalEvolution = HierarchicalEvolution(
-        META_POP_SIZE,
-        GENESIS_POP_SIZE,
+        POP_SIZE,
+        MAX_GEN,
         META_CXPB,
         GENESIS_CXPB,
         META_MUTPB,
         GENESIS_MUTPB,
         META_INDPB,
         GENESIS_INDPB,
-        META_MAX_GEN,
-        GENESIS_MAX_GEN,
         MIN_AR,
         MAX_LATENCY if type == LATENCY else MAX_POWER,
         NO_OF_NEURONS,
@@ -91,6 +92,7 @@ def solve(
         experimentName,
         sendEGs,
         deleteEGs,
+        DOMINANCE_THRESHOLD,
         retainPopulation,
     )
 
