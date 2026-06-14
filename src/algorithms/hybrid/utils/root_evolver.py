@@ -19,7 +19,7 @@ class RootEvolver:
         """
 
         self._popSize: int = popSize
-        self._rootSearchSpace: list[int] = self.generateRootSearchSpace()
+        self._rootSearchSpace: list[int] = self._generateRootSearchSpace()
 
     @staticmethod
     def getRootIndividual() -> int:
@@ -47,7 +47,7 @@ class RootEvolver:
         with RootEvolver.lock:
             RootEvolver._rootIndividual = root
 
-    def generateRootSearchSpace(self) -> list[int]:
+    def _generateRootSearchSpace(self) -> list[int]:
         """
         Generates the search space for the root individual.
 

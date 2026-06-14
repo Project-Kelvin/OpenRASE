@@ -1,5 +1,5 @@
 """
-This defines teh models associated with calibration.
+This defines the models associated with calibration.
 """
 
 class ResourceDemand(dict):
