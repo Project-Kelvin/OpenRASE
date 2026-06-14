@@ -1,8 +1,8 @@
-FROM caddy:2.9-builder-alpine AS builder
+FROM caddy:2.11-builder-alpine AS builder
 
 RUN xcaddy build --with github.com/corazawaf/coraza-caddy/v2
 
-FROM caddy:2.9-alpine
+FROM caddy:2.11-alpine
 
 RUN apk add --update --no-cache \
     bash \
