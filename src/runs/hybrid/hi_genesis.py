@@ -25,12 +25,14 @@ from utils.tui import TUI
 
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
-def run(headless: bool) -> None:
+@click.option("--client", is_flag=True, default=False, help="Run in client mode.")
+def run(headless: bool, client: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
     Parameters:
         headless (bool): Whether to run the emulator in headless mode.
+        client (bool): Whether to run the algorithm in client mode.
 
     Returns:
         None
@@ -165,8 +167,8 @@ def run(headless: bool) -> None:
                         topologyToUse = removeHost(topologyToUse, hostToRemove)
                         TUI.appendToSolverLog(f"Simulated failure of host {hostToRemove}.")
 
-                    if segment != 9:
-                        continue
+                    # if segment < 9:
+                    #     continue
 
                     self._trafficGenerator.setDesign([trafficSegments[segment]])
                     solve(
@@ -180,7 +182,8 @@ def run(headless: bool) -> None:
                         "hi_genesis",
                         f"{len(allRequestsReceived)}_0.1_False_10_2_{segment}",
                         LATENCY,
-                        True
+                        True,
+                        client,
                     )
 
             except Exception as e:

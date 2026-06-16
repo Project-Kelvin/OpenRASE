@@ -1113,7 +1113,7 @@ class HierarchicalEvolution:
                     HierarchicalEvolution._genesisPopulation = deepcopy(
                         cast(list[GenesisIndividual], evaluatedPop)
                     )
-                if len(qualifiedIndividuals) >= self._minQualInd:
+                if len(qualifiedIndividuals) >= self._minQualInd or gen >= self._maxGen:
                     break
 
                 TUI.appendToSolverLog("Exiting GENESIS evolution and moving to the next generation of meta.")
@@ -1139,7 +1139,7 @@ class HierarchicalEvolution:
                 metaPF = newMetaPF
                 shouldGenesisGenContinue = True
 
-            if len(qualifiedIndividuals) >= self._minQualInd:
+            if len(qualifiedIndividuals) >= self._minQualInd or gen >= self._maxGen:
                 break
             TUI.appendToSolverLog("Exiting meta evolution and moving to the next generation of root.")
             newRootPF: tools.ParetoFront = tools.ParetoFront()

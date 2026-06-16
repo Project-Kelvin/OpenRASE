@@ -29,7 +29,7 @@ from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 
 
-class HierarchicalEvolution:
+class HierarchicalEvolutionClient:
     """
     Class responsible for the hierarchical evolution.
     """
@@ -211,7 +211,7 @@ class HierarchicalEvolution:
 
             newGenesisPopulation: list[GenesisIndividual] = []
             for i in range(prevMetaPopSize):
-                subGenesisPop: list[GenesisIndividual] = HierarchicalEvolution._genesisPopulation[i * prevGenesisPopSize : genesisPopBoundary]
+                subGenesisPop: list[GenesisIndividual] = HierarchicalEvolutionClient._genesisPopulation[i * prevGenesisPopSize : genesisPopBoundary]
                 selectedGenesisPop: list[GenesisIndividual] = self._toolbox.select(subGenesisPop, k=self._genesisPopSize)
                 if len(selectedGenesisPop) < self._genesisPopSize:
                     diff: int = len(selectedGenesisPop) - self._genesisPopSize
@@ -220,38 +220,38 @@ class HierarchicalEvolution:
                 newGenesisPopulation.extend(selectedGenesisPop)
                 genesisPopBoundary += prevGenesisPopSize
             TUI.appendToSolverLog(f"Pruned GENESIS population to size: {len(newGenesisPopulation)}.")
-            HierarchicalEvolution._genesisPopulation = newGenesisPopulation
+            HierarchicalEvolutionClient._genesisPopulation = newGenesisPopulation
 
             for _ in range(self._metaPopSize - prevMetaPopSize):
                 metaIndividual: Individual = self._toolbox.metaIndividual()
                 genesisPopulation: list[GenesisIndividual] = self._generateGenesisPopulation(metaIndividual)
                 TUI.appendToSolverLog(f"Generated new GENESIS population for meta individual: {metaIndividual.id}")
-                HierarchicalEvolution._metaPopulation.append(metaIndividual)
-                HierarchicalEvolution._genesisPopulation.extend(genesisPopulation)
-            TUI.appendToSolverLog(f"Total GENESIS population size after adding new meta individuals: {len(HierarchicalEvolution._genesisPopulation)}.")
+                HierarchicalEvolutionClient._metaPopulation.append(metaIndividual)
+                HierarchicalEvolutionClient._genesisPopulation.extend(genesisPopulation)
+            TUI.appendToSolverLog(f"Total GENESIS population size after adding new meta individuals: {len(HierarchicalEvolutionClient._genesisPopulation)}.")
         elif self._metaPopSize < prevMetaPopSize:
             TUI.appendToSolverLog("New meta population smaller than previous meta population.")
-            selectedMetaPop: list[Individual] = self._toolbox.select(HierarchicalEvolution._metaPopulation, k=self._metaPopSize)
+            selectedMetaPop: list[Individual] = self._toolbox.select(HierarchicalEvolutionClient._metaPopulation, k=self._metaPopSize)
             if len(selectedMetaPop) < self._metaPopSize:
                 diff: int = len(selectedMetaPop) - self._metaPopSize
-                unSelectedMetaPop: list[Individual] = [ind for ind in HierarchicalEvolution._metaPopulation if ind.id not in [selected.id for selected in selectedMetaPop]]
+                unSelectedMetaPop: list[Individual] = [ind for ind in HierarchicalEvolutionClient._metaPopulation if ind.id not in [selected.id for selected in selectedMetaPop]]
                 selectedMetaPop.extend(random.choices(unSelectedMetaPop, k=abs(diff)))
             selectedGenesisPop: list[GenesisIndividual] = []
             genesisPopBoundary: int = prevGenesisPopSize
-            for i, metaInd in enumerate(HierarchicalEvolution._metaPopulation):
+            for i, metaInd in enumerate(HierarchicalEvolutionClient._metaPopulation):
                 if len([selectedMetaInd for selectedMetaInd in selectedMetaPop if selectedMetaInd.id == metaInd.id]) == 1:
-                    selectedGenesisPop.extend(HierarchicalEvolution._genesisPopulation[i * prevGenesisPopSize : genesisPopBoundary])
+                    selectedGenesisPop.extend(HierarchicalEvolutionClient._genesisPopulation[i * prevGenesisPopSize : genesisPopBoundary])
                 genesisPopBoundary += prevGenesisPopSize
 
-            HierarchicalEvolution._metaPopulation = [metaInd for metaInd in HierarchicalEvolution._metaPopulation if metaInd.id in [selectedMetaInd.id for selectedMetaInd in selectedMetaPop]]
-            HierarchicalEvolution._genesisPopulation = selectedGenesisPop
+            HierarchicalEvolutionClient._metaPopulation = [metaInd for metaInd in HierarchicalEvolutionClient._metaPopulation if metaInd.id in [selectedMetaInd.id for selectedMetaInd in selectedMetaPop]]
+            HierarchicalEvolutionClient._genesisPopulation = selectedGenesisPop
 
-            TUI.appendToSolverLog(f"Pruned meta population to size: {len(HierarchicalEvolution._metaPopulation)}.")
-            TUI.appendToSolverLog(f"Total GENESIS population size after pruning meta individuals: {len(HierarchicalEvolution._genesisPopulation)}.")
+            TUI.appendToSolverLog(f"Pruned meta population to size: {len(HierarchicalEvolutionClient._metaPopulation)}.")
+            TUI.appendToSolverLog(f"Total GENESIS population size after pruning meta individuals: {len(HierarchicalEvolutionClient._genesisPopulation)}.")
             newGenesisPopulation: list[GenesisIndividual] = []
             genesisPopBoundary: int = prevGenesisPopSize
-            for i, metaInd in enumerate(HierarchicalEvolution._metaPopulation):
-                subGenesisPop: list[GenesisIndividual] = HierarchicalEvolution._genesisPopulation[i * prevGenesisPopSize : genesisPopBoundary]
+            for i, metaInd in enumerate(HierarchicalEvolutionClient._metaPopulation):
+                subGenesisPop: list[GenesisIndividual] = HierarchicalEvolutionClient._genesisPopulation[i * prevGenesisPopSize : genesisPopBoundary]
 
                 for _ in range(self._genesisPopSize - prevGenesisPopSize):
                     selectedGenesisInd: GenesisIndividual = cast(GenesisIndividual, GenesisUtils.generateRandomGenesisIndividual(GenesisIndividual, self._topology, self._sfcrs))
@@ -261,8 +261,8 @@ class HierarchicalEvolution:
                 newGenesisPopulation.extend(subGenesisPop)
                 genesisPopBoundary += prevGenesisPopSize
 
-            HierarchicalEvolution._genesisPopulation = newGenesisPopulation
-            TUI.appendToSolverLog(f"Recomposed GENESIS population to size: {len(HierarchicalEvolution._genesisPopulation)}.")
+            HierarchicalEvolutionClient._genesisPopulation = newGenesisPopulation
+            TUI.appendToSolverLog(f"Recomposed GENESIS population to size: {len(HierarchicalEvolutionClient._genesisPopulation)}.")
 
 
     def _createLogFiles(
@@ -975,21 +975,21 @@ class HierarchicalEvolution:
 
         if (
             not self._retainPopulation
-            or len(HierarchicalEvolution._metaPopulation) == 0
+            or len(HierarchicalEvolutionClient._metaPopulation) == 0
         ):
-            HierarchicalEvolution._metaPopulation: list[Individual] = (
+            HierarchicalEvolutionClient._metaPopulation: list[Individual] = (
                 self._toolbox.metaPopulation(n=self._metaPopSize)
             )
 
         if (
             not self._retainPopulation
-            or len(HierarchicalEvolution._genesisPopulation) == 0
+            or len(HierarchicalEvolutionClient._genesisPopulation) == 0
         ):
-            for metaIndividual in HierarchicalEvolution._metaPopulation:
+            for metaIndividual in HierarchicalEvolutionClient._metaPopulation:
                 genesisPopulation: list[GenesisIndividual] = (
                     self._generateGenesisPopulation(metaIndividual)
                 )
-                HierarchicalEvolution._genesisPopulation.extend(genesisPopulation)
+                HierarchicalEvolutionClient._genesisPopulation.extend(genesisPopulation)
 
         metaGen: int = 0
         genesisGen: int = 0
@@ -1016,30 +1016,30 @@ class HierarchicalEvolution:
                 rootGen,
                 metaGen,
                 genesisGen,
-                cast(list[Individual], HierarchicalEvolution._genesisPopulation),
+                cast(list[Individual], HierarchicalEvolutionClient._genesisPopulation),
                 []
             )
 
             qualifiedIndividuals.extend(qualInd)
 
-            HierarchicalEvolution._genesisPopulation = deepcopy(
+            HierarchicalEvolutionClient._genesisPopulation = deepcopy(
                 cast(list[GenesisIndividual], evaluatedPop)
             )
 
-            HierarchicalEvolution._metaPopulation = self._evaluateMetaFitness(
-                HierarchicalEvolution._metaPopulation,
-                HierarchicalEvolution._genesisPopulation,
+            HierarchicalEvolutionClient._metaPopulation = self._evaluateMetaFitness(
+                HierarchicalEvolutionClient._metaPopulation,
+                HierarchicalEvolutionClient._genesisPopulation,
             )
 
             newRootPF: tools.ParetoFront = tools.ParetoFront()
             newMetaPF: tools.ParetoFront = tools.ParetoFront()
             newGenesisPF: tools.ParetoFront = tools.ParetoFront()
-            newRootPF.update(HierarchicalEvolution._genesisPopulation)
-            newMetaPF.update(HierarchicalEvolution._genesisPopulation)
-            newGenesisPF.update(HierarchicalEvolution._genesisPopulation)
+            newRootPF.update(HierarchicalEvolutionClient._genesisPopulation)
+            newMetaPF.update(HierarchicalEvolutionClient._genesisPopulation)
+            newGenesisPF.update(HierarchicalEvolutionClient._genesisPopulation)
             rootDominance: float = self._calculateParetoDominatedPercentage(rootPF, newRootPF)
             metaDominance: float = self._calculateParetoDominatedPercentage(metaPF, newMetaPF)
-            self._writeMetaLog(rootGen, metaGen, HierarchicalEvolution._metaPopulation, metaDominance)
+            self._writeMetaLog(rootGen, metaGen, HierarchicalEvolutionClient._metaPopulation, metaDominance)
             self._writeRootLog(rootGen, rootDominance)
             rootPF = newRootPF
             metaPF = newMetaPF
@@ -1050,7 +1050,7 @@ class HierarchicalEvolution:
             while len(qualifiedIndividuals) < self._minQualInd and shouldMetaGenContinue and gen <= self._maxGen:
                 metaGen += 1
                 metaPopulation: list[Individual] = deepcopy(
-                    cast(list[Individual], HierarchicalEvolution._metaPopulation)
+                    cast(list[Individual], HierarchicalEvolutionClient._metaPopulation)
                 )
                 metaOffspring: list[Individual] = []
 
@@ -1060,12 +1060,12 @@ class HierarchicalEvolution:
                         self._metaCxPb,
                         self._metaMutPb,
                     )
-                    HierarchicalEvolution._genesisPopulation = (
+                    HierarchicalEvolutionClient._genesisPopulation = (
                         self._updateMetaIndividualOfGenesisPopulation(
                             metaOffspring,
                             cast(
                                 list[GenesisIndividual],
-                                HierarchicalEvolution._genesisPopulation,
+                                HierarchicalEvolutionClient._genesisPopulation,
                             ),
                         )
                     )
@@ -1081,7 +1081,7 @@ class HierarchicalEvolution:
                     genesisGen += 1
 
                     genesisPopulation: list[GenesisIndividual] = deepcopy(
-                        cast(list[GenesisIndividual], HierarchicalEvolution._genesisPopulation)
+                        cast(list[GenesisIndividual], HierarchicalEvolutionClient._genesisPopulation)
                     )
 
                     genesisOffSpring: list[GenesisIndividual] = []
@@ -1096,7 +1096,7 @@ class HierarchicalEvolution:
                         genesisOffSpring = deepcopy(genesisPopulation)
 
                     evaluatedPop, qualInd = self._performGAOperationsGenesis(
-                        gen, rootGen, metaGen, genesisGen, cast(list[Individual], genesisOffSpring), cast(list[Individual], HierarchicalEvolution._genesisPopulation))
+                        gen, rootGen, metaGen, genesisGen, cast(list[Individual], genesisOffSpring), cast(list[Individual], HierarchicalEvolutionClient._genesisPopulation))
 
                     qualifiedIndividuals.extend(qualInd)
                     newGenesisPF: tools.ParetoFront = tools.ParetoFront()
@@ -1105,7 +1105,7 @@ class HierarchicalEvolution:
                         genesisPF, newGenesisPF
                     )
                     genesisPF = newGenesisPF
-                    HierarchicalEvolution._genesisPopulation = deepcopy(
+                    HierarchicalEvolutionClient._genesisPopulation = deepcopy(
                         cast(list[GenesisIndividual], evaluatedPop)
                     )
 
@@ -1119,7 +1119,7 @@ class HierarchicalEvolution:
 
                         break
 
-                if len(qualifiedIndividuals) >= self._minQualInd:
+                if len(qualifiedIndividuals) >= self._minQualInd or gen >= self._maxGen:
                     break
 
                 if didRootChange:
@@ -1130,16 +1130,16 @@ class HierarchicalEvolution:
                     metaOffspring,
                     cast(
                         list[GenesisIndividual],
-                        HierarchicalEvolution._genesisPopulation,
+                        HierarchicalEvolutionClient._genesisPopulation,
                     ),
                 )
 
-                HierarchicalEvolution._metaPopulation = self._selectMetaPopulation(
-                    HierarchicalEvolution._metaPopulation,
+                HierarchicalEvolutionClient._metaPopulation = self._selectMetaPopulation(
+                    HierarchicalEvolutionClient._metaPopulation,
                     metaOffspring,
                 )
                 newMetaPF: tools.ParetoFront = tools.ParetoFront()
-                newMetaPF.update(HierarchicalEvolution._genesisPopulation)
+                newMetaPF.update(HierarchicalEvolutionClient._genesisPopulation)
                 shouldMetaGenContinue = self._isParetoDominated(
                     metaPF, newMetaPF
                 )
@@ -1148,11 +1148,11 @@ class HierarchicalEvolution:
                 metaPF = newMetaPF
                 shouldGenesisGenContinue = True
 
-            if len(qualifiedIndividuals) >= self._minQualInd:
+            if len(qualifiedIndividuals) >= self._minQualInd or gen >= self._maxGen:
                 break
             TUI.appendToSolverLog("Exiting meta evolution and moving to the next generation of root.")
             newRootPF: tools.ParetoFront = tools.ParetoFront()
-            newRootPF.update(HierarchicalEvolution._genesisPopulation)
+            newRootPF.update(HierarchicalEvolutionClient._genesisPopulation)
             isCurrentRootDominant = self._isParetoDominated(
                 rootPF, newRootPF
             )

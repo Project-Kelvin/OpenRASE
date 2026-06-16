@@ -2,22 +2,21 @@
 This defines the API service for the root node of the HiGENESIS algorithm.
 """
 
-from algorithms.hybrid.constants.root_evolver import ROOT_PATH, SELECT_NEIGHBOUR_PATH
-from algorithms.hybrid.models.root_evolver import SelectNeighbour
-from fastapi import FastAPI
+from algorithms.hybrid.constants.root_evolver import ROOT_PATH, SELECT_NEIGHBOUR_PATH, SERVICE_PORT
+from flask import Flask, jsonify, request
 from algorithms.hybrid.utils.root_evolver import RootEvolver
 
 POP_SIZE: int = 100
 
-app: FastAPI = FastAPI()
+app: Flask = Flask(__name__)
 rootEvolver: RootEvolver = RootEvolver(POP_SIZE)
 root: int = rootEvolver.generateRandomRoot()
 rootEvolver.setRootIndividual(root)
 rootEvolver.addRootToExploredRoot(root)
 
 
-@app.get(ROOT_PATH)
-def getRoot() -> int:
+@app.route(ROOT_PATH, methods=["GET"])
+def getRoot() -> tuple:
     """
     Returns the current root individual.
 
@@ -25,17 +24,40 @@ def getRoot() -> int:
         int: The current root individual.
     """
 
-    return RootEvolver.getRootIndividual()
+    return jsonify(RootEvolver.getRootIndividual()), 200
 
-@app.post(SELECT_NEIGHBOUR_PATH)
-def setRootNeighbour(selectNeighbour: SelectNeighbour) -> None:
+@app.route(SELECT_NEIGHBOUR_PATH, methods=["POST"])
+def setRootNeighbour() -> tuple:
     """
     Sets the neighbour of the current root individual.
 
-    Parameters:
-        selectNeighbour (SelectNeighbour): The request body containing the neighbour information.
+    Request JSON body:
+        root (int): Root individual.
+        radius (float): Radius for neighbour selection.
     """
 
-    nextRoot: int = rootEvolver.selectRootNeighbour(selectNeighbour.root, selectNeighbour.radius)
+    payload = request.get_json(silent=True) or {}
+
+    if "root" not in payload or "radius" not in payload:
+        return jsonify({"error": "Fields 'root' and 'radius' are required."}), 400
+
+    try:
+        root = int(payload["root"])
+        radius = float(payload["radius"])
+    except (TypeError, ValueError):
+        return jsonify({"error": "Fields 'root' and 'radius' must be numeric."}), 400
+
+    nextRoot: int = rootEvolver.selectRootNeighbour(root, radius)
     RootEvolver.setRootIndividual(nextRoot)
     rootEvolver.addRootToExploredRoot(nextRoot)
+    return "", 204
+
+def runRootService() -> None:
+    """
+    Starts the Flask application for the root evolver service.
+    """
+
+    app.run(debug=True, host="0.0.0.0", port=SERVICE_PORT)
+
+if __name__ == "__main__":
+    runRootService()

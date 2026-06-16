@@ -2,13 +2,14 @@
 This defines the GA that evolves teh weights of the Neural Network.
 """
 
-from typing import Callable
+from typing import Callable, Union
 from shared.models.sfc_request import SFCRequest
 from shared.models.traffic_design import TrafficDesign
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from algorithms.hybrid.constants.genesis_objective import LATENCY
 from algorithms.hybrid.utils.hierarchical_evolution import HierarchicalEvolution
+from algorithms.hybrid.utils.hierarchical_evolution_client import HierarchicalEvolutionClient
 from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
@@ -47,6 +48,7 @@ def solve(
     experimentName: str,
     type: str = LATENCY,
     retainPopulation: bool = False,
+    isClientMode: bool = False,
 ) -> None:
     """
     Evolves the weights of the Neural Network.
@@ -63,12 +65,15 @@ def solve(
         experimentName (str): the name of the experiment.
         type (str): the type of the objective function to optimize. Defaults to LATENCY.
         retainPopulation (bool): specifies if the population should be retained in memory.
+        isClientMode (bool): specifies if the algorithm should run in client mode.
 
     Returns:
         None
     """
 
-    hiGenesis: HierarchicalEvolution = HierarchicalEvolution(
+    HiGenesisClass = HierarchicalEvolutionClient if isClientMode else HierarchicalEvolution
+
+    hiGenesis: Union[HierarchicalEvolutionClient, HierarchicalEvolution] = HiGenesisClass(
         POP_SIZE,
         MAX_GEN,
         META_CXPB,
