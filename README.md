@@ -49,7 +49,7 @@ Run the following command.
 ```bash
 which pyenv
 ```
-Copy the output leaving the trailing `/pyenv` part.
+Copy the output, omitting the trailing `/pyenv` part.
 Run the following command.
 ```bash
 sudo visudo
@@ -98,7 +98,7 @@ Run the following command.
 ```bash
 which poetry
 ```
-Copy the output leaving the trailing `/poetry` part.
+Copy the output, omitting the trailing `/poetry` part.
 Run the following command.
 ```bash
 sudo visudo
@@ -121,7 +121,7 @@ Get the path of the Python 3.9 executable.
 pyenv which python
 ```
 Copy the output.
-Run the following command replacing the placeholder with the copied output.
+Run the following command, replacing the placeholder with the copied output.
 ```bash
 poetry env use <path to python 3.9 executable>
 ```
@@ -131,7 +131,7 @@ Get the path of the Python 3.9 executable.
 sudo pyenv which python
 ```
 Copy the output.
-Run the following command replacing the placeholder with the copied output.
+Run the following command, replacing the placeholder with the copied output.
 ```bash
 sudo poetry env use <path to python 3.9 executable>
 ```
@@ -143,11 +143,17 @@ sudo poetry install
 ```bash
 sudo poetry run python -m pip install ryu
 ```
+>[!NOTE]
+>If you get an error, then ensure `pip` is version `24.0` by running the following command:
+>```
+>sudo poetry run python -m pip install -U pip==24.0
+>```
+
 Install eventlet.
 ```bash
 sudo poetry run python -m pip install eventlet==0.30.2
 ```
-13. Initialize OpenRASE
+13. Initialise OpenRASE
 ```bash
 sudo poetry run init
 ```
