@@ -1148,19 +1148,19 @@ class HierarchicalEvolutionClient:
                 metaPF = newMetaPF
                 shouldGenesisGenContinue = True
 
-            if len(qualifiedIndividuals) >= self._minQualInd or gen >= self._maxGen:
+            if (len(qualifiedIndividuals) >= self._minQualInd or gen >= self._maxGen) and not didRootChange:
                 break
-            TUI.appendToSolverLog("Exiting meta evolution and moving to the next generation of root.")
-            newRootPF: tools.ParetoFront = tools.ParetoFront()
-            newRootPF.update(HierarchicalEvolutionClient._genesisPopulation)
-            isCurrentRootDominant = self._isParetoDominated(
-                rootPF, newRootPF
-            )
-            dominance: float = self._calculateParetoDominatedPercentage(rootPF, newRootPF)
-            self._writeRootLog(rootGen, dominance)
-            currentRootIndividual: int = -1
 
             if not didRootChange:
+                TUI.appendToSolverLog("Exiting meta evolution and moving to the next generation of root.")
+                newRootPF: tools.ParetoFront = tools.ParetoFront()
+                newRootPF.update(HierarchicalEvolutionClient._genesisPopulation)
+                isCurrentRootDominant = self._isParetoDominated(
+                    rootPF, newRootPF
+                )
+                dominance: float = self._calculateParetoDominatedPercentage(rootPF, newRootPF)
+                self._writeRootLog(rootGen, dominance)
+                currentRootIndividual: int = -1
                 currentRootIndividual = self._rootClient.getRootIndividual()
                 if isCurrentRootDominant:
                     prevRootIndividual = currentRootIndividual
@@ -1189,6 +1189,7 @@ class HierarchicalEvolutionClient:
 
         experimentNames: list[str] = self._experimentName.split("_")
 
+        TUI.appendToSolverLog(f"{self._experimentName} is completed.")
         with open(
             os.path.join(self._experimentDir, "experiment.txt"),
             "w",
