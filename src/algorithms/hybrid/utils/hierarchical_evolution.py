@@ -851,11 +851,11 @@ class HierarchicalEvolution:
 
             emHof: tools.ParetoFront = tools.ParetoFront()
 
-            populationEG: "list[DecodedIndividual]" = GenesisUtils.decodePop(
-                qualifiedIndividuals, self._topology, self._sfcrs
+            populationEG: "list[DecodedIndividual]" = GenesisUtils.extractDecodedIndividuals(
+                qualifiedIndividuals, genesisPopulation, populationEG
             )
             HybridEvaluation.cacheForOnline(populationEG, self._trafficDesign)
-            for decodedInd in populationEG:
+            for i, decodedInd in enumerate(populationEG):
                 if self._objectiveType == POWER:
                     ar, latency = HybridEvaluation.evaluationOnEmulatorPowerUsage(
                         decodedInd,
@@ -882,10 +882,10 @@ class HierarchicalEvolution:
                         self._topology,
                         self._maxMemoryDemand,
                     )
-                qualifiedIndividuals[decodedInd[0]].fitness.values = (ar, latency)
+                qualifiedIndividuals[i].fitness.values = (ar, latency)
 
                 for p in genesisNewPop:
-                    if p.id == qualifiedIndividuals[decodedInd[0]].id:
+                    if p.id == qualifiedIndividuals[i].id:
                         p.fitness.values = (ar, latency)
                         break
 

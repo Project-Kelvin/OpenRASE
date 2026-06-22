@@ -19,6 +19,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.utils.config import getConfig
 from algorithms.hybrid.constants.genesis_objective import LATENCY, POWER
 from algorithms.hybrid.models.individuals import Individual
+from algorithms.hybrid.utils.genesis import GenesisUtils
 from algorithms.models.embedding import DecodedIndividual
 from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
 from mano.telemetry import Telemetry
@@ -360,11 +361,11 @@ class HybridEvolution:
 
             emHof = tools.ParetoFront()
 
-            populationEG: "list[DecodedIndividual]" = self._decodePop(
-                qualifiedIndividuals, topology, fgrs
+            populationEG: "list[DecodedIndividual]" = GenesisUtils.extractDecodedIndividuals(
+                qualifiedIndividuals, pop, populationEG
             )
             HybridEvaluation.cacheForOnline(populationEG, trafficDesign)
-            for decodedInd in populationEG:
+            for i, decodedInd in enumerate(populationEG):
                 if type == POWER:
                     ar, latency = HybridEvaluation.evaluationOnEmulatorPowerUsage(
                         decodedInd,
@@ -391,10 +392,10 @@ class HybridEvolution:
                         topology,
                         maxMemoryDemand,
                     )
-                qualifiedIndividuals[decodedInd[0]].fitness.values = (ar, latency)
+                qualifiedIndividuals[i].fitness.values = (ar, latency)
 
                 for p in pop:
-                    if p.id == qualifiedIndividuals[decodedInd[0]].id:
+                    if p.id == qualifiedIndividuals[i].id:
                         p.fitness.values = (ar, latency)
                         break
 

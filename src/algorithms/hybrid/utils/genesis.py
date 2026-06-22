@@ -4,13 +4,13 @@ Defines the utils for the GENESIS algorithm.
 
 from concurrent.futures import ProcessPoolExecutor
 import timeit
-from typing import  Optional, Sequence, Tuple, Type, cast
-from uuid import uuid4
+from typing import  Optional, Tuple, Type, cast
+from uuid import UUID, uuid4
 from deap import tools
 import numpy as np
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
-from algorithms.hybrid.models.individuals import GenesisIndividual
+from algorithms.hybrid.models.individuals import GenesisIndividual, Individual
 from algorithms.hybrid.models.weights import GenesisWeights
 from algorithms.models.embedding import DecodedIndividual, LinkData
 from algorithms.hybrid.solvers.chain_composition import generateFGs
@@ -23,9 +23,6 @@ from algorithms.hybrid.utils.extract_weights import (
     getPredefinedWeights,
     getWeightsLength,
 )
-from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution, Individual
-from mano.telemetry import Telemetry
-from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 
 
@@ -71,6 +68,38 @@ class GenesisUtils:
         )
         cls.rejectionRate = rejectionRate
         cls.sigma = sigma
+
+    @staticmethod
+    def extractDecodedIndividuals(
+        individualsToExtract: list[GenesisIndividual],
+        pop: list[Individual],
+        decodedPop: list[DecodedIndividual],
+    ) -> list[DecodedIndividual]:
+        """
+        Converts a list of genesis individuals to a list of decoded individuals.
+
+        Parameters:
+            individualsToExtract (list[GenesisIndividual]): the list of individuals to extract.
+            pop (list[GenesisIndividual]): the population of genesis individuals.
+            decodedPop (list[DecodedIndividual]): the list of decoded individuals.
+
+        Returns:
+            list[DecodedIndividual]: the list of decoded individuals.
+        """
+
+        extracted: list[DecodedIndividual] = []
+        for ind in individualsToExtract:
+            indID: UUID  = ind.id
+            print("1")
+            popIndex: int = [i for i, ind in enumerate(pop) if ind.id == indID][0]
+            print("2")
+
+            decodedIndividual: DecodedIndividual = [decoded for decoded in decodedPop if decoded[0] == popIndex][0]
+            print("3")
+            extracted.append(decodedIndividual)
+
+        return extracted
+
 
     @staticmethod
     def decodeIndividual(
