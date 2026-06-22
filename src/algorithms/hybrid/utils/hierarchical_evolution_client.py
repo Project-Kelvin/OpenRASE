@@ -699,8 +699,8 @@ class HierarchicalEvolutionClient:
         return offspring
 
     def _performGAOperationsGenesis(
-        self, gen: int, rootGen: int, metaGen: int, genesisGen: int, genesisPopulation: list[Individual], parentPopulation: list[Individual]
-    ) -> tuple[list[Individual], list[Individual]]:
+        self, gen: int, rootGen: int, metaGen: int, genesisGen: int, genesisPopulation: list[Individual], parentPopulation: list[Individual], parentPopEG: list[DecodedIndividual]
+    ) -> tuple[list[Individual], list[Individual], list[DecodedIndividual]]:
         """
         Evaluates the fitness of the genesis individuals.
 
@@ -711,9 +711,10 @@ class HierarchicalEvolutionClient:
             genesisGen (int): the current generation.
             genesisPopulation (list[Individual]): the genesis population to evaluate.
             parentPopulation (list[Individual]): the parent genesis population.
+            parentPopEG (list[DecodedIndividual]): the decoded parent genesis population.
 
         Returns:
-            tuple[list[Individual], list[Individual]]: the evaluated genesis population and the qualified individuals
+            tuple[list[Individual], list[Individual], list[DecodedIndividual]]: the evaluated genesis population, the qualified individuals, and the decoded genesis population.
         """
 
         TUI.appendToSolverLog(
@@ -802,6 +803,9 @@ class HierarchicalEvolutionClient:
         else:
             genesisNewPop = cast(list[GenesisIndividual], genesisPopulation)
 
+        popEG: list[DecodedIndividual] = GenesisUtils.extractDecodedIndividuals(
+            cast(list[Individual], genesisNewPop), populationEG + parentPopEG
+        )
         ars = [ind.fitness.values[0] for ind in genesisNewPop]
         latencies = [ind.fitness.values[1] for ind in genesisNewPop]
         hof: tools.ParetoFront = tools.ParetoFront()
@@ -852,7 +856,7 @@ class HierarchicalEvolutionClient:
             emHof: tools.ParetoFront = tools.ParetoFront()
 
             populationEG: "list[DecodedIndividual]" = GenesisUtils.extractDecodedIndividuals(
-                qualifiedIndividuals, genesisPopulation, populationEG)
+                qualifiedIndividuals, popEG)
             HybridEvaluation.cacheForOnline(populationEG, self._trafficDesign)
             for i, decodedInd in enumerate(populationEG):
                 if self._objectiveType == POWER:
@@ -910,7 +914,7 @@ class HierarchicalEvolutionClient:
                 f"Generation {genesisGen}: Min AR: {emMinAR}, Max Latency: {emMaxLatency}"
             )
 
-        return cast(list[Individual], genesisNewPop), qualifiedIndividuals
+        return cast(list[Individual], genesisNewPop), qualifiedIndividuals, popEG
 
     def _genesisSelect(
         self,
@@ -1010,12 +1014,13 @@ class HierarchicalEvolutionClient:
             metaGen = 0
             genesisGen = 0
             rootGen += 1
-            evaluatedPop, qualInd = self._performGAOperationsGenesis(
+            evaluatedPop, qualInd, popEG = self._performGAOperationsGenesis(
                 gen,
                 rootGen,
                 metaGen,
                 genesisGen,
                 cast(list[Individual], HierarchicalEvolutionClient._genesisPopulation),
+                [],
                 []
             )
 
@@ -1094,8 +1099,8 @@ class HierarchicalEvolutionClient:
                     else:
                         genesisOffSpring = deepcopy(genesisPopulation)
 
-                    evaluatedPop, qualInd = self._performGAOperationsGenesis(
-                        gen, rootGen, metaGen, genesisGen, cast(list[Individual], genesisOffSpring), cast(list[Individual], HierarchicalEvolutionClient._genesisPopulation))
+                    evaluatedPop, qualInd, popEG = self._performGAOperationsGenesis(
+                        gen, rootGen, metaGen, genesisGen, cast(list[Individual], genesisOffSpring), cast(list[Individual], HierarchicalEvolutionClient._genesisPopulation), popEG)
 
                     qualifiedIndividuals.extend(qualInd)
                     newGenesisPF: tools.ParetoFront = tools.ParetoFront()

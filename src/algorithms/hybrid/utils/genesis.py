@@ -71,16 +71,14 @@ class GenesisUtils:
 
     @staticmethod
     def extractDecodedIndividuals(
-        individualsToExtract: list[GenesisIndividual],
-        pop: list[Individual],
+        individualsToExtract: list[Individual],
         decodedPop: list[DecodedIndividual],
     ) -> list[DecodedIndividual]:
         """
         Converts a list of genesis individuals to a list of decoded individuals.
 
         Parameters:
-            individualsToExtract (list[GenesisIndividual]): the list of individuals to extract.
-            pop (list[GenesisIndividual]): the population of genesis individuals.
+            individualsToExtract (list[Individual]): the list of individuals to extract.
             decodedPop (list[DecodedIndividual]): the list of decoded individuals.
 
         Returns:
@@ -91,10 +89,7 @@ class GenesisUtils:
         for ind in individualsToExtract:
             indID: UUID  = ind.id
             print("1")
-            popIndex: int = [i for i, ind in enumerate(pop) if ind.id == indID][0]
-            print("2")
-
-            decodedIndividual: DecodedIndividual = [decoded for decoded in decodedPop if decoded[0] == popIndex][0]
+            decodedIndividual: DecodedIndividual = [decoded for decoded in decodedPop if decoded[5] == indID][0]
             print("3")
             extracted.append(decodedIndividual)
 
@@ -158,7 +153,7 @@ class GenesisUtils:
             TUI.appendToSolverLog(f"Error decoding individual {index}: {e}")
             raise Exception(f"Error decoding individual {index}: {e}")
 
-        return cast(DecodedIndividual, (index, egs, embedData, linkData, ar))
+        return cast(DecodedIndividual, (index, egs, embedData, linkData, ar, individual.id))
 
     @staticmethod
     def decodePop(

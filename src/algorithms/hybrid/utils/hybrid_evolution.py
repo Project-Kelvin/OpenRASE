@@ -202,6 +202,7 @@ class HybridEvolution:
     def _performGeneticOperation(
         self,
         parent: list[Individual],
+        parentPopEG: list[DecodedIndividual],
         pop: list[Individual],
         topology: Topology,
         fgrs: list[SFCRequest],
@@ -221,12 +222,13 @@ class HybridEvolution:
         deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
         hof: tools.ParetoFront,
         type: str = LATENCY,
-    ) -> "tuple[list[Individual], list[Individual]]":
+    ) -> "tuple[list[Individual], list[Individual], list[DecodedIndividual]]":
         """
         Perform the genetic operation.
 
         Parameters:
             parent (list[Individual]): the parent population.
+            parentPopEG (list[DecodedIndividual]): the decoded parent population.
             pop (list[Individual]): the current population.
             topology (Topology): the topology.
             fgrs (list[SFCRequest]): the SFC Requests.
@@ -248,7 +250,7 @@ class HybridEvolution:
             type (str): the optimisation objective type.
 
         Returns:
-            tuple[list[Individual], list[Individual]: the updated population and qualified individuals.
+            tuple[list[Individual], list[Individual], list[DecodedIndividual]]: the updated population, qualified individuals, and decoded population.
         """
 
         TUI.appendToSolverLog(f"Decoding population for generation {gen}.")
@@ -317,6 +319,11 @@ class HybridEvolution:
             pop, hof = self._select(pop, parent, popSize, hof)
         else:
             hof.update(pop)
+
+        popEG: "list[DecodedIndividual]" = GenesisUtils.extractDecodedIndividuals(
+            pop, populationEG + parentPopEG
+        )
+
         ars = [ind.fitness.values[0] for ind in pop]
         latencies = [ind.fitness.values[1] for ind in pop]
 
@@ -362,7 +369,7 @@ class HybridEvolution:
             emHof = tools.ParetoFront()
 
             populationEG: "list[DecodedIndividual]" = GenesisUtils.extractDecodedIndividuals(
-                qualifiedIndividuals, pop, populationEG
+                qualifiedIndividuals, popEG
             )
             HybridEvaluation.cacheForOnline(populationEG, trafficDesign)
             for i, decodedInd in enumerate(populationEG):
@@ -421,7 +428,7 @@ class HybridEvolution:
                 f"Generation {gen}: Min AR: {emMinAR}, Max Latency: {emMaxLatency}"
             )
 
-        return pop, qualifiedIndividuals
+        return pop, qualifiedIndividuals, popEG
 
     def hybridSolve(
         self,
@@ -509,7 +516,8 @@ class HybridEvolution:
         )
         gen: int = 1
         hof: tools.ParetoFront = tools.ParetoFront()
-        pop, qualifiedIndividuals = self._performGeneticOperation(
+        pop, qualifiedIndividuals, popEG = self._performGeneticOperation(
+            [],
             [],
             pop,
             topology,
@@ -546,8 +554,9 @@ class HybridEvolution:
             TUI.appendToSolverLog(
                 f"Offspring generated for generation {gen}. Evaluating offspring."
             )
-            pop, qualifiedIndividuals = self._performGeneticOperation(
+            pop, qualifiedIndividuals, popEG = self._performGeneticOperation(
                 pop,
+                popEG,
                 offspring,
                 topology,
                 fgrs,
