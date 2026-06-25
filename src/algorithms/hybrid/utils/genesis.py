@@ -88,9 +88,7 @@ class GenesisUtils:
         extracted: list[DecodedIndividual] = []
         for ind in individualsToExtract:
             indID: UUID  = ind.id
-            print("1")
             decodedIndividual: DecodedIndividual = [decoded for decoded in decodedPop if decoded[5] == indID][0]
-            print("3")
             extracted.append(decodedIndividual)
 
         return extracted
