@@ -996,7 +996,7 @@ class HierarchicalEvolutionClient:
 
         metaGen: int = 0
         genesisGen: int = 0
-        gen: int = 0
+        gen: int = -1
         rootGen: int = -1
         qualifiedIndividuals: list[Individual] = []
 
@@ -1014,6 +1014,7 @@ class HierarchicalEvolutionClient:
             metaGen = 0
             genesisGen = 0
             rootGen += 1
+            gen += 1
             evaluatedPop, qualInd, popEG = self._performGAOperationsGenesis(
                 gen,
                 rootGen,
