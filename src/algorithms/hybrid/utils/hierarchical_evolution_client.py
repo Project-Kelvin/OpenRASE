@@ -185,7 +185,7 @@ class HierarchicalEvolutionClient:
         """
 
         dominatedPercentage: float = self._calculateParetoDominatedPercentage(pf1, pf2)
-        print("Dominated percentage: ", dominatedPercentage)
+        TUI.appendToSolverLog(f"Dominated percentage: {dominatedPercentage}")
 
         return dominatedPercentage > self._dominanceThreshold
 
@@ -994,10 +994,10 @@ class HierarchicalEvolutionClient:
                 )
                 HierarchicalEvolutionClient._genesisPopulation.extend(genesisPopulation)
 
-        metaGen: int = 0
-        genesisGen: int = 0
-        gen: int = -1
-        rootGen: int = -1
+        metaGen: int = 1
+        genesisGen: int = 1
+        gen: int = 0
+        rootGen: int = 0
         qualifiedIndividuals: list[Individual] = []
 
         rootPF: tools.ParetoFront = tools.ParetoFront()
@@ -1052,7 +1052,7 @@ class HierarchicalEvolutionClient:
 
             didRootChange: bool = False
 
-            while len(qualifiedIndividuals) < self._minQualInd and shouldMetaGenContinue and gen <= self._maxGen:
+            while len(qualifiedIndividuals) < self._minQualInd and shouldMetaGenContinue and gen < self._maxGen:
                 metaGen += 1
                 metaPopulation: list[Individual] = deepcopy(
                     cast(list[Individual], HierarchicalEvolutionClient._metaPopulation)
@@ -1080,7 +1080,7 @@ class HierarchicalEvolutionClient:
                 genesisGen = 0
                 while (
                     len(qualifiedIndividuals) < self._minQualInd
-                    and shouldGenesisGenContinue and gen <= self._maxGen
+                    and shouldGenesisGenContinue and gen < self._maxGen
                 ):
                     gen += 1
                     genesisGen += 1
