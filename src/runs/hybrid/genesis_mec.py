@@ -43,7 +43,7 @@ def run(headless: bool) -> None:
 
     for mecTopo in mecTopos:
 
-        segmentDuration: int = 1 * 60
+        segmentDuration: int = 2 * 60
         design: TrafficDesign = generateTrafficDesignFromIoTTrace(
             os.path.join(
                 f"{getConfig()['repoAbsolutePath']}",
