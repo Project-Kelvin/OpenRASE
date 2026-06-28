@@ -27,13 +27,10 @@ from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 
 MAX_MEMORY_DEMAND: int = 1
-MAX_LATENCY: int = 100
+MAX_LATENCY: int = 150
 MAX_POWER: int = 300
-MIN_AR: float = 0.95
+MIN_AR: float = 0.75
 MIN_QUAL_IND: int = 1
-CXPB: float = 1.0
-INDPB: float = 0.5
-MUTPB: float = 0.5
 NGEN: int = 100
 
 DecodePop = Callable[
@@ -63,7 +60,30 @@ class HybridEvolution:
         crossover: Crossover,
         mutate: Mutate,
         individualContainer: Type[Individual],
+        mutPb: float,
+        cxpPb: float,
+        indPb: float,
+        evaluateOnline: bool = True,
     ):
+        """
+        Initializes the HybridEvolution class.
+
+        Parameters:
+            experimentName (str): the name of the experiment.
+            decodePop (DecodePop): the function to decode the population.
+            generateRandomIndividual (GenerateRandomIndividual): the function to generate a random individual.
+            crossover (Crossover): the crossover function.
+            mutate (Mutate): the mutation function.
+            individualContainer (Type[Individual]): the class type for individuals.
+            mutPb (float): the mutation probability.
+            cxpPb (float): the crossover probability.
+            indPb (float): the individual mutation probability.
+            evaluateOnline (bool): whether to evaluate the solution online or offline.
+
+        Returns:
+            None
+        """
+
         self._decodePop: DecodePop = decodePop
         self._generateRandomIndividual: GenerateRandomIndividual = (
             generateRandomIndividual
@@ -75,6 +95,10 @@ class HybridEvolution:
             getConfig()["repoAbsolutePath"], "artifacts", "experiments", experimentName
         )
         self._individualContainer: Type[Individual] = individualContainer
+        self._mutPb: float = mutPb
+        self._indPb: float = indPb
+        self._cxpPb: float = cxpPb
+        self._evaluateOnline: bool = evaluateOnline
 
     def _select(
         self,
@@ -162,17 +186,13 @@ class HybridEvolution:
 
     def _generateOffspring(
         self,
-        pop: "list[Individual]",
-        CXPB: float,
-        MUTPB: float,
+        pop: "list[Individual]"
     ) -> "list[Individual]":
         """
         Generate offspring from the population.
 
         Parameters:
             pop (list[Individual]): the population.
-            CXPB (float): the crossover probability.
-            MUTPB (float): the mutation probability.
 
         Returns:
             offspring (list[Individual]): the offspring.
@@ -182,7 +202,7 @@ class HybridEvolution:
         random.shuffle(offspring)
 
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
-            if random.random() < CXPB:
+            if random.random() < self._cxpPb:
 
                 self._toolbox.mate(child1, child2)
 
@@ -192,7 +212,7 @@ class HybridEvolution:
                 child2.id = uuid4()
 
         for mutant in offspring:
-            if random.random() < MUTPB:
+            if random.random() < self._mutPb:
                 self._toolbox.mutate(mutant)
 
                 del mutant.fitness.values
@@ -354,79 +374,80 @@ class HybridEvolution:
             # Start the online phase of the hybrid evolution
             # ---------------------------------------------------------------------------------------------
 
-            # If there are more than one individual, select the one with max AR and then min latency.
+            if self._evaluateOnline:
+                # If there are more than one individual, select the one with max AR and then min latency.
 
-            if len(qualifiedIndividuals) > 1:
-                qualifiedIndividuals.sort(
-                    key=lambda ind: (ind.fitness.values[0], -ind.fitness.values[1]),
-                    reverse=True,
+                if len(qualifiedIndividuals) > 1:
+                    qualifiedIndividuals.sort(
+                        key=lambda ind: (ind.fitness.values[0], -ind.fitness.values[1]),
+                        reverse=True,
+                    )
+                    qualifiedIndividuals = [qualifiedIndividuals[0]]
+
+                for ind in qualifiedIndividuals:
+                    del ind.fitness.values
+
+                emHof = tools.ParetoFront()
+
+                populationEG: "list[DecodedIndividual]" = GenesisUtils.extractDecodedIndividuals(
+                    qualifiedIndividuals, popEG
                 )
-                qualifiedIndividuals = [qualifiedIndividuals[0]]
+                HybridEvaluation.cacheForOnline(populationEG, trafficDesign)
+                for i, decodedInd in enumerate(populationEG):
+                    if type == POWER:
+                        ar, latency = HybridEvaluation.evaluationOnEmulatorPowerUsage(
+                            decodedInd,
+                            fgrs,
+                            gen,
+                            ngen,
+                            sendEGs,
+                            deleteEGs,
+                            trafficDesign,
+                            telemetry,
+                            topology,
+                            maxMemoryDemand,
+                        )
+                    else:
+                        ar, latency = HybridEvaluation.evaluationOnEmulator(
+                            decodedInd,
+                            fgrs,
+                            gen,
+                            ngen,
+                            sendEGs,
+                            deleteEGs,
+                            trafficDesign,
+                            trafficGenerator,
+                            topology,
+                            maxMemoryDemand,
+                        )
+                    qualifiedIndividuals[i].fitness.values = (ar, latency)
 
-            for ind in qualifiedIndividuals:
-                del ind.fitness.values
+                    for p in pop:
+                        if p.id == qualifiedIndividuals[i].id:
+                            p.fitness.values = (ar, latency)
+                            break
 
-            emHof = tools.ParetoFront()
+                emHof.update(qualifiedIndividuals)
 
-            populationEG: "list[DecodedIndividual]" = GenesisUtils.extractDecodedIndividuals(
-                qualifiedIndividuals, popEG
-            )
-            HybridEvaluation.cacheForOnline(populationEG, trafficDesign)
-            for i, decodedInd in enumerate(populationEG):
-                if type == POWER:
-                    ar, latency = HybridEvaluation.evaluationOnEmulatorPowerUsage(
-                        decodedInd,
-                        fgrs,
-                        gen,
-                        ngen,
-                        sendEGs,
-                        deleteEGs,
-                        trafficDesign,
-                        telemetry,
-                        topology,
-                        maxMemoryDemand,
-                    )
-                else:
-                    ar, latency = HybridEvaluation.evaluationOnEmulator(
-                        decodedInd,
-                        fgrs,
-                        gen,
-                        ngen,
-                        sendEGs,
-                        deleteEGs,
-                        trafficDesign,
-                        trafficGenerator,
-                        topology,
-                        maxMemoryDemand,
-                    )
-                qualifiedIndividuals[i].fitness.values = (ar, latency)
+                ars = [ind.fitness.values[0] for ind in qualifiedIndividuals]
+                latencies = [ind.fitness.values[1] for ind in qualifiedIndividuals]
 
-                for p in pop:
-                    if p.id == qualifiedIndividuals[i].id:
-                        p.fitness.values = (ar, latency)
-                        break
+                self._writeData(gen + 1, ars, latencies, "emulator", dirName)
+                self._writePFs(gen + 1, emHof, "emulator", dirName)
 
-            emHof.update(qualifiedIndividuals)
+                qualifiedIndividuals = [
+                    ind
+                    for ind in emHof
+                    if ind.fitness.values[0] >= minAR
+                    and ind.fitness.values[1] <= maxSecondObjective
+                ]
 
-            ars = [ind.fitness.values[0] for ind in qualifiedIndividuals]
-            latencies = [ind.fitness.values[1] for ind in qualifiedIndividuals]
+                emMinAR = min(ars)
+                emMaxLatency = max(latencies)
 
-            self._writeData(gen + 1, ars, latencies, "emulator", dirName)
-            self._writePFs(gen + 1, emHof, "emulator", dirName)
-
-            qualifiedIndividuals = [
-                ind
-                for ind in emHof
-                if ind.fitness.values[0] >= minAR
-                and ind.fitness.values[1] <= maxSecondObjective
-            ]
-
-            emMinAR = min(ars)
-            emMaxLatency = max(latencies)
-
-            TUI.appendToSolverLog(
-                f"Generation {gen}: Min AR: {emMinAR}, Max Latency: {emMaxLatency}"
-            )
+                TUI.appendToSolverLog(
+                    f"Generation {gen}: Min AR: {emMinAR}, Max Latency: {emMaxLatency}"
+                )
 
         return pop, qualifiedIndividuals, popEG
 
@@ -442,7 +463,7 @@ class HybridEvolution:
         popSize: int,
         experiment: str,
         type=LATENCY,
-        retainPopulation: bool = False,
+        retainPopulation: bool = False
     ) -> None:
         """
         Run the Genetic Algorithm + Dijkstra Algorithm.
@@ -503,7 +524,7 @@ class HybridEvolution:
             "population", tools.initRepeat, list, self._toolbox.individual
         )
         self._toolbox.register("mate", self._crossover)
-        self._toolbox.register("mutate", self._mutate, indpb=INDPB)
+        self._toolbox.register("mutate", self._mutate, indpb=self._indPb)
         self._toolbox.register("select", tools.selNSGA2)
 
         pop: "list[Individual]" = (
@@ -550,7 +571,7 @@ class HybridEvolution:
             TUI.appendToSolverLog(
                 f"Generation {gen} started. Performing genetic operations."
             )
-            offspring: "list[Individual]" = self._generateOffspring(pop, CXPB, MUTPB)
+            offspring: "list[Individual]" = self._generateOffspring(pop)
             TUI.appendToSolverLog(
                 f"Offspring generated for generation {gen}. Evaluating offspring."
             )

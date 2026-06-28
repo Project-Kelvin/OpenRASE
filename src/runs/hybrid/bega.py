@@ -23,16 +23,21 @@ from utils.tui import TUI
 
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
-def run(headless: bool) -> None:
+@click.option("--hyper", is_flag=True, default=False, help="Run in hyperparameter tuning mode.")
+def run(headless: bool, hyper: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
     Parameters:
         headless (bool): Whether to run the emulator in headless mode.
+        hyper (bool): Whether to run in hyperparameter tuning mode.
 
     Returns:
         None
     """
+
+    mutationProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
+    individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
 
     experimentsIncludeFilter: list[dict[str, Any]] = [
     ]
@@ -188,16 +193,41 @@ def run(headless: bool) -> None:
                     while not self._requests.empty():
                         requests.append(self._requests.get())
                         sleep(0.1)
-                    solve(
-                        topology,
-                        requests,
-                        self._orchestrator.sendEmbeddingGraphs,
-                        self._orchestrator.deleteEmbeddingGraphs,
-                        trafficDesign,
-                        self._trafficGenerator,
-                        self._orchestrator.getTelemetry(),
-                        exp["name"],
-                    )
+
+                    if hyper:
+                        for mutPb in mutationProbabilities:
+                            for indPb in individualProbabilities:
+                                for i in range(5):
+                                    TUI.appendToSolverLog(
+                                        f"Running experiment {exp['name']} with mutPb={mutPb} and indPb={indPb}."
+                                    )
+                                    solve(
+                                        topology,
+                                        requests,
+                                        self._orchestrator.sendEmbeddingGraphs,
+                                        self._orchestrator.deleteEmbeddingGraphs,
+                                        trafficDesign,
+                                        self._trafficGenerator,
+                                        self._orchestrator.getTelemetry(),
+                                        f"{exp['name']}_{mutPb}_{indPb}_{i}",
+                                        mutPb = mutPb,
+                                        indPb = indPb,
+                                        evaluateOnline = False,
+                                    )
+                    else:
+                        TUI.appendToSolverLog(
+                            f"Running experiment {exp['name']} with default parameters."
+                        )
+                        solve(
+                            topology,
+                            requests,
+                            self._orchestrator.sendEmbeddingGraphs,
+                            self._orchestrator.deleteEmbeddingGraphs,
+                            trafficDesign,
+                            self._trafficGenerator,
+                            self._orchestrator.getTelemetry(),
+                            exp["name"],
+                        )
 
                 except Exception as e:
                     TUI.appendToSolverLog(str(e), True)

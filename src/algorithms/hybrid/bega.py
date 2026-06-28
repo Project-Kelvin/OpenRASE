@@ -18,15 +18,9 @@ from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 
 POP_SIZE: int = 100
-
-hybridEvolution: HybridEvolution = HybridEvolution(
-    "ga_hybrid",
-    decodePop,
-    generateRandomIndividual,
-    tools.cxTwoPoint,
-    mutate,
-    Individual
-)
+INDPB: float = 0.5
+MUTPB: float = 0.5
+CXPB: float = 1.0
 
 def solve(
     topology: Topology,
@@ -36,7 +30,11 @@ def solve(
     trafficDesign: "list[TrafficDesign]",
     trafficGenerator: TrafficGenerator,
     telemetry: Telemetry,
-    experiment: str
+    experiment: str,
+    mutPb: float = MUTPB,
+    cxpPb: float = CXPB,
+    indPb: float = INDPB,
+    evaluateOnline: bool = True,
 ) -> None:
     """
     Solves the problem using a GA for VNF embedding and Dijkstra for link embedding.
@@ -50,10 +48,27 @@ def solve(
         trafficGenerator (TrafficGenerator): the traffic generator to use for solving.
         telemetry (Telemetry): telemetry instance.
         experiment (str): the experiment name.
+        mutPb (float): the mutation probability.
+        cxpPb (float): the crossover probability.
+        indPb (float): the individual mutation probability.
+        evaluateOnline (bool): whether to evaluate the solution online or offline.
 
     Returns:
         None
     """
+
+    hybridEvolution: HybridEvolution = HybridEvolution(
+        "ga_hybrid",
+        decodePop,
+        generateRandomIndividual,
+        tools.cxTwoPoint,
+        mutate,
+        Individual,
+        mutPb,
+        cxpPb,
+        indPb,
+        evaluateOnline=evaluateOnline
+    )
 
     hybridEvolution.hybridSolve(
         topology,

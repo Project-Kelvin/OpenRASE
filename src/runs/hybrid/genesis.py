@@ -25,16 +25,25 @@ from utils.tui import TUI
 
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
-def run(headless: bool) -> None:
+@click.option("--gaHyper", is_flag=True, default=False, help="Run in GA hyperparameter tuning mode.")
+@click.option("--GenesisHyper", is_flag=True, default=False, help="Run in GENESIS hyperparameter tuning mode.")
+def run(headless: bool, gaHyper: bool, GenesisHyper: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
     Parameters:
         headless (bool): Whether to run the emulator in headless mode.
+        gaHyper (bool): Whether to run in GA hyperparameter tuning mode.
+        GenesisHyper (bool): Whether to run in GENESIS hyperparameter tuning mode.
 
     Returns:
         None
     """
+
+    mutationProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
+    individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
+    rejectionRates: list[float] = [0.05, 0.1, 0.2, 0.5]
+    sigmas: list[float] = [0.0, 2.0, 5.0, 10.0]
 
     experimentsIncludeFilter: list[dict[str, Any]] = [
         (8, 0.2, False, 5, 1),
@@ -176,17 +185,54 @@ def run(headless: bool) -> None:
                         requests.append(self._requests.get())
                         sleep(0.1)
 
-                    solve(
-                        requests,
-                        self._orchestrator.sendEmbeddingGraphs,
-                        self._orchestrator.deleteEmbeddingGraphs,
-                        trafficDesign,
-                        self._trafficGenerator,
-                        self._orchestrator.getTelemetry(),
-                        topology,
-                        "genesis",
-                        exp["name"],
-                    )
+                    if gaHyper:
+                        for mutPb in mutationProbabilities:
+                            for indPb in individualProbabilities:
+                                for i in range(5):
+                                    solve(
+                                        requests,
+                                        self._orchestrator.sendEmbeddingGraphs,
+                                        self._orchestrator.deleteEmbeddingGraphs,
+                                        trafficDesign,
+                                        self._trafficGenerator,
+                                        self._orchestrator.getTelemetry(),
+                                        topology,
+                                        "genesis",
+                                        f"{exp['name']}_mutPb_{mutPb}_indPb_{indPb}_{i}",
+                                        mutPb=mutPb,
+                                        indPb=indPb,
+                                        evaluateOnline=False
+                                    )
+                    elif GenesisHyper:
+                        for sigma in sigmas:
+                            for rejectionRate in rejectionRates:
+                                for i in range(5):
+                                    solve(
+                                        requests,
+                                        self._orchestrator.sendEmbeddingGraphs,
+                                        self._orchestrator.deleteEmbeddingGraphs,
+                                        trafficDesign,
+                                        self._trafficGenerator,
+                                        self._orchestrator.getTelemetry(),
+                                        topology,
+                                        "genesis",
+                                        f"{exp['name']}_sigma_{sigma}_rejectionRate_{rejectionRate}",
+                                        sigma=sigma,
+                                        rejectionRate=rejectionRate,
+                                        evaluateOnline=False
+                                    )
+                    else:
+                        solve(
+                            requests,
+                            self._orchestrator.sendEmbeddingGraphs,
+                            self._orchestrator.deleteEmbeddingGraphs,
+                            trafficDesign,
+                            self._trafficGenerator,
+                            self._orchestrator.getTelemetry(),
+                            topology,
+                            "genesis",
+                            exp["name"],
+                        )
 
                 except Exception as e:
                     TUI.appendToSolverLog(str(e), True)

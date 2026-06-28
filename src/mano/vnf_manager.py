@@ -224,11 +224,14 @@ class VNFManager:
             for future in futures:
                 future.result()
 
-        client: DockerClient = from_env()
-        client.containers.prune()
-        client.images.prune()
-        client.networks.prune()
-        client.volumes.prune()
+        try:
+            client: DockerClient = from_env()
+            client.containers.prune()
+            client.images.prune()
+            client.networks.prune()
+            client.volumes.prune()
+        except Exception as e:
+            TUI.appendToLog(f"Error pruning Docker resources: {e}", True)
 
     def deployEmbeddingGraphs(self, egs: "list[EmbeddingGraph]") -> None:
         """
