@@ -22,6 +22,9 @@ NO_OF_NEURONS: int = 2
 POP_SIZE: int = 100
 REJECTION_RATE: float = 0.05
 SIGMA: float = 2.0
+MUTPB: float = 0.5
+INDPB: float = 0.5
+CXPB: float = 1.0
 
 
 def solve(
@@ -36,6 +39,12 @@ def solve(
     experimentName: str,
     type: str = LATENCY,
     retainPopulation: bool = False,
+    mutPb: float = MUTPB,
+    indPb: float = INDPB,
+    cxPb: float = CXPB,
+    sigma: float = SIGMA,
+    rejectionRate: float = REJECTION_RATE,
+    evaluateOnline: bool = True,
 ) -> None:
     """
     Evolves the weights of the Neural Network.
@@ -52,12 +61,18 @@ def solve(
         experimentName (str): the name of the experiment.
         type (str): the type of the objective function to optimize. Defaults to LATENCY.
         retainPopulation (bool): specifies if the population should be retained in memory.
+        mutPb (float): the mutation probability.
+        indPb (float): the individual mutation probability.
+        cxPb (float): the crossover probability.
+        sigma (float): the standard deviation for the Gaussian noise.
+        rejectionRate (float): the rate at which individuals are rejected.
+        evaluateOnline (bool): whether to evaluate the solution online or offline.
 
     Returns:
         None
     """
 
-    GenesisUtils.init(sfcrs, topology, NO_OF_NEURONS, REJECTION_RATE, SIGMA)
+    GenesisUtils.init(sfcrs, topology, NO_OF_NEURONS, rejectionRate, sigma)
 
     hybridEvolution: HybridEvolution = HybridEvolution(
         dirName,
@@ -66,6 +81,10 @@ def solve(
         GenesisUtils.genesisCrossover,
         GenesisUtils.genesisMutate,
         GenesisIndividual,
+        mutPb,
+        cxPb,
+        indPb,
+        evaluateOnline=evaluateOnline
     )
 
     hybridEvolution.hybridSolve(
