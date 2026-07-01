@@ -153,7 +153,8 @@ def generateTrafficDesignFromIoTTrace(dataFile: str, hourDuration: int = 5*60, s
     trafficDesign: TrafficDesign = []
 
     for count in counts:
+        count: int = round(count) if round(count) > 0 else 1
         for _i in range(hourDuration):
-            trafficDesign.append(TrafficStep(target=round(count), duration="1s"))
+            trafficDesign.append(TrafficStep(target=count, duration="1s"))
 
     return trafficDesign
