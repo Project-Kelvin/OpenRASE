@@ -58,7 +58,7 @@ def solve(
     """
 
     hybridEvolution: HybridEvolution = HybridEvolution(
-        "ga_hybrid",
+        "bega",
         decodePop,
         generateRandomIndividual,
         tools.cxTwoPoint,

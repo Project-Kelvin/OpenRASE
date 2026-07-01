@@ -39,9 +39,10 @@ def run(headless: bool, hyper: bool) -> None:
     mutationProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
 
-    experimentsIncludeFilter: list[dict[str, Any]] = [
+    experimentsIncludeFilter: list[tuple[int, float, bool, int, float]] = [
+        (8, 0.1, False, 5, 1)
     ]
-    experimentsExcludeFilter: list[dict[str, Any]] = [
+    experimentsExcludeFilter: list[tuple[int, float, bool, int, float]] = [
         # (16, 0.1, False, 5, 1),
         # (16, 0.1, False, 5, 2),
         # (16, 0.1, False, 10, 1),

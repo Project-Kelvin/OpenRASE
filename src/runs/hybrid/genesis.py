@@ -25,16 +25,16 @@ from utils.tui import TUI
 
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
-@click.option("--gaHyper", is_flag=True, default=False, help="Run in GA hyperparameter tuning mode.")
-@click.option("--GenesisHyper", is_flag=True, default=False, help="Run in GENESIS hyperparameter tuning mode.")
-def run(headless: bool, gaHyper: bool, GenesisHyper: bool) -> None:
+@click.option("--ga", is_flag=True, default=False, help="Run in GA hyperparameter tuning mode.")
+@click.option("--genesis", is_flag=True, default=False, help="Run in GENESIS hyperparameter tuning mode.")
+def run(headless: bool, ga: bool, genesis: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
     Parameters:
         headless (bool): Whether to run the emulator in headless mode.
-        gaHyper (bool): Whether to run in GA hyperparameter tuning mode.
-        GenesisHyper (bool): Whether to run in GENESIS hyperparameter tuning mode.
+        ga (bool): Whether to run in GA hyperparameter tuning mode.
+        genesis (bool): Whether to run in GENESIS hyperparameter tuning mode.
 
     Returns:
         None
@@ -42,11 +42,11 @@ def run(headless: bool, gaHyper: bool, GenesisHyper: bool) -> None:
 
     mutationProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
-    rejectionRates: list[float] = [0.05, 0.1, 0.2, 0.5]
+    rejectionRates: list[float] = [0.05, 0.07, 0.1]
     sigmas: list[float] = [0.0, 2.0, 5.0, 10.0]
 
     experimentsIncludeFilter: list[dict[str, Any]] = [
-        (8, 0.2, False, 5, 1),
+        (12, 0.2, False, 5, 1),
     ]
     experimentsExcludeFilter: list[dict[str, Any]] = []
     experimentPriority: list[str] = []
@@ -185,7 +185,7 @@ def run(headless: bool, gaHyper: bool, GenesisHyper: bool) -> None:
                         requests.append(self._requests.get())
                         sleep(0.1)
 
-                    if gaHyper:
+                    if ga:
                         for mutPb in mutationProbabilities:
                             for indPb in individualProbabilities:
                                 for i in range(5):
@@ -203,7 +203,7 @@ def run(headless: bool, gaHyper: bool, GenesisHyper: bool) -> None:
                                         indPb=indPb,
                                         evaluateOnline=False
                                     )
-                    elif GenesisHyper:
+                    elif genesis:
                         for sigma in sigmas:
                             for rejectionRate in rejectionRates:
                                 for i in range(5):
@@ -216,7 +216,7 @@ def run(headless: bool, gaHyper: bool, GenesisHyper: bool) -> None:
                                         self._orchestrator.getTelemetry(),
                                         topology,
                                         "genesis",
-                                        f"{exp['name']}_sigma_{sigma}_rejectionRate_{rejectionRate}",
+                                        f"{exp['name']}_sigma_{sigma}_rejectionRate_{rejectionRate}_{i}",
                                         sigma=sigma,
                                         rejectionRate=rejectionRate,
                                         evaluateOnline=False

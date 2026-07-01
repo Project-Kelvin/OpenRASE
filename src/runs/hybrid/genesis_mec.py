@@ -9,7 +9,6 @@ import random
 from time import sleep
 from typing import Any
 import click
-from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
@@ -17,12 +16,11 @@ from shared.utils.config import getConfig
 from algorithms.hybrid.constants.genesis_objective import POWER
 from algorithms.hybrid.genesis import solve
 from mano.orchestrator import Orchestrator
-from sfc.fg_request_generator import FGRequestGenerator
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
-from utils.topology import generateFatTreeTopology, generateTopologyFromEdgeList
-from utils.traffic_design import calculateTrafficDuration, generateTrafficDesignFromFile, generateTrafficDesignFromIoTTrace
+from utils.topology import generateTopologyFromEdgeList
+from utils.traffic_design import generateTrafficDesignFromIoTTrace
 from utils.tui import TUI
 
 

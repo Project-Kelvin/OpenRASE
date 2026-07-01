@@ -29,9 +29,9 @@ from utils.tui import TUI
 MAX_MEMORY_DEMAND: int = 1
 MAX_LATENCY: int = 150
 MAX_POWER: int = 300
-MIN_AR: float = 0.75
+MIN_AR: float = 1
 MIN_QUAL_IND: int = 1
-NGEN: int = 100
+NGEN: int = 500
 
 DecodePop = Callable[
     [list[Individual], Topology, list[SFCRequest]], list[DecodedIndividual]
@@ -618,6 +618,7 @@ class HybridEvolution:
             expFile.write(f"Link Bandwidth: {names[3]}\n")
             expFile.write(f"No. of CPUs: {names[4]}\n")
             expFile.write(f"Time taken: {expEndTime - expStartTime:.2f}\n")
+            expFile.write(f"Qualified Individuals: {len(qualifiedIndividuals)}\n")
 
         self._toolbox.unregister("individual")
         self._toolbox.unregister("population")

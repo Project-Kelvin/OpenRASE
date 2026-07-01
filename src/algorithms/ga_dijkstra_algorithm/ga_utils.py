@@ -390,6 +390,8 @@ def algorithm(
 
             del child1.fitness.values
             del child2.fitness.values
+            child1.id = uuid4()
+            child2.id = uuid4()
 
     for mutant in offspring:
         if random.random() < MUTPB:
@@ -549,6 +551,6 @@ def decodePop(
 
         acceptanceRatio: float = len(egs) / len(fgrs)
 
-        populationEG.append((index, egs, embeddingData, linkData, acceptanceRatio))
+        populationEG.append((index, egs, embeddingData, linkData, acceptanceRatio, individual.id))
 
     return populationEG
