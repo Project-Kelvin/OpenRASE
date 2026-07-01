@@ -22,8 +22,8 @@ NO_OF_NEURONS: int = 2
 POP_SIZE: int = 100
 REJECTION_RATE: float = 0.05
 SIGMA: float = 2.0
-MUTPB: float = 0.5
-INDPB: float = 0.5
+MUTPB: float = 0.7
+INDPB: float = 0.7
 CXPB: float = 1.0
 
 
