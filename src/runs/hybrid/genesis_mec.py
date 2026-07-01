@@ -41,7 +41,7 @@ def run(headless: bool) -> None:
 
     for mecTopo in mecTopos:
 
-        segmentDuration: int = 2 * 60
+        segmentDuration: int = 60
         design: TrafficDesign = generateTrafficDesignFromIoTTrace(
             os.path.join(
                 f"{getConfig()['repoAbsolutePath']}",
@@ -52,13 +52,14 @@ def run(headless: bool) -> None:
                 "iot-trace.csv",
             ),
             segmentDuration,
-            1000,
+            10000,
         )
 
         steps: int = len(design)
-        segments: int = steps // segmentDuration
+        segments: int = steps // (2 * segmentDuration)
         stepsPerSegment: int = steps // segments
         trafficSegments: "list[TrafficDesign]" = []
+
         for segment in range(segments):
             startStep: int = segment * stepsPerSegment
             endStep: int = (segment + 1) * stepsPerSegment
@@ -162,7 +163,7 @@ def run(headless: bool) -> None:
                     while not self._requests.empty():
                         originalRequests.append(self._requests.get())
                         sleep(0.1)
-
+                        
                     for segment in range(segments):
                         step: int = 4
                         remainder: int = segment % step
@@ -184,7 +185,7 @@ def run(headless: bool) -> None:
                             removedHosts.append(hostIdToRemove)
                             topologyToUse = removeHost(topologyToUse, hostToRemove)
                             TUI.appendToSolverLog(
-                                f"Simulated failure of host {hostToRemove}."
+                                f"Simulated failure of host {hostToRemove} during segment {segment}."
                             )
 
                         self._trafficGenerator.setDesign([trafficSegments[segment]])
