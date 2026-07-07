@@ -87,31 +87,17 @@ def toFileName(value: str) -> str:
 
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
-@click.option("--copies", default=8, type=int, help="Number of copies per SFCR template.")
-@click.option("--episodes", default=120, type=int, help="MTDRL training episodes.")
-@click.option("--cpu", default=1.0, type=float, help="CPU per host.")
-@click.option("--memory", default=4096, type=int, help="Memory per host.")
-@click.option("--bandwidth", default=10, type=int, help="Link bandwidth.")
-@click.option("--delay", default=1, type=int, help="Link delay.")
-@click.option("--traffic-scale", default=0.2, type=float, help="Traffic design scale.")
-@click.option("--seed", default=42, type=int, help="Random seed.")
-@click.option("--dynamic", is_flag=True, default=False, help="Run dynamic evaluation like genesis_dynamic.")
-@click.option("--segments", default=10, type=int, help="Traffic segments for dynamic evaluation.")
 def run(
     headless: bool,
-    copies: int,
-    episodes: int,
-    cpu: float,
-    memory: int,
-    bandwidth: int,
-    delay: int,
-    traffic_scale: float,
-    seed: int,
-    dynamic: bool,
-    segments: int,
 ) -> None:
     """
     Run MTDRL-based SFCR embedding experiments.
+
+    Parameters:
+        headless (bool): Whether to run the emulator in headless mode.
+
+    Returns:
+        None
     """
 
     config = getConfig()
@@ -134,7 +120,7 @@ def run(
 
     baseTrafficDesign: TrafficDesign = generateTrafficDesignFromFile(
         requestsPath,
-        traffic_scale,
+        1,
         4,
         False,
         False,
@@ -142,14 +128,17 @@ def run(
     if len(baseTrafficDesign) == 0:
         raise ValueError("Traffic design is empty.")
 
+    segments: int = 10
+    copies: int = 1
+    episodes: int = 100
+    seed: int = 42
     trafficSegments: list[TrafficDesign] = (
-        splitTrafficDesign(baseTrafficDesign, segments) if dynamic else [baseTrafficDesign]
+        splitTrafficDesign(baseTrafficDesign, segments)
     )
-    topology: Topology = generateFatTreeTopology(4, bandwidth, cpu, memory, delay)
+    topology: Topology = generateFatTreeTopology(4, 10, 1, 5120, 10)
     vnfCatalog: list[str] = config["vnfs"]["names"]
     experimentName: str = (
-        f"mode={'dynamic' if dynamic else 'static'}|copies={copies}|episodes={episodes}|"
-        f"cpu={cpu}|memory={memory}|bw={bandwidth}|delay={delay}|traffic_scale={traffic_scale}|seed={seed}"
+        f"RL_0.1_False_10_2"
     )
     artifactsDir: str = os.path.join(
         config["repoAbsolutePath"],
@@ -344,16 +333,6 @@ def run(
                 while not self._requests.empty():
                     originalRequests.append(self._requests.get())
                     sleep(0.05)
-
-                if not dynamic:
-                    staticRequests: list[SFCRequest] = []
-                    for request in originalRequests:
-                        for copyIndex in range(copies):
-                            requestCopy: SFCRequest = copy.deepcopy(request)
-                            requestCopy["sfcrID"] = f"{request['sfcrID']}-{copyIndex}-0"
-                            staticRequests.append(requestCopy)
-                    self._runSegment(staticRequests, self._orchestrator.getTopology(), trafficSegments[0], 0)
-                    return
 
                 topologyToUse: Topology = copy.deepcopy(self._orchestrator.getTopology())
                 allRequests: list[SFCRequest] = []
