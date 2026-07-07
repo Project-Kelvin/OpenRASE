@@ -131,6 +131,9 @@ def run(
     segments: int = 10
     copies: int = 1
     episodes: int = 100
+    maxEpisodes: int = 500
+    acceptanceThreshold: float = 1.0
+    latencyThreshold: float = 150.0
     seed: int = 42
     trafficSegments: list[TrafficDesign] = (
         splitTrafficDesign(baseTrafficDesign, segments)
@@ -153,7 +156,7 @@ def run(
     if not os.path.exists(metricsPath):
         with open(metricsPath, "w", encoding="utf8") as metricsFile:
             metricsFile.write(
-                "experiment,segment,acceptance_ratio,calculated_delay,measured_latency,total_execution_time\n"
+                "experiment,segment,acceptance_ratio,calculated_delay,measured_latency,total_execution_time,episodes_used,converged,termination_reason\n"
             )
 
     class SFCRGen(SFCRequestGenerator):
@@ -250,6 +253,9 @@ def run(
             calculatedDelay: float,
             measuredLatency: float,
             totalExecutionTime: float,
+            episodesUsed: int,
+            converged: bool,
+            terminationReason: str,
             acceptedCount: int,
             failedCount: int,
             topologyUsed: Topology,
@@ -257,13 +263,16 @@ def run(
             with open(metricsPath, "a", encoding="utf8") as metricsFile:
                 metricsFile.write(
                     f"{experimentName},{segment},{acceptanceRatio},{calculatedDelay},"
-                    f"{measuredLatency},{totalExecutionTime}\n"
+                    f"{measuredLatency},{totalExecutionTime},{episodesUsed},"
+                    f"{str(converged).lower()},{terminationReason}\n"
                 )
             timestamp: str = datetime.now().isoformat()
             logLine: str = (
                 f"[{timestamp}] experiment={experimentName} segment={segment} "
                 f"acceptance_ratio={acceptanceRatio} calculated_delay={calculatedDelay} "
-                f"measured_latency={measuredLatency} total_execution_time={totalExecutionTime}"
+                f"measured_latency={measuredLatency} total_execution_time={totalExecutionTime} "
+                f"episodes_used={episodesUsed} converged={str(converged).lower()} "
+                f"termination_reason={terminationReason}"
             )
             with open(summaryLogPath, "a", encoding="utf8") as summaryLogFile:
                 summaryLogFile.write(f"{logLine}\n")
@@ -282,7 +291,8 @@ def run(
             segment: int,
         ) -> None:
             startTime: float = default_timer()
-            drlConfig = MTDRLConfig(trainingEpisodes=episodes)
+            episodeStep: int = max(1, min(episodes, maxEpisodes))
+            drlConfig = MTDRLConfig(trainingEpisodes=episodeStep)
             ingressTrafficMap: dict[str, float] = DRLSolver._buildIngressTrafficMap(requests, segmentDesign)
             embedder = MTDRLSFCREmbedder(
                 topology=topologyToUse,
@@ -290,22 +300,50 @@ def run(
                 config=drlConfig,
                 seed=seed + segment,
             )
-            accepted, failed = embedder.embed(requests, ingressTrafficMap=ingressTrafficMap)
-            acceptanceRatio: float = (
-                float(len(accepted)) / float(len(requests)) if len(requests) > 0 else 0.0
-            )
-            calculatedDelay: float = DRLSolver._calculateDelay(topologyToUse, accepted)
-
+            episodesUsed: int = 0
+            converged: bool = False
+            terminationReason: str = "max_episodes_reached"
+            acceptanceRatio: float = 0.0
+            calculatedDelay: float = float("nan")
             measuredLatency: float = float("nan")
-            if len(accepted) > 0:
-                self._trafficGenerator.setDesign([segmentDesign])
-                self._orchestrator.sendEmbeddingGraphs(accepted)
-                trafficDuration: int = calculateTrafficDuration(segmentDesign)
-                TUI.appendToSolverLog(f"Segment {segment}: waiting for {trafficDuration}s.")
-                sleep(trafficDuration)
-                trafficData: pd.DataFrame = self._trafficGenerator.getData(f"{trafficDuration:.0f}s")
-                measuredLatency = DRLSolver._calculateMeasuredLatency(trafficData)
-                self._orchestrator.deleteEmbeddingGraphs(accepted)
+            accepted: list[EmbeddingGraph] = []
+            failed: list[SFCRequest] = []
+            trafficDuration: int = calculateTrafficDuration(segmentDesign)
+
+            while episodesUsed < maxEpisodes:
+                episodesThisRound: int = min(episodeStep, maxEpisodes - episodesUsed)
+                embedder._config.trainingEpisodes = episodesThisRound
+                accepted, failed = embedder.embed(requests, ingressTrafficMap=ingressTrafficMap)
+                episodesUsed += episodesThisRound
+
+                acceptanceRatio = (
+                    float(len(accepted)) / float(len(requests)) if len(requests) > 0 else 0.0
+                )
+                calculatedDelay = DRLSolver._calculateDelay(topologyToUse, accepted)
+                measuredLatency = float("nan")
+
+                if len(accepted) > 0:
+                    self._trafficGenerator.setDesign([segmentDesign])
+                    self._orchestrator.sendEmbeddingGraphs(accepted)
+                    try:
+                        TUI.appendToSolverLog(
+                            f"Segment {segment}: waiting for {trafficDuration}s after {episodesUsed} episodes."
+                        )
+                        sleep(trafficDuration)
+                        trafficData: pd.DataFrame = self._trafficGenerator.getData(f"{trafficDuration:.0f}s")
+                        measuredLatency = DRLSolver._calculateMeasuredLatency(trafficData)
+                    finally:
+                        self._orchestrator.deleteEmbeddingGraphs(accepted)
+
+                hasLatency: bool = not math.isnan(measuredLatency)
+                converged = (
+                    acceptanceRatio >= acceptanceThreshold
+                    and hasLatency
+                    and measuredLatency <= latencyThreshold
+                )
+                if converged:
+                    terminationReason = "converged"
+                    break
 
             totalExecutionTime: float = default_timer() - startTime
             DRLSolver._writeMetrics(
@@ -314,6 +352,9 @@ def run(
                 calculatedDelay,
                 measuredLatency,
                 totalExecutionTime,
+                episodesUsed,
+                converged,
+                terminationReason,
                 len(accepted),
                 len(failed),
                 topologyToUse,
@@ -321,7 +362,8 @@ def run(
             TUI.appendToSolverLog(
                 f"Segment {segment}: AR={acceptanceRatio:.4f}, "
                 f"CalcDelay={calculatedDelay}, Latency={measuredLatency}, "
-                f"Exec={totalExecutionTime:.4f}s"
+                f"Exec={totalExecutionTime:.4f}s, Episodes={episodesUsed}, "
+                f"Converged={str(converged).lower()}"
             )
 
         def generateEmbeddingGraphs(self) -> None:
