@@ -337,8 +337,8 @@ def run(
 
         def generateEmbeddingGraphs(self) -> None:
             try:
-while self._requests.empty():
-    sleep(0.05)
+                while self._requests.empty():
+                    sleep(0.05)
 
                 originalRequests: list[SFCRequest] = []
                 while not self._requests.empty():
