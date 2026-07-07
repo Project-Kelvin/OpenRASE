@@ -180,17 +180,27 @@ class MTDRLSFCREmbedder:
         self._train(sfcrs, ingressTrafficMap)
         accepted: list[EmbeddingGraph] = []
         failed: list[SFCRequest] = []
+        hostResidual = {
+            host["id"]: {
+                "cpu": float(host["cpu"]),
+                "memory": float(host["memory"]),
+            }
+            for host in self._hosts
+        }
+        linkResidual = {k: float(v) for k, v in self._linkCapacities.items()}
         for sfcr in sfcrs:
-            episode = self._runEpisode(
+            embedding, hostResidual, linkResidual = self._runEpisode(
                 sfcr,
                 training=False,
                 epsilon=0.0,
                 ingressTrafficMap=ingressTrafficMap,
+                hostResidual=hostResidual,
+                linkResidual=linkResidual,
             )
-            if episode["embedding"] is None:
+            if embedding is None:
                 failed.append(sfcr)
             else:
-                accepted.append(episode["embedding"])
+                accepted.append(embedding)
 
         return accepted, failed
 
@@ -218,18 +228,28 @@ class MTDRLSFCREmbedder:
         training: bool,
         epsilon: float,
         ingressTrafficMap: Optional[dict[str, float]],
-    ) -> dict[str, Optional[EmbeddingGraph]]:
-        hostResidual = {
-            host["id"]: {
-                "cpu": float(host["cpu"]),
-                "memory": float(host["memory"]),
+        hostResidual: Optional[dict[str, dict[str, float]]] = None,
+        linkResidual: Optional[dict[str, float]] = None,
+    ) -> tuple[Optional[EmbeddingGraph], dict[str, dict[str, float]], dict[str, float]]:
+        initialHostResidual = (
+            hostResidual
+            if hostResidual is not None
+            else {
+                host["id"]: {
+                    "cpu": float(host["cpu"]),
+                    "memory": float(host["memory"]),
+                }
+                for host in self._hosts
             }
-            for host in self._hosts
-        }
-        linkResidual = {k: float(v) for k, v in self._linkCapacities.items()}
+        )
+        initialLinkResidual = (
+            linkResidual if linkResidual is not None else {k: float(v) for k, v in self._linkCapacities.items()}
+        )
+        hostResidual = copy.deepcopy(initialHostResidual)
+        linkResidual = dict(initialLinkResidual)
         orderedVnfs = self._getOrderedVNFs(sfcr)
         if len(orderedVnfs) == 0:
-            return {"embedding": None}
+            return None, initialHostResidual, initialLinkResidual
 
         latencyBudget = float(sfcr.get("latency", self._config.defaultLatencyBudget))
         bandwidthDemand = float(sfcr.get("bandwidthDemand", self._config.defaultBandwidthDemand))
@@ -352,17 +372,17 @@ class MTDRLSFCREmbedder:
             lastNode = selectedHost
 
         if episodeFailed or len(selectedHosts) == 0:
-            return {"embedding": None}
+            return None, initialHostResidual, initialLinkResidual
 
         tailPathData = self._findPath(lastNode, SERVER, bandwidthDemand, linkResidual)
         if tailPathData is None:
-            return {"embedding": None}
+            return None, initialHostResidual, initialLinkResidual
         tailPath = tailPathData[0]
         self._consumeBandwidth(tailPath, bandwidthDemand, linkResidual)
         selectedPaths.append(tailPath)
 
         embedding = self._buildEmbeddingGraph(sfcr, orderedVnfs, selectedHosts, selectedPaths)
-        return {"embedding": embedding}
+        return embedding, hostResidual, linkResidual
 
     def _pushInvalidTransition(self, stateSeq: np.ndarray, reward: float) -> None:
         nextMask = np.zeros((self._actionDim,), dtype=np.float32)
