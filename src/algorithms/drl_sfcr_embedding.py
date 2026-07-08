@@ -8,7 +8,7 @@ from collections import deque
 from dataclasses import dataclass
 import copy
 import random
-from typing import Deque, Optional
+from typing import Any, Deque, Optional, cast
 
 import networkx as nx
 import numpy as np
@@ -45,9 +45,11 @@ class MTDRLConfig:
     congestionWeight: float = 0.35
     delayWeight: float = 0.35
     bandwidthWeight: float = 0.30
+    congestionRewardBlend: float = 0.50
+    eligibilityClip: float = 10.0
     positionReward: float = 0.10
-    invalidActionPenalty: float = 2.0
-    invalidPathPenalty: float = 2.0
+    invalidActionPenalty: float = 1.0
+    invalidPathPenalty: float = 1.0
     routeDelayWeight: float = 0.55
     routeBandwidthWeight: float = 0.45
     defaultBandwidthDemand: float = 1.0
@@ -100,14 +102,21 @@ class MTDRLQNetwork(tf.keras.Model):
         # Build graph once
         self(tf.zeros((1, 1, stateDim), dtype=tf.float32), training=False)
 
-    def call(self, inputs: tf.Tensor, training: bool = False) -> tuple[dict[str, tf.Tensor], tf.Tensor]:
-        x = self._lstm(inputs, training=training)
-        x = self._shared(x, training=training)
+    def call(
+        self,
+        inputs: tf.Tensor,
+        training: bool | None = None,
+        mask: Any = None,
+    ) -> tuple[dict[str, tf.Tensor], tf.Tensor]:
+        del mask
+        trainingFlag: bool = bool(training) if training is not None else False
+        x = self._lstm(inputs, training=trainingFlag)
+        x = self._shared(x, training=trainingFlag)
         taskQs: dict[str, tf.Tensor] = {}
         for task in self._tasks:
-            t = self._taskLayers[task](x, training=training)
-            value = self._valueHeads[task](t, training=training)
-            adv = self._advHeads[task](t, training=training)
+            t = self._taskLayers[task](x, training=trainingFlag)
+            value = self._valueHeads[task](t, training=trainingFlag)
+            adv = self._advHeads[task](t, training=trainingFlag)
             taskQs[task] = value + (adv - tf.reduce_mean(adv, axis=1, keepdims=True))
 
         aggregatedQ = (taskQs["congestion"] + taskQs["delay"] + taskQs["bandwidth"]) / 3.0
@@ -258,6 +267,8 @@ class MTDRLSFCREmbedder:
         selectedHosts: list[str] = []
         selectedPaths: list[list[str]] = []
         stateWindow: Deque[np.ndarray] = deque(maxlen=self._config.historyLength)
+        # Paper-style eligibility trace over actions (hosts).
+        eligibilityTrace: np.ndarray = np.zeros((self._actionDim,), dtype=np.float32)
         episodeFailed: bool = False
 
         for step, vnf in enumerate(orderedVnfs):
@@ -286,12 +297,19 @@ class MTDRLSFCREmbedder:
 
             action = self._selectAction(stateSeq, validActions, epsilon)
             selectedHost = self._hostIds[action]
+            lambdaTrace = float(min(1.0, max(0.0, self._config.lambdaTrace)))
+            eligibilityTrace *= lambdaTrace
+            eligibilityTrace[action] = min(
+                self._config.eligibilityClip,
+                float(eligibilityTrace[action] + 1.0),
+            )
             pathData = self._findPath(lastNode, selectedHost, bandwidthDemand, linkResidual)
             if pathData is None:
                 if training:
                     self._pushInvalidTransition(
                         stateSeq,
                         -self._config.invalidPathPenalty,
+                        action=action,
                     )
                 episodeFailed = True
                 break
@@ -312,26 +330,33 @@ class MTDRLSFCREmbedder:
             selectedHosts.append(selectedHost)
             selectedPaths.append(path)
 
+            # Use cumulative path metrics so factors approximate full-SFC quantities.
+            cumulativeDelay = 0.0
+            for selectedPath in selectedPaths:
+                cumulativeDelay += self._pathDelay(selectedPath)
             congestionReward = self._congestionReward(selectedHost, hostResidual)
-            delayReward = max(0.0, 1.0 - (pathDelay / max(1.0, latencyBudget)))
-            bandwidthReward = self._bandwidthReward(path, linkResidual)
-            positionShape = self._config.positionReward * ((step + 1) / len(orderedVnfs))
-            weightedReward = (
-                self._config.congestionWeight * congestionReward
-                + self._config.delayWeight * delayReward
-                + self._config.bandwidthWeight * bandwidthReward
-                + positionShape
+            delayReward = self._delayFactor(cumulativeDelay, latencyBudget)
+            bandwidthReward = self._bandwidthFactor(selectedPaths, linkResidual)
+            # Position factor eta used as reward shaping in the paper.
+            positionShape = float(step + 1) / float(len(orderedVnfs))
+            # R[a_t] = r_s * r_l * (xi * r_d * egb[a_t] + zeta * r_b)
+            reward = (
+                positionShape
+                * congestionReward
+                * (
+                    self._config.delayWeight * delayReward * float(eligibilityTrace[action])
+                    + self._config.bandwidthWeight * bandwidthReward
+                )
+                + self._config.positionReward * positionShape
             )
-            reward = weightedReward * (self._config.lambdaTrace**step)
             taskRewards = np.array(
                 [
                     self._config.congestionWeight * congestionReward,
-                    self._config.delayWeight * delayReward,
+                    self._config.delayWeight * delayReward * float(eligibilityTrace[action]),
                     self._config.bandwidthWeight * bandwidthReward,
                 ],
                 dtype=np.float32,
             )
-            taskRewards = taskRewards * (self._config.lambdaTrace**step)
 
             done = step == (len(orderedVnfs) - 1)
             if done:
@@ -384,12 +409,13 @@ class MTDRLSFCREmbedder:
         embedding = self._buildEmbeddingGraph(sfcr, orderedVnfs, selectedHosts, selectedPaths)
         return embedding, hostResidual, linkResidual
 
-    def _pushInvalidTransition(self, stateSeq: np.ndarray, reward: float) -> None:
+    def _pushInvalidTransition(self, stateSeq: np.ndarray, reward: float, action: Optional[int] = None) -> None:
         nextMask = np.zeros((self._actionDim,), dtype=np.float32)
+        chosenAction = 0 if action is None else int(max(0, min(self._actionDim - 1, action)))
         self._replay.append(
             Transition(
                 state=stateSeq,
-                action=0,
+                action=chosenAction,
                 reward=reward,
                 taskRewards=np.array([reward, reward, reward], dtype=np.float32),
                 nextState=np.zeros_like(stateSeq),
@@ -508,16 +534,18 @@ class MTDRLSFCREmbedder:
             cpuUtil = 1.0 - (cpuLeft / totalCPU)
             memUtil = 1.0 - (memLeft / totalMemory)
             route = self._findPath(lastNode, hostId, self._config.defaultBandwidthDemand, linkResidual)
-            routeExists = 1.0 if route is not None else 0.0
-            routeDelayNorm = (route[1] / max(1.0, latencyBudget)) if route is not None else 1.0
+            delayToPreviousNorm = (route[1] / max(1.0, latencyBudget)) if route is not None else 1.0
+            bandwidthToPrevious = (
+                self._pathResidualBandwidthRatio(route[0], linkResidual) if route is not None else 0.0
+            )
             features.extend(
                 [
                     cpuLeft / totalCPU,
                     memLeft / totalMemory,
                     cpuUtil,
                     memUtil,
-                    routeExists,
-                    routeDelayNorm,
+                    delayToPreviousNorm,
+                    bandwidthToPrevious,
                 ]
             )
 
@@ -527,29 +555,48 @@ class MTDRLSFCREmbedder:
             vnfVector[self._vnfToIndex[currentVnf]] = 1.0
         features.extend(vnfVector)
 
-        linkRatios: list[float] = []
-        for key, capacity in self._linkCapacities.items():
-            if capacity <= 0:
-                continue
-            linkRatios.append(linkResidual[key] / capacity)
-        avgResidualBw = float(np.mean(linkRatios)) if len(linkRatios) > 0 else 0.0
-        maxCongestion = 0.0
-        for host in self._hosts:
-            hostId = host["id"]
-            totalCPU = max(1e-6, float(host["cpu"]))
-            totalMemory = max(1e-6, float(host["memory"]))
-            cpuUtil = 1.0 - (hostResidual[hostId]["cpu"] / totalCPU)
-            memUtil = 1.0 - (hostResidual[hostId]["memory"] / totalMemory)
-            maxCongestion = max(maxCongestion, cpuUtil, memUtil)
+        ingressForState = float(self._config.defaultIngressTraffic)
+        for key in ("ingressTraffic", "ingress_traffic", "reqps", "target"):
+            if key in sfcr and sfcr[key] is not None:
+                candidateIngress = float(sfcr[key])
+                if candidateIngress > 0:
+                    ingressForState = candidateIngress
+                    break
+
+        demandCpuNorm = 0.0
+        demandMemoryNorm = 0.0
+        if currentVnf is not None:
+            demandCpu, demandMemory = self._getDemand(currentVnf, ingressForState, step + 1)
+            maxHostCPU = max([max(1e-6, float(host["cpu"])) for host in self._hosts], default=1.0)
+            maxHostMemory = max([max(1e-6, float(host["memory"])) for host in self._hosts], default=1.0)
+            demandCpuNorm = demandCpu / maxHostCPU
+            demandMemoryNorm = demandMemory / maxHostMemory
+
         features.extend(
             [
-                avgResidualBw,
-                maxCongestion,
                 float(step + 1) / float(len(orderedVnfs)),
                 latencyBudget / max(1.0, self._config.defaultLatencyBudget),
+                demandCpuNorm,
+                demandMemoryNorm,
             ]
         )
         return np.array(features, dtype=np.float32)
+
+    def _pathResidualBandwidthRatio(self, path: list[str], linkResidual: dict[str, float]) -> float:
+        if len(path) < 2:
+            return 1.0
+
+        ratios: list[float] = []
+        for index in range(len(path) - 1):
+            key = self._edgeKey(path[index], path[index + 1])
+            capacity = self._linkCapacities.get(key, 0.0)
+            if capacity <= 0:
+                continue
+            ratios.append(linkResidual.get(key, 0.0) / capacity)
+
+        if len(ratios) == 0:
+            return 0.0
+        return float(min(ratios))
 
     def _makeSequence(self, window: Deque[np.ndarray]) -> np.ndarray:
         sequence = np.zeros((self._config.historyLength, self._stateDim), dtype=np.float32)
@@ -569,19 +616,55 @@ class MTDRLSFCREmbedder:
         host = [h for h in self._hosts if h["id"] == hostId][0]
         cpuUtil = 1.0 - (hostResidual[hostId]["cpu"] / max(1e-6, float(host["cpu"])))
         memUtil = 1.0 - (hostResidual[hostId]["memory"] / max(1e-6, float(host["memory"])))
-        return max(0.0, 1.0 - max(cpuUtil, memUtil))
+        localReward = max(0.0, 1.0 - max(cpuUtil, memUtil))
+        globalReward = self._globalCongestionReward(hostResidual)
+        blend = float(min(1.0, max(0.0, self._config.congestionRewardBlend)))
+        return blend * globalReward + (1.0 - blend) * localReward
 
-    def _bandwidthReward(self, path: list[str], linkResidual: dict[str, float]) -> float:
-        if len(path) < 2:
+    @staticmethod
+    def _delayFactor(pathDelay: float, latencyBudget: float) -> float:
+        normalizedDelay = pathDelay / max(1e-6, latencyBudget)
+        return float(np.exp(-normalizedDelay))
+
+    def _bandwidthFactor(self, paths: list[list[str]], linkResidual: dict[str, float]) -> float:
+        if len(paths) == 0:
             return 1.0
         ratios: list[float] = []
+        for path in paths:
+            if len(path) < 2:
+                continue
+            for index in range(len(path) - 1):
+                key = self._edgeKey(path[index], path[index + 1])
+                cap = self._linkCapacities.get(key, 0.0)
+                if cap <= 0:
+                    continue
+                ratios.append(linkResidual[key] / cap)
+        if len(ratios) == 0:
+            return 0.0
+        bandwidthCost = 1.0 - float(np.mean(ratios))
+        return float(np.exp(-max(0.0, bandwidthCost)))
+
+    def _globalCongestionReward(self, hostResidual: dict[str, dict[str, float]]) -> float:
+        utilization: list[float] = []
+        for host in self._hosts:
+            hostId = host["id"]
+            totalCPU = max(1e-6, float(host["cpu"]))
+            totalMemory = max(1e-6, float(host["memory"]))
+            cpuUtil = 1.0 - (hostResidual[hostId]["cpu"] / totalCPU)
+            memUtil = 1.0 - (hostResidual[hostId]["memory"] / totalMemory)
+            utilization.append(max(cpuUtil, memUtil))
+        if len(utilization) == 0:
+            return 1.0
+        # Lower utilization variance reflects better load balancing.
+        variance = float(np.var(np.array(utilization, dtype=np.float32)))
+        return float(np.exp(-variance))
+
+    def _pathDelay(self, path: list[str]) -> float:
+        totalDelay = 0.0
         for index in range(len(path) - 1):
             key = self._edgeKey(path[index], path[index + 1])
-            cap = self._linkCapacities.get(key, 0.0)
-            if cap <= 0:
-                continue
-            ratios.append(linkResidual[key] / cap)
-        return float(np.mean(ratios)) if len(ratios) > 0 else 0.0
+            totalDelay += self._linkDelays.get(key, 0.0)
+        return totalDelay
 
     def _findPath(
         self,
@@ -700,13 +783,13 @@ class MTDRLSFCREmbedder:
         selectedHosts: list[str],
         selectedPaths: list[list[str]],
     ) -> EmbeddingGraph:
-        chainRoot = {
+        chainRoot: dict[str, Any] = {
             "host": {"id": selectedHosts[0]},
             "vnf": {"id": orderedVnfs[0]},
         }
-        cursor = chainRoot
+        cursor: dict[str, Any] = chainRoot
         for index in range(1, len(orderedVnfs)):
-            nextNode = {
+            nextNode: dict[str, Any] = {
                 "host": {"id": selectedHosts[index]},
                 "vnf": {"id": orderedVnfs[index]},
             }
@@ -714,7 +797,7 @@ class MTDRLSFCREmbedder:
             cursor = nextNode
         cursor["next"] = {"host": {"id": SERVER}, "next": TERMINAL}
 
-        links = []
+        links: list[dict[str, Any]] = []
         for path in selectedPaths:
             links.append(
                 {
@@ -724,12 +807,15 @@ class MTDRLSFCREmbedder:
                 }
             )
 
-        return {
-            "sfcID": sfcr["sfcrID"],
-            "sfcrID": sfcr["sfcrID"],
-            "vnfs": chainRoot,
-            "links": links,
-        }
+        return cast(
+            EmbeddingGraph,
+            {
+                "sfcID": sfcr["sfcrID"],
+                "sfcrID": sfcr["sfcrID"],
+                "vnfs": chainRoot,
+                "links": links,
+            },
+        )
 
     def _buildGraph(self) -> None:
         for link in self._topology["links"]:

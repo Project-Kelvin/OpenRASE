@@ -10,11 +10,14 @@ import math
 import os
 import random
 from datetime import datetime
+from typing import Union, cast
 from time import sleep
 from timeit import default_timer
 
 import click
 import pandas as pd
+from algorithms.hybrid.utils.demand_predictions import DemandPredictions
+from algorithms.hybrid.models.traffic import TimeSFCRequests
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
@@ -26,6 +29,7 @@ from mano.orchestrator import Orchestrator
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
+from utils.embedding_graph import traverseVNF
 from utils.topology import generateFatTreeTopology
 from utils.traffic_design import calculateTrafficDuration, generateTrafficDesignFromFile
 from utils.tui import TUI
@@ -85,6 +89,10 @@ def toFileName(value: str) -> str:
     )
 
 
+REQUEST_SIZE_MBPS: float = 0.05
+HOST_VIRTUALISATION_DELAY: float = 1.0
+
+
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
 def run(
@@ -121,15 +129,14 @@ def run(
     baseTrafficDesign: TrafficDesign = generateTrafficDesignFromFile(
         requestsPath,
         1,
-        4,
-        False,
+        20,
         False,
     )
     if len(baseTrafficDesign) == 0:
         raise ValueError("Traffic design is empty.")
 
     segments: int = 10
-    copies: int = 1
+    copies: int = 20
     episodes: int = 100
     maxEpisodes: int = 500
     acceptanceThreshold: float = 1.0
@@ -138,15 +145,28 @@ def run(
     trafficSegments: list[TrafficDesign] = (
         splitTrafficDesign(baseTrafficDesign, segments)
     )
-    topology: Topology = generateFatTreeTopology(4, 10, 1, 5120, 10)
+    topology: Topology = generateFatTreeTopology(4, 10, 1, 5120, 1)
     vnfCatalog: list[str] = config["vnfs"]["names"]
     experimentName: str = (
         f"RL_0.1_False_10_2"
     )
     artifactsDir: str = os.path.join(
         config["repoAbsolutePath"],
-        "artifacts",
-        "drl_sfcr",
+        "artifacts"
+    )
+    if not os.path.exists(artifactsDir):
+        os.makedirs(artifactsDir)
+
+    experimentLogDir: str = os.path.join(
+        artifactsDir,
+        "experiments"
+    )
+    if not os.path.exists(experimentLogDir):
+        os.makedirs(experimentLogDir)
+
+    artifactsDir: str = os.path.join(
+        experimentLogDir,
+        "rl_dc",
     )
     if not os.path.exists(artifactsDir):
         os.makedirs(artifactsDir)
@@ -177,12 +197,18 @@ def run(
                 sfcr.setdefault("latency", 200)
                 sfcr.setdefault("strictOrder", [])
                 requests.append(sfcr)
-            self._orchestrator.sendRequests(requests)
+            requestPayload: list[Union[SFCRequest, EmbeddingGraph]] = cast(
+                list[Union[SFCRequest, EmbeddingGraph]],
+                requests,
+            )
+            self._orchestrator.sendRequests(requestPayload)
 
     class DRLSolver(Solver):
         """
         Solver backed by MTDRL SFCR embedder.
         """
+
+        _demandPredictions: DemandPredictions = DemandPredictions()
 
         @staticmethod
         def _getLinkDelay(topology: Topology, source: str, destination: str) -> float:
@@ -199,22 +225,131 @@ def run(
                 return 0.0
             return float(links[0].get("delay", 0.0) or 0.0)
 
+        @staticmethod
+        def _getLinkBandwidth(topology: Topology, source: str, destination: str) -> float:
+            links = [
+                topoLink
+                for topoLink in topology["links"]
+                if (
+                    topoLink["source"] == source and topoLink["destination"] == destination
+                ) or (
+                    topoLink["source"] == destination and topoLink["destination"] == source
+                )
+            ]
+            if len(links) == 0:
+                return 0.0
+            return float(links[0].get("bandwidth", 0.0) or 0.0)
+
+        @staticmethod
+        def _getHostCPU(topology: Topology, hostID: str) -> float:
+            hosts = [host for host in topology["hosts"] if host["id"] == hostID]
+            if len(hosts) == 0:
+                return 0.0
+            return float(hosts[0].get("cpu", 0.0) or 0.0)
+
+        @staticmethod
+        def _getEmbeddedVNFs(embedding: EmbeddingGraph) -> list[tuple[str, str, int]]:
+            embeddedVNFs: list[tuple[str, str, int]] = []
+
+            def parseVNF(vnf: dict, depth: int) -> None:
+                if "vnf" not in vnf or "host" not in vnf:
+                    return
+                if "id" not in vnf["vnf"] or "id" not in vnf["host"]:
+                    return
+                embeddedVNFs.append((vnf["vnf"]["id"], vnf["host"]["id"], depth))
+
+            traverseVNF(embedding["vnfs"], parseVNF)
+            return embeddedVNFs
+
         @classmethod
-        def _calculateDelay(cls, topology: Topology, embeddings: list[EmbeddingGraph]) -> float:
+        def _calculatePropagationDelay(cls, topology: Topology, embedding: EmbeddingGraph) -> float:
+            propagationDelay: float = 0.0
+            for forwardingLink in embedding["links"]:
+                path: list[str] = [forwardingLink["source"]["id"]]
+                path.extend(forwardingLink["links"])
+                path.append(forwardingLink["destination"]["id"])
+                for index in range(len(path) - 1):
+                    propagationDelay += cls._getLinkDelay(topology, path[index], path[index + 1])
+            return propagationDelay
+
+        @classmethod
+        def _calculateQueueDelay(
+            cls,
+            topology: Topology,
+            embedding: EmbeddingGraph,
+            ingressReqps: float,
+        ) -> float:
+            queueDelay: float = 0.0
+            for forwardingLink in embedding["links"]:
+                divisor: int = int(forwardingLink.get("divisor", 1) or 1)
+                effectiveReqps: float = ingressReqps / float(max(1, divisor))
+                demandSizeMbps: float = effectiveReqps * REQUEST_SIZE_MBPS
+                path: list[str] = [forwardingLink["source"]["id"]]
+                path.extend(forwardingLink["links"])
+                path.append(forwardingLink["destination"]["id"])
+                for index in range(len(path) - 1):
+                    bandwidth: float = cls._getLinkBandwidth(topology, path[index], path[index + 1])
+                    residualBandwidth: float = bandwidth - demandSizeMbps
+                    if residualBandwidth <= 0:
+                        return float("inf")
+                    queueDelay += 1.0 / residualBandwidth
+            return queueDelay
+
+        @classmethod
+        def _calculateProcessingDelay(
+            cls,
+            topology: Topology,
+            embedding: EmbeddingGraph,
+            ingressReqps: float,
+        ) -> float:
+            processingDelay: float = 0.0
+            for vnfID, hostID, depth in cls._getEmbeddedVNFs(embedding):
+                divisor: int = 2 ** max(0, depth - 1)
+                effectiveReqps: float = ingressReqps / float(max(1, divisor))
+                cpuDemand: float = cls._demandPredictions.getDemand(vnfID, effectiveReqps)["cpu"]
+                cpuAvailable: float = cls._getHostCPU(topology, hostID)
+                residualCPU: float = cpuAvailable - cpuDemand
+                if residualCPU <= 0:
+                    return float("inf")
+                processingDelay += 1.0 / residualCPU
+            return processingDelay
+
+        @classmethod
+        def _calculateVirtualisationDelay(cls, embedding: EmbeddingGraph) -> float:
+            return HOST_VIRTUALISATION_DELAY * float(len(cls._getEmbeddedVNFs(embedding)))
+
+        @classmethod
+        def _calculateDelay(
+            cls,
+            topology: Topology,
+            embeddings: list[EmbeddingGraph],
+            ingressTrafficMap: dict[str, float],
+        ) -> float:
             if len(embeddings) == 0:
                 return float("nan")
 
-            totalDelay: float = 0.0
-            for eg in embeddings:
-                egDelay: float = 0.0
-                for link in eg["links"]:
-                    path: list[str] = [link["source"]["id"]]
-                    path.extend(link["links"])
-                    path.append(link["destination"]["id"])
-                    for index in range(len(path) - 1):
-                        egDelay += cls._getLinkDelay(topology, path[index], path[index + 1])
-                totalDelay += egDelay
-            return totalDelay / len(embeddings)
+            trafficSnapshot: dict[str, float] = {
+                embedding["sfcID"]: float(ingressTrafficMap.get(embedding["sfcID"], 0.0))
+                for embedding in embeddings
+            }
+            trafficSeries: TimeSFCRequests = cast(TimeSFCRequests, [trafficSnapshot])
+            cls._demandPredictions.cacheResourceDemands(embeddings, trafficSeries)
+
+            totalLatency: float = 0.0
+            for embedding in embeddings:
+                ingressReqps: float = float(ingressTrafficMap.get(embedding["sfcID"], 0.0))
+                propagationDelay: float = cls._calculatePropagationDelay(topology, embedding)
+                queueDelay: float = cls._calculateQueueDelay(topology, embedding, ingressReqps)
+                processingDelay: float = cls._calculateProcessingDelay(topology, embedding, ingressReqps)
+                virtualisationDelay: float = cls._calculateVirtualisationDelay(embedding)
+                totalLatency += (
+                    propagationDelay
+                    + queueDelay
+                    + processingDelay
+                    + virtualisationDelay
+                )
+
+            return totalLatency / float(len(embeddings))
 
         @staticmethod
         def _calculateMeasuredLatency(trafficData: pd.DataFrame) -> float:
@@ -319,7 +454,11 @@ def run(
                 acceptanceRatio = (
                     float(len(accepted)) / float(len(requests)) if len(requests) > 0 else 0.0
                 )
-                calculatedDelay = DRLSolver._calculateDelay(topologyToUse, accepted)
+                calculatedDelay = DRLSolver._calculateDelay(
+                    topologyToUse,
+                    accepted,
+                    ingressTrafficMap,
+                )
                 measuredLatency = float("nan")
 
                 if len(accepted) > 0:
@@ -380,7 +519,7 @@ def run(
                 allRequests: list[SFCRequest] = []
                 removedHosts: list[str] = []
                 randomizer = random.Random(seed)
-                failureStartSegment: int = max(1, len(trafficSegments) // 2)
+                failureStartSegment: int = 6
 
                 for segment, segmentDesign in enumerate(trafficSegments):
                     copiesThisSegment: int = copies if segment == 0 else 1
