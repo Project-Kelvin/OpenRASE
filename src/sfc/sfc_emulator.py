@@ -3,10 +3,11 @@ Defines the SFCEmulator class.
 """
 
 from threading import Thread
-from typing import Any, Type, Union
+from typing import Any, Optional, Type, Union
+from time import monotonic, sleep
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
-from constants.notification import TOPOLOGY_INSTALLED
+from constants.notification import TOPOLOGY_INSTALLED, TOPOLOGY_INSTALL_FAILED
 from mano.mano_class import MANO
 from mano.notification_system import NotificationSystem, Subscriber
 from sfc.fg_request_generator import FGRequestGenerator
@@ -43,7 +44,10 @@ class SFCEmulator(Subscriber):
             self._mano.getOrchestrator())
         self._threads: "list[Thread]" = []
         NotificationSystem.subscribe(TOPOLOGY_INSTALLED, self)
+        NotificationSystem.subscribe(TOPOLOGY_INSTALL_FAILED, self)
         self._topologyInstalled: bool = False
+        self._topologyInstallFailed: bool = False
+        self._topologyInstallError: Optional[str] = None
 
     def startTest(self, topology: Topology, trafficDesign: "list[TrafficDesign]") -> None:
         """
@@ -70,6 +74,9 @@ class SFCEmulator(Subscriber):
             self._topologyInstalled = True
             self._threads.append(sfcrThread)
             self._threads.append(solverThread)
+        elif topic == TOPOLOGY_INSTALL_FAILED:
+            self._topologyInstallFailed = True
+            self._topologyInstallError = str(args[0]) if len(args) > 0 else "unknown error"
 
     def startCLI(self) -> None:
         """
@@ -103,8 +110,21 @@ class SFCEmulator(Subscriber):
         Wait for all threads to finish.
         """
 
-        while not self._topologyInstalled:
-            pass
+        installTimeoutSec: float = 120.0
+        startTime: float = monotonic()
+
+        while not self._topologyInstalled and not self._topologyInstallFailed:
+            if monotonic() - startTime > installTimeoutSec:
+                raise TimeoutError(
+                    "Timed out while waiting for topology installation. "
+                    "Check logs for installation errors."
+                )
+            sleep(0.05)
+
+        if self._topologyInstallFailed:
+            raise RuntimeError(
+                f"Topology installation failed: {self._topologyInstallError}"
+            )
 
         for thread in self._threads:
             thread.join()

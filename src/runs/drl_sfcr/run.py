@@ -131,6 +131,8 @@ def run(
 
     topos: list[str] = []
 
+    print(f"Running MTDRL SFCR embedding experiments with topology '{topology}'...")
+
     if topology == "mec":
         topos =["milan", "25N50E"]
     else:
@@ -288,6 +290,7 @@ def run(
             Solver backed by MTDRL SFCR embedder.
             """
 
+            print("Initialising Demand Predictions...")
             _demandPredictions: DemandPredictions = DemandPredictions()
 
             @staticmethod
@@ -624,8 +627,11 @@ def run(
                     TUI.appendToSolverLog(str(e), True)
                 TUI.appendToSolverLog("Finished MTDRL solver run.")
 
-        TUI.appendToSolverLog(f"Starting MTDRL solver run for topology '{topoName}'...")
+        print(f"Starting MTDRL solver run for topology '{topoName}'...")
         sfcEmulator = SFCEmulator(SFCRGen, DRLSolver, headless)
-        TUI.appendToSolverLog(f"Starting test for topology '{topoName}'...")
-        sfcEmulator.startTest(topo, [trafficSegments[0]])
-        sfcEmulator.end()
+        try:
+            print(f"Starting test for topology '{topoName}'...")
+            sfcEmulator.startTest(topo, [trafficSegments[0]])
+        finally:
+            TUI.appendToSolverLog("Ending SFC emulator.")
+            sfcEmulator.end()

@@ -14,7 +14,7 @@ from mininet.node import Ryu, Host, OVSKernelSwitch
 from mininet.net import Containernet
 from mininet.cli import CLI
 from mininet.link import TCLink
-from constants.notification import TOPOLOGY_INSTALLED
+from constants.notification import TOPOLOGY_INSTALLED, TOPOLOGY_INSTALL_FAILED
 from constants.topology import SERVER, SFCC
 from constants.container import (
     SERVER_IMAGE,
@@ -224,6 +224,7 @@ class InfraManager:
             NotificationSystem.publish(TOPOLOGY_INSTALLED)
         except Exception as e:
             TUI.appendToLog(f"Error: {str(e)}", True)
+            NotificationSystem.publish(TOPOLOGY_INSTALL_FAILED, str(e))
 
     def getHostIPs(self) -> "dict[str, Tuple[IPv4Network, IPv4Address]]":
         """
