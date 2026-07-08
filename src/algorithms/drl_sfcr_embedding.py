@@ -20,6 +20,7 @@ from shared.models.topology import Topology
 
 from calibrate.demand_predictor import DemandPredictor
 from constants.topology import SERVER, SFCC
+from utils.tui import TUI
 
 
 @dataclass
@@ -219,7 +220,8 @@ class MTDRLSFCREmbedder:
         ingressTrafficMap: Optional[dict[str, float]],
     ) -> None:
         epsilon: float = self._config.epsilon
-        for _ in range(self._config.trainingEpisodes):
+        for i in range(self._config.trainingEpisodes):
+            TUI.appendToSolverLog(f"Training episode {i + 1}/{self._config.trainingEpisodes}...")
             shuffled = sfcrs[:]
             self._random.shuffle(shuffled)
             for sfcr in shuffled:
