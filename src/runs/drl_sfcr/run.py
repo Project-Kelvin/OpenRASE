@@ -9,8 +9,9 @@ import json
 import math
 import os
 import random
+import sys
 from datetime import datetime
-from typing import Union, cast
+from typing import Any, Union, cast
 from time import sleep
 from timeit import default_timer
 
@@ -128,6 +129,14 @@ def run(
     Returns:
         None
     """
+
+    # Ensure redirected logs are flushed immediately in headless/background runs.
+    stdout: Any = sys.stdout
+    stderr: Any = sys.stderr
+    if hasattr(stdout, "reconfigure"):
+        stdout.reconfigure(line_buffering=True, write_through=True)
+    if hasattr(stderr, "reconfigure"):
+        stderr.reconfigure(line_buffering=True, write_through=True)
 
     topos: list[str] = []
 
