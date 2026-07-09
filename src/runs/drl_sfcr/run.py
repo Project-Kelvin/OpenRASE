@@ -619,14 +619,7 @@ def run(
 
                     TUI.appendToSolverLog(f"Starting segment processing for topology '{topoName}'...")
                     for segment, segmentDesign in enumerate(trafficSegments):
-                        copiesThisSegment: int = copies if segment == 0 else 1
-                        segmentRequests: list[SFCRequest] = []
-                        for request in originalRequests:
-                            for copyIndex in range(copiesThisSegment):
-                                requestCopy: SFCRequest = copy.deepcopy(request)
-                                requestCopy["sfcrID"] = f"{request['sfcrID']}-{copyIndex}-{segment}"
-                                segmentRequests.append(requestCopy)
-                        allRequests.extend(segmentRequests)
+                        allRequests = generateSFCRsFromTemplates(originalRequests, segment, topology)
 
                         if segment > failureStartSegment and len(topologyToUse["hosts"]) > 1:
                             remainingHosts: list[str] = [
