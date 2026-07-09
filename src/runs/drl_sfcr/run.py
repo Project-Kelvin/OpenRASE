@@ -130,8 +130,8 @@ def toFileName(value: str) -> str:
 
 REQUEST_SIZE_MBPS: float = 0.05
 HOST_VIRTUALISATION_DELAY: float = 1.0
-OVERLOAD_DELAY_PENALTY: float = 1_000_000.0
-MAX_CALCULATED_DELAY: float = 1_000_000_000.0
+OVERLOAD_DELAY_PENALTY: float = 1_000.0
+MAX_CALCULATED_DELAY: float = 10_000.0
 
 
 @click.command()
