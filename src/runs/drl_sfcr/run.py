@@ -110,6 +110,8 @@ def toFileName(value: str) -> str:
 
 REQUEST_SIZE_MBPS: float = 0.05
 HOST_VIRTUALISATION_DELAY: float = 1.0
+OVERLOAD_DELAY_PENALTY: float = 1_000_000.0
+MAX_CALCULATED_DELAY: float = 1_000_000_000.0
 
 
 @click.command()
@@ -383,7 +385,8 @@ def run(
                         bandwidth: float = cls._getLinkBandwidth(topology, path[index], path[index + 1])
                         residualBandwidth: float = bandwidth - demandSizeMbps
                         if residualBandwidth <= 0:
-                            return float("inf")
+                            queueDelay += OVERLOAD_DELAY_PENALTY
+                            continue
                         queueDelay += 1.0 / residualBandwidth
                 return queueDelay
 
@@ -402,7 +405,8 @@ def run(
                     cpuAvailable: float = cls._getHostCPU(topology, hostID)
                     residualCPU: float = cpuAvailable - cpuDemand
                     if residualCPU <= 0:
-                        return float("inf")
+                        processingDelay += OVERLOAD_DELAY_PENALTY
+                        continue
                     processingDelay += 1.0 / residualCPU
                 return processingDelay
 
@@ -441,7 +445,10 @@ def run(
                         + virtualisationDelay
                     )
 
-                return totalLatency / float(len(embeddings))
+                averageLatency: float = totalLatency / float(len(embeddings))
+                if not math.isfinite(averageLatency):
+                    return MAX_CALCULATED_DELAY
+                return averageLatency
 
             @staticmethod
             def _calculateMeasuredLatency(trafficData: pd.DataFrame) -> float:
@@ -549,6 +556,8 @@ def run(
                     accepted,
                     ingressTrafficMap,
                 )
+                if not math.isfinite(calculatedDelay):
+                    calculatedDelay = MAX_CALCULATED_DELAY
 
                 if len(accepted) > 0:
                     self._trafficGenerator.setDesign([segmentDesign])
