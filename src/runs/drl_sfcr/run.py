@@ -167,13 +167,14 @@ def run(
 
     if static:
         topology = "fat-tree"
-        experimentConfig = [
-            (8, 0.1, False, 10, 2),
-            (8, 0.2, False, 10, 2),
-            (8, 0.1, True, 10, 2),
-            (8, 0.1, False, 5, 2),
-            (8, 0.1, False, 10, 1),
-        ]
+        for noOfCopy in [8, 12]:
+            for trafficScale in [0.1, 0.2]:
+                for trafficPattern in [False, True]:
+                    for linkBandwidth in [10, 5]:
+                        for noOfCPUs in [2, 1, 0.5]:
+                            experimentConfig.append(
+                                (noOfCopy, trafficScale, trafficPattern, linkBandwidth, noOfCPUs)
+                            )
     else:
         experimentConfig = [
             (20, 0.1, False, 10, 2),
