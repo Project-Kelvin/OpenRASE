@@ -46,8 +46,13 @@ def run(headless: bool, ga: bool, genesis: bool) -> None:
     sigmas: list[float] = [0.0, 2.0, 5.0, 10.0]
 
     experimentsIncludeFilter: list[dict[str, Any]] = [
-        (12, 0.2, False, 5, 1),
+        (12, 0.2, False, 5, 1), # Hard
+        (8, 0.2, False, 10, 2), # Medium
+        (8, 0.1, False, 10, 2), # Easy
     ]
+
+    noOfRuns: int = 20
+
     experimentsExcludeFilter: list[dict[str, Any]] = []
     experimentPriority: list[str] = []
     experimentsToRun: list[dict[str, Any]] = []
@@ -222,17 +227,19 @@ def run(headless: bool, ga: bool, genesis: bool) -> None:
                                         evaluateOnline=False
                                     )
                     else:
-                        solve(
-                            requests,
-                            self._orchestrator.sendEmbeddingGraphs,
-                            self._orchestrator.deleteEmbeddingGraphs,
-                            trafficDesign,
-                            self._trafficGenerator,
-                            self._orchestrator.getTelemetry(),
-                            topology,
-                            "genesis",
-                            exp["name"],
-                        )
+                        for i in range(noOfRuns):
+                            solve(
+                                requests,
+                                self._orchestrator.sendEmbeddingGraphs,
+                                self._orchestrator.deleteEmbeddingGraphs,
+                                trafficDesign,
+                                self._trafficGenerator,
+                                self._orchestrator.getTelemetry(),
+                                topology,
+                                "genesis",
+                                f"{exp['name']}_{i}",
+                            )
+
 
                 except Exception as e:
                     TUI.appendToSolverLog(str(e), True)

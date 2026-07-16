@@ -30,7 +30,7 @@ from utils.tui import TUI
 demandPredictor: DemandPredictor = DemandPredictor()
 
 def generateRandomIndividual(
-    container: Type[Individual], topo: Topology, fgrs: "list[EmbeddingGraph]", alpha: float = 0.1
+    container: Type[Individual], topo: Topology, fgrs: "list[EmbeddingGraph]", alpha: float = 0.05
 ) -> "list[list[int]]":
     """
     Generate a random individual.

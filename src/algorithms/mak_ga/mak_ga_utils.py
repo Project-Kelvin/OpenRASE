@@ -66,7 +66,7 @@ class MakGAUtils:
         while not isValid:
             for _i in range(noOfVNFs):
                 host: int = random.randint(1, noOfHosts)
-                if random.random() < 0.1:
+                if random.random() < 0.05:
                     host = 0
                 individual.append(host)
 

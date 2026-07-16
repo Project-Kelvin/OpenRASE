@@ -27,11 +27,11 @@ from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 
 MAX_MEMORY_DEMAND: int = 1
-MAX_LATENCY: int = 150
+MAX_LATENCY: int = 100
 MAX_POWER: int = 300
 MIN_AR: float = 1
 MIN_QUAL_IND: int = 1
-NGEN: int = 500
+NGEN: int = 100
 
 DecodePop = Callable[
     [list[Individual], Topology, list[SFCRequest]], list[DecodedIndividual]

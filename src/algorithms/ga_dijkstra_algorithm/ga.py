@@ -102,13 +102,13 @@ def GADijkstraAlgorithm(
     toolbox.register("individual", generateRandomIndividual, Individual, topology, fgrs)
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("mate", tools.cxTwoPoint)
-    toolbox.register("mutate", mutate, indpb=1.0)
+    toolbox.register("mutate", mutate, indpb=0.5)
     toolbox.register("select", tools.selNSGA2)
 
     pop = toolbox.population(n=NO_OF_INDIVIDUALS)
     gen: int = 1
 
-    CXPB, MUTPB, NGEN = 1.0, 1.0, 10
+    CXPB, MUTPB, NGEN = 1.0, 0.5, 10
     TIME_LIMIT: int = 24 * 60 * 60
 
     startTime: float = timeit.default_timer()

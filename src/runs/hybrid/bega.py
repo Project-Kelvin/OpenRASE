@@ -39,9 +39,14 @@ def run(headless: bool, hyper: bool) -> None:
     mutationProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
 
-    experimentsIncludeFilter: list[tuple[int, float, bool, int, float]] = [
-        (8, 0.1, False, 5, 1)
+    experimentsIncludeFilter: list[dict[str, Any]] = [
+        (12, 0.2, False, 5, 1), # Hard
+        (8, 0.2, False, 10, 2), # Medium
+        (8, 0.1, False, 10, 2), # Easy
     ]
+
+    noOfRuns: int = 20
+
     experimentsExcludeFilter: list[tuple[int, float, bool, int, float]] = [
         # (16, 0.1, False, 5, 1),
         # (16, 0.1, False, 5, 2),
@@ -219,16 +224,18 @@ def run(headless: bool, hyper: bool) -> None:
                         TUI.appendToSolverLog(
                             f"Running experiment {exp['name']} with default parameters."
                         )
-                        solve(
-                            topology,
-                            requests,
-                            self._orchestrator.sendEmbeddingGraphs,
-                            self._orchestrator.deleteEmbeddingGraphs,
-                            trafficDesign,
-                            self._trafficGenerator,
-                            self._orchestrator.getTelemetry(),
-                            exp["name"],
-                        )
+
+                        for i in range(noOfRuns):
+                            solve(
+                                topology,
+                                requests,
+                                self._orchestrator.sendEmbeddingGraphs,
+                                self._orchestrator.deleteEmbeddingGraphs,
+                                trafficDesign,
+                                self._trafficGenerator,
+                                self._orchestrator.getTelemetry(),
+                                f"{exp['name']}_{i}",
+                            )
 
                 except Exception as e:
                     TUI.appendToSolverLog(str(e), True)
