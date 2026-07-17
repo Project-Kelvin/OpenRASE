@@ -173,17 +173,17 @@ def gahaEvolve(
                     else:
                         newChild[gene] = child1[gene]
 
-                decodedChildren: list[
-                    tuple[
-                        int,
-                        list[EmbeddingGraph],
-                        EmbeddingData,
-                        LinkData,
-                        float,
-                        dict[str, list[tuple[str, int]]],
-                    ]
-                ] = makGAUtils.decodePop([newChild])
-                makGAUtils.cacheDemand(decodedChildren)
+                # decodedChildren: list[
+                #     tuple[
+                #         int,
+                #         list[EmbeddingGraph],
+                #         EmbeddingData,
+                #         LinkData,
+                #         float,
+                #         dict[str, list[tuple[str, int]]],
+                #     ]
+                # ] = makGAUtils.decodePop([newChild])
+                # makGAUtils.cacheDemand(decodedChildren)
                 # child1HostConstraintViolated: bool = isHostConstraintViolated(
                 #     decodedChildren[0], topology, demandPredictions, trafficDesign[0]
                 # )
@@ -223,17 +223,17 @@ def gahaEvolve(
 
                 child1[gene] = host
 
-                decodedChildren: list[
-                    tuple[
-                        int,
-                        list[EmbeddingGraph],
-                        EmbeddingData,
-                        LinkData,
-                        float,
-                        dict[str, list[tuple[str, int]]],
-                    ]
-                ] = makGAUtils.decodePop([child1])
-                makGAUtils.cacheDemand(decodedChildren)
+                # decodedChildren: list[
+                #     tuple[
+                #         int,
+                #         list[EmbeddingGraph],
+                #         EmbeddingData,
+                #         LinkData,
+                #         float,
+                #         dict[str, list[tuple[str, int]]],
+                #     ]
+                # ] = makGAUtils.decodePop([child1])
+                # makGAUtils.cacheDemand(decodedChildren)
                 # child1HostConstraintViolated: bool = isHostConstraintViolated(
                 #     decodedChildren[0], topology, demandPredictions, trafficDesign[0]
                 # )

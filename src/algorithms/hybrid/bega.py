@@ -17,7 +17,7 @@ from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution, Individual
 from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 
-POP_SIZE: int = 100
+POP_SIZE: int = 20
 INDPB: float = 0.5
 MUTPB: float = 0.5
 CXPB: float = 1.0

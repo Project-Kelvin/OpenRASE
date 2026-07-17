@@ -98,7 +98,6 @@ class HybridEvolution:
         self._mutPb: float = mutPb
         self._indPb: float = indPb
         self._cxpPb: float = cxpPb
-        self._crossPb: float = crossPb
         self._evaluateOnline: bool = evaluateOnline
 
     def _select(

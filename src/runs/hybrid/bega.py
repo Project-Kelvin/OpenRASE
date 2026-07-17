@@ -41,7 +41,7 @@ def run(headless: bool, hyper: bool) -> None:
     crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
 
     experimentsIncludeFilter: list[dict[str, Any]] = [
-        (12, 0.2, False, 10, 2), # Hard
+        (12, 0.2, False, 5, 1), # Hard
         (8, 0.2, False, 10, 2), # Medium
         (8, 0.1, False, 10, 2), # Easy
     ]

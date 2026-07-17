@@ -2,9 +2,12 @@
 This defines the util class used by the GA algorithm developed by Mohammad Ali Khoshkholghi.
 """
 
+from concurrent.futures import ProcessPoolExecutor
 import copy
 import random
+from typing import cast
 import numpy as np
+from algorithms.hybrid.models.individuals import Individual
 from algorithms.mak_ga.models.embedding import EmbeddingData
 from utils.embedding_graph import traverseVNF
 from algorithms.hybrid.utils.demand_predictions import DemandPredictions
@@ -82,17 +85,19 @@ class MakGAUtils:
 
         return individual
 
-    def _convertIndividualToEmbeddingGraphs(self, individual: list[int]) -> tuple[
+    def _convertIndividualToEmbeddingGraphs(self, individual: list[int], popIndex: int) -> tuple[
         list[EmbeddingGraph],
         EmbeddingData,
         LinkData,
         dict[str, list[tuple[str, int, int]]],
+        int
     ]:
         """
         Converts a list of integers representing an individual into a list of EmbeddingGraph objects.
 
         Parameters:
             individual (list[int]): A list of integers where each integer represents the index of a host.
+            popIndex (int): The index of the individual in the population.
 
         Returns:
             tuple[list[EmbeddingGraph], EmbeddingData, LinkData, dict[str, list[tuple[str, int]]]]:
@@ -101,6 +106,7 @@ class MakGAUtils:
                 - An EmbeddingData object containing the embedding data.
                 - A LinkData object containing the link data.
                 - A dictionary mapping SFC IDs to lists of tuples containing VNF IDs, their instance, and their depths.
+                - The index of the individual in the population.
         """
 
         copiedIndividual = individual.copy()
@@ -323,9 +329,10 @@ class MakGAUtils:
             embeddingData,
             linkData,
             vnfData,
+            popIndex,
         )
 
-    def decodePop(self, pop: list[list[int]]) -> list[
+    def decodePop(self, pop: list[Individual]) -> list[
         tuple[
             int,
             list[EmbeddingGraph],
@@ -339,7 +346,7 @@ class MakGAUtils:
         Decodes a population of individuals into EmbeddingGraph objects and calculates the total cost.
 
         Parameters:
-            pop (list[list[int]]): A list of individuals, where each individual is a list of integers.
+            pop (list[Individual]): A list of individuals, where each individual is an Individual object.
 
         Returns:
             list[tuple[int, list[EmbeddingGraph], EmbeddingData, LinkData, float, dict[str, list[tuple[str, int]]]]]:A list containing a tuple that consists of the index, embedding graphs, embedding data, link data, acceptance ratio, and VNF data for each individual.
@@ -347,22 +354,21 @@ class MakGAUtils:
 
         decodedPop: list[DecodedIndividual] = []
         copiedFGRs: list[EmbeddingGraph] = copy.deepcopy(self._fgrs)
-        for index, individual in enumerate(pop):
-            egs, embeddingData, linkData, vnfData = (
-                self._convertIndividualToEmbeddingGraphs(individual)
-            )
 
-            acceptanceRatio: float = len(egs) / len(copiedFGRs) if copiedFGRs else 0.0
-            decodedPop.append(
-                (
-                    index,
-                    egs,
-                    EmbeddingData(embeddingData),
-                    LinkData(linkData),
-                    acceptanceRatio,
-                    vnfData,
+        with ProcessPoolExecutor() as executor:
+            futures = [
+                executor.submit(
+                    self._convertIndividualToEmbeddingGraphs,
+                    individual,
+                    index
                 )
-            )
+                for index, individual in enumerate(pop)
+            ]
+
+            for future in futures:
+                egs, embeddingData, linkData, vnfData, index = future.result()
+                acceptanceRatio: float = len(egs) / len(copiedFGRs) if copiedFGRs else 0.0
+                decodedPop.append(cast(DecodedIndividual, (index, egs, embeddingData, linkData, acceptanceRatio, pop[index].id)))
 
         return decodedPop
 

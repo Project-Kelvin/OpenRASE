@@ -64,7 +64,7 @@ def generateRandomIndividual(
 
 
 def convertIndividualToEmbeddingGraph(
-    individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", topology: Topology, index: int
+    individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", topology: Topology, popIndex: int
 ) -> "Tuple[list[EmbeddingGraph], EmbeddingData, LinkData, int]":
     """
     Convert individual to an embedding graph.
@@ -73,10 +73,10 @@ def convertIndividualToEmbeddingGraph(
         individual (list[list[int]]): the individual to convert.
         fgrs (list[EmbeddingGraph]): The SFC Requests.
         topology (Topology): The Topology.
-        index (int): The index of the individual in the population.
+        popIndex (int): The index of the embedding graph in the population.
 
     Returns:
-        tuple[list[EmbeddingGraph], EmbeddingData, LinkData, index]: the embedding graph, the embedding data, the link data, and the index.
+        tuple[list[EmbeddingGraph], EmbeddingData, LinkData, popIndex]: the embedding graph, the embedding data, the link data, and the index.
     """
 
     egs: "list[EmbeddingGraph]" = []
@@ -249,7 +249,7 @@ def convertIndividualToEmbeddingGraph(
 
             egs.append(eg)
 
-    return egs, embeddingData, linkData, index
+    return egs, embeddingData, linkData, popIndex
 
 
 def evaluation(

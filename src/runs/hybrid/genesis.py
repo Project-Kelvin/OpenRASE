@@ -47,7 +47,7 @@ def run(headless: bool, ga: bool, genesis: bool) -> None:
     sigmas: list[float] = [0.0, 2.0, 5.0, 10.0]
 
     experimentsIncludeFilter: list[dict[str, Any]] = [
-        (12, 0.2, False, 10, 2), # Hard
+        (12, 0.2, False, 5, 1), # Hard
         (8, 0.2, False, 10, 2), # Medium
         (8, 0.1, False, 10, 2), # Easy
     ]
@@ -195,7 +195,7 @@ def run(headless: bool, ga: bool, genesis: bool) -> None:
                         for crossPb in crossoverProbabilities:
                             for mutPb in mutationProbabilities:
                                 for indPb in individualProbabilities:
-                                    for i in range(5):
+                                    for i in range(20):
                                         solve(
                                             requests,
                                             self._orchestrator.sendEmbeddingGraphs,
