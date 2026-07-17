@@ -29,7 +29,7 @@ from utils.tui import TUI
 MAX_MEMORY_DEMAND: int = 1
 MAX_LATENCY: int = 100
 MAX_POWER: int = 300
-MIN_AR: float = 1
+MIN_AR: float = 0.95
 MIN_QUAL_IND: int = 1
 NGEN: int = 100
 
@@ -98,6 +98,7 @@ class HybridEvolution:
         self._mutPb: float = mutPb
         self._indPb: float = indPb
         self._cxpPb: float = cxpPb
+        self._crossPb: float = crossPb
         self._evaluateOnline: bool = evaluateOnline
 
     def _select(

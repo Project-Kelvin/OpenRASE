@@ -42,11 +42,12 @@ def run(headless: bool, ga: bool, genesis: bool) -> None:
 
     mutationProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
+    crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     rejectionRates: list[float] = [0.05, 0.07, 0.1]
     sigmas: list[float] = [0.0, 2.0, 5.0, 10.0]
 
     experimentsIncludeFilter: list[dict[str, Any]] = [
-        (12, 0.2, False, 5, 1), # Hard
+        (12, 0.2, False, 10, 2), # Hard
         (8, 0.2, False, 10, 2), # Medium
         (8, 0.1, False, 10, 2), # Easy
     ]
@@ -57,7 +58,7 @@ def run(headless: bool, ga: bool, genesis: bool) -> None:
     experimentPriority: list[str] = []
     experimentsToRun: list[dict[str, Any]] = []
 
-    for noOfCopy in [8, 12]:
+    for noOfCopy in [15, 12, 8]:
         for trafficScale in [0.1, 0.2]:
             for trafficPattern in [False, True]:
                 for linkBandwidth in [10, 5]:
@@ -191,23 +192,25 @@ def run(headless: bool, ga: bool, genesis: bool) -> None:
                         sleep(0.1)
 
                     if ga:
-                        for mutPb in mutationProbabilities:
-                            for indPb in individualProbabilities:
-                                for i in range(5):
-                                    solve(
-                                        requests,
-                                        self._orchestrator.sendEmbeddingGraphs,
-                                        self._orchestrator.deleteEmbeddingGraphs,
-                                        trafficDesign,
-                                        self._trafficGenerator,
-                                        self._orchestrator.getTelemetry(),
-                                        topology,
-                                        "genesis",
-                                        f"{exp['name']}_mutPb_{mutPb}_indPb_{indPb}_{i}",
-                                        mutPb=mutPb,
-                                        indPb=indPb,
-                                        evaluateOnline=False
-                                    )
+                        for crossPb in crossoverProbabilities:
+                            for mutPb in mutationProbabilities:
+                                for indPb in individualProbabilities:
+                                    for i in range(5):
+                                        solve(
+                                            requests,
+                                            self._orchestrator.sendEmbeddingGraphs,
+                                            self._orchestrator.deleteEmbeddingGraphs,
+                                            trafficDesign,
+                                            self._trafficGenerator,
+                                            self._orchestrator.getTelemetry(),
+                                            topology,
+                                            "genesis",
+                                            f"{exp['name']}_mutPb_{mutPb}_indPb_{indPb}_{i}",
+                                            mutPb=mutPb,
+                                            indPb=indPb,
+                                            cxPb=crossPb,
+                                            evaluateOnline=False
+                                        )
                     elif genesis:
                         for sigma in sigmas:
                             for rejectionRate in rejectionRates:

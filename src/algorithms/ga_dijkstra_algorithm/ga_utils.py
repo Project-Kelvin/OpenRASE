@@ -2,11 +2,13 @@
 This defines a function that generates a random individual.
 """
 
+from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
 import copy
 import random
 from time import sleep
-from typing import Callable, Tuple, Type
+import timeit
+from typing import Callable, Tuple, Type, cast
 from uuid import uuid4
 from dijkstar import Graph, find_path
 import pandas as pd
@@ -62,8 +64,8 @@ def generateRandomIndividual(
 
 
 def convertIndividualToEmbeddingGraph(
-    individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", topology: Topology
-) -> "Tuple[list[EmbeddingGraph], EmbeddingData, LinkData]":
+    individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", topology: Topology, index: int
+) -> "Tuple[list[EmbeddingGraph], EmbeddingData, LinkData, int]":
     """
     Convert individual to an embedding graph.
 
@@ -71,9 +73,10 @@ def convertIndividualToEmbeddingGraph(
         individual (list[list[int]]): the individual to convert.
         fgrs (list[EmbeddingGraph]): The SFC Requests.
         topology (Topology): The Topology.
+        index (int): The index of the individual in the population.
 
     Returns:
-        tuple[list[EmbeddingGraph], EmbeddingData, LinkData]: the embedding graph, the embedding data and the link data.
+        tuple[list[EmbeddingGraph], EmbeddingData, LinkData, index]: the embedding graph, the embedding data, the link data, and the index.
     """
 
     egs: "list[EmbeddingGraph]" = []
@@ -246,7 +249,7 @@ def convertIndividualToEmbeddingGraph(
 
             egs.append(eg)
 
-    return egs, embeddingData, linkData
+    return egs, embeddingData, linkData, index
 
 
 def evaluation(
@@ -528,7 +531,7 @@ def crossover(
 
 
 def decodePop(
-    pop: "list[list[list[int]]]", topology: Topology, fgrs: "list[EmbeddingGraph]"
+    pop: "list[Individual]", topology: Topology, fgrs: "list[EmbeddingGraph]"
 ) -> "list[DecodedIndividual]":
     """
     Generate Embedding Graphs from the population.
@@ -542,15 +545,29 @@ def decodePop(
         list[IndividualEG]: A list containing EGs, embedding data, link data and acceptance ratio.
     """
 
-    populationEG: "list[DecodedIndividual]" = []
+    startTime: float = timeit.default_timer()
+    decodedPop: "list[DecodedIndividual]" = []
 
-    for index, individual in enumerate(pop):
-        egs, embeddingData, linkData = convertIndividualToEmbeddingGraph(
-            individual, fgrs, topology
-        )
+    with ProcessPoolExecutor() as executor:
+        futures = [
+            executor.submit(
+                convertIndividualToEmbeddingGraph,
+                individual,
+                fgrs,
+                topology,
+                index
+            )
+            for index, individual in enumerate(pop)
+        ]
 
-        acceptanceRatio: float = len(egs) / len(fgrs)
+        for future in futures:
+            egs, embeddingData, linkData, index = future.result()
+            acceptanceRatio: float = len(egs) / len(fgrs)
+            decodedPop.append(cast(DecodedIndividual, (index, egs, embeddingData, linkData, acceptanceRatio, pop[index].id)))
 
-        populationEG.append((index, egs, embeddingData, linkData, acceptanceRatio, individual.id))
+    endTime: float = timeit.default_timer()
+    TUI.appendToSolverLog(
+        f"Decoded {len(decodedPop)} individuals in {endTime - startTime:.2f} seconds."
+    )
 
-    return populationEG
+    return decodedPop

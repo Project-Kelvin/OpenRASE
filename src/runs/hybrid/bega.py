@@ -38,9 +38,10 @@ def run(headless: bool, hyper: bool) -> None:
 
     mutationProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
+    crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
 
     experimentsIncludeFilter: list[dict[str, Any]] = [
-        (12, 0.2, False, 5, 1), # Hard
+        (12, 0.2, False, 10, 2), # Hard
         (8, 0.2, False, 10, 2), # Medium
         (8, 0.1, False, 10, 2), # Easy
     ]
@@ -69,7 +70,7 @@ def run(headless: bool, hyper: bool) -> None:
     ]
     experimentsToRun: list[dict[str, Any]] = []
 
-    for noOfCopy in [8, 12]:
+    for noOfCopy in [8, 12, 15]:
         for trafficScale in [0.1, 0.2]:
             for trafficPattern in [False, True]:
                 for linkBandwidth in [10, 5]:
@@ -201,25 +202,27 @@ def run(headless: bool, hyper: bool) -> None:
                         sleep(0.1)
 
                     if hyper:
-                        for mutPb in mutationProbabilities:
-                            for indPb in individualProbabilities:
-                                for i in range(5):
-                                    TUI.appendToSolverLog(
-                                        f"Running experiment {exp['name']} with mutPb={mutPb} and indPb={indPb}."
-                                    )
-                                    solve(
-                                        topology,
-                                        requests,
-                                        self._orchestrator.sendEmbeddingGraphs,
-                                        self._orchestrator.deleteEmbeddingGraphs,
-                                        trafficDesign,
-                                        self._trafficGenerator,
-                                        self._orchestrator.getTelemetry(),
-                                        f"{exp['name']}_{mutPb}_{indPb}_{i}",
-                                        mutPb = mutPb,
-                                        indPb = indPb,
-                                        evaluateOnline = False,
-                                    )
+                        for crossPb in crossoverProbabilities:
+                            for mutPb in mutationProbabilities:
+                                for indPb in individualProbabilities:
+                                    for i in range(5):
+                                        TUI.appendToSolverLog(
+                                            f"Running experiment {exp['name']} with mutPb={mutPb} and indPb={indPb}."
+                                        )
+                                        solve(
+                                            topology,
+                                            requests,
+                                            self._orchestrator.sendEmbeddingGraphs,
+                                            self._orchestrator.deleteEmbeddingGraphs,
+                                            trafficDesign,
+                                            self._trafficGenerator,
+                                            self._orchestrator.getTelemetry(),
+                                            f"{exp['name']}_{mutPb}_{indPb}_{i}",
+                                            mutPb = mutPb,
+                                            indPb = indPb,
+                                            cxpPb = crossPb,
+                                            evaluateOnline = False,
+                                        )
                     else:
                         TUI.appendToSolverLog(
                             f"Running experiment {exp['name']} with default parameters."

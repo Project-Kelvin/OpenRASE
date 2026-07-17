@@ -19,7 +19,7 @@ tf.get_logger().setLevel("ERROR")
 tf.keras.utils.disable_interactive_logging()
 
 NO_OF_NEURONS: int = 2
-POP_SIZE: int = 100
+POP_SIZE: int = 20
 REJECTION_RATE: float = 0.05
 SIGMA: float = 2.0
 MUTPB: float = 0.7
