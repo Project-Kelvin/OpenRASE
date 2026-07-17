@@ -58,7 +58,7 @@ def run(headless: bool, ga: bool, genesis: bool) -> None:
     experimentPriority: list[str] = []
     experimentsToRun: list[dict[str, Any]] = []
 
-    for noOfCopy in [15, 12, 8]:
+    for noOfCopy in [12, 8]:
         for trafficScale in [0.1, 0.2]:
             for trafficPattern in [False, True]:
                 for linkBandwidth in [10, 5]:

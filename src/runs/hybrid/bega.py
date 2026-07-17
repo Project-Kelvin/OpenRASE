@@ -70,7 +70,7 @@ def run(headless: bool, hyper: bool) -> None:
     ]
     experimentsToRun: list[dict[str, Any]] = []
 
-    for noOfCopy in [8, 12, 15]:
+    for noOfCopy in [12, 8]:
         for trafficScale in [0.1, 0.2]:
             for trafficPattern in [False, True]:
                 for linkBandwidth in [10, 5]:
