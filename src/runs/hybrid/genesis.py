@@ -208,7 +208,7 @@ def run(headless: bool, ga: bool, genesis: bool) -> None:
                                             self._orchestrator.getTelemetry(),
                                             topology,
                                             "genesis",
-                                            f"{exp['name']}_mutPb_{mutPb}_indPb_{indPb}_cr{crossPb}_{crossPb}_{i}",
+                                            f"{exp['name']}_mutPb_{mutPb}_indPb_{indPb}_cxPb_{crossPb}_{i}",
                                             mutPb=mutPb,
                                             indPb=indPb,
                                             cxPb=crossPb,

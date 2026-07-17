@@ -47,7 +47,7 @@ def run(headless: bool, hyper: bool) -> None:
     ]
 
     if hyper:
-        experimentsIncludeFilter = [experimentsIncludeFilter[1]]  # Only run the medium experiment for hyperparameter tuning
+        experimentsIncludeFilter = [experimentsIncludeFilter[2]]  # Only run the medium experiment for hyperparameter tuning
 
     noOfRuns: int = 20
 
@@ -208,7 +208,7 @@ def run(headless: bool, hyper: bool) -> None:
                         for crossPb in crossoverProbabilities:
                             for mutPb in mutationProbabilities:
                                 for indPb in individualProbabilities:
-                                    for i in range(5):
+                                    for i in range(20):
                                         TUI.appendToSolverLog(
                                             f"Running experiment {exp['name']} with mutPb={mutPb} and indPb={indPb}."
                                         )
@@ -220,7 +220,7 @@ def run(headless: bool, hyper: bool) -> None:
                                             trafficDesign,
                                             self._trafficGenerator,
                                             self._orchestrator.getTelemetry(),
-                                            f"{exp['name']}_{mutPb}_{indPb}_{crossPb}_{i}",
+                                            f"{exp['name']}_mutPb{mutPb}_indPb{indPb}_cxPb{crossPb}_{i}",
                                             mutPb = mutPb,
                                             indPb = indPb,
                                             cxpPb = crossPb,
