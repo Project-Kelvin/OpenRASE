@@ -46,6 +46,9 @@ def run(headless: bool, hyper: bool) -> None:
         (8, 0.1, False, 10, 2), # Easy
     ]
 
+    if hyper:
+        experimentsIncludeFilter = [experimentsIncludeFilter[1]]  # Only run the medium experiment for hyperparameter tuning
+
     noOfRuns: int = 20
 
     experimentsExcludeFilter: list[tuple[int, float, bool, int, float]] = [

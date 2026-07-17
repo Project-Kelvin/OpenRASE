@@ -52,6 +52,9 @@ def run(headless: bool, ga: bool, genesis: bool) -> None:
         (8, 0.1, False, 10, 2), # Easy
     ]
 
+    if ga or genesis:
+        experimentsIncludeFilter = [experimentsIncludeFilter[1]]  # Only run the medium experiment for hyperparameter tuning
+
     noOfRuns: int = 20
 
     experimentsExcludeFilter: list[dict[str, Any]] = []
