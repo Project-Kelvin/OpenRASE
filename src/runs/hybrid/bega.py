@@ -220,7 +220,7 @@ def run(headless: bool, hyper: bool) -> None:
                                             trafficDesign,
                                             self._trafficGenerator,
                                             self._orchestrator.getTelemetry(),
-                                            f"{exp['name']}_{mutPb}_{indPb}_{i}",
+                                            f"{exp['name']}_{mutPb}_{indPb}_{crossPb}_{i}",
                                             mutPb = mutPb,
                                             indPb = indPb,
                                             cxpPb = crossPb,
