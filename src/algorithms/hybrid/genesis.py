@@ -48,6 +48,7 @@ def solve(
     evaluateOnline: bool = True,
     staticChain: bool = False,
     dijkstra: bool = False,
+    disableGaussian: bool = False,
 ) -> None:
     """
     Evolves the weights of the Neural Network.
@@ -72,6 +73,7 @@ def solve(
         evaluateOnline (bool): whether to evaluate the solution online or offline.
         staticChain (bool): whether to use static chain decoding.
         dijkstra (bool): whether to use Dijkstra's algorithm for pathfinding.
+        disableGaussian (bool): whether to disable the Gaussian distribution for host selection.
 
     Returns:
         None
@@ -96,7 +98,7 @@ def solve(
             list[GenesisUtils.DecodedIndividual]: the decoded population.
         """
 
-        return GenesisUtils.decodePop(pop, topology, sfcrs, staticChain, dijkstra)
+        return GenesisUtils.decodePop(pop, topology, sfcrs, staticChain, dijkstra, disableGaussian)
 
     hybridEvolution: HybridEvolution = HybridEvolution(
         dirName,

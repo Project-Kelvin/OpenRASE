@@ -29,7 +29,8 @@ from utils.tui import TUI
 @click.option("--genesis", is_flag=True, default=False, help="Run in GENESIS hyperparameter tuning mode.")
 @click.option("--staticChain", is_flag=True, default=False, help="Use static chain decoding.")
 @click.option("--dijkstra", is_flag=True, default=False, help="Use Dijkstra's algorithm for pathfinding.")
-def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bool) -> None:
+@click.option("--disableGaussian", is_flag=True, default=False, help="Disable the Gaussian distribution for host selection.")
+def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bool, disableGaussian: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -39,6 +40,7 @@ def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bo
         genesis (bool): Whether to run in GENESIS hyperparameter tuning mode.
         staticChain (bool): Whether to use static chain decoding.
         dijkstra (bool): Whether to use Dijkstra's algorithm for pathfinding.
+        disableGaussian (bool): Whether to disable the Gaussian distribution for host selection.
 
     Returns:
         None
@@ -250,6 +252,7 @@ def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bo
                                 f"{exp['name']}_{i}",
                                 staticChain=staticChain,
                                 dijkstra=dijkstra,
+                                disableGaussian=disableGaussian
                             )
 
 

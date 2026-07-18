@@ -102,6 +102,7 @@ class GenesisUtils:
         sfcrs: "list[SFCRequest]",
         staticChain: bool = False,
         dijkstra: bool = False,
+        disableGaussian: bool = False,
     ) -> DecodedIndividual:
         """
         Decodes an individual to an Embedding Graph.
@@ -113,6 +114,7 @@ class GenesisUtils:
             sfcrs (list[SFCRequest]): the list of SFCRequests
             staticChain (bool): whether to use static chain decoding.
             dijkstra (bool): whether to use Dijkstra's algorithm for pathfinding.
+            dsableGaussian (bool): whether to disable the Gaussian distribution for host selection.
 
         Returns:
             DecodedIndividual: A tuple containing the embedding graphs, embedding data, link data, and acceptance ratio.
@@ -147,6 +149,7 @@ class GenesisUtils:
                 GenesisUtils.noOfNeurons,
                 individual.metaIndividual[0],
                 individual.metaIndividual[1],
+                disableGaussian,
             )
             embedLinks: Optional[EmbedLinks] = None
             linkData: Optional[LinkData] = None
@@ -165,7 +168,7 @@ class GenesisUtils:
 
     @staticmethod
     def decodePop(
-        pop: list[Individual], topology: Topology, sfcrs: "list[SFCRequest]", staticChain: bool = False, dijkstra: bool = False
+        pop: list[Individual], topology: Topology, sfcrs: "list[SFCRequest]", staticChain: bool = False, dijkstra: bool = False, disableGaussian: bool = False
     ) -> list[DecodedIndividual]:
         """
         Generates the Embedding Graphs.
@@ -176,6 +179,7 @@ class GenesisUtils:
             sfcrs (list[SFCRequest]): the list of SFCRequests.
             staticChain (bool): whether to use static chain decoding.
             dijkstra (bool): whether to use Dijkstra's algorithm for pathfinding.
+            disableGaussian (bool): whether to disable the Gaussian distribution for host selection.
 
         Returns:
             list[DecodedIndividual]: A list consisting of tuples containing the embedding graphs, embedding data, link data, and acceptance ratio.
@@ -194,6 +198,7 @@ class GenesisUtils:
                     sfcrs,
                     staticChain,
                     dijkstra,
+                    disableGaussian
                 )
                 for index, individual in enumerate(pop)
             ]

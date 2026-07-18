@@ -60,6 +60,7 @@ def convertNPtoEGs(
     indices: list[str],
     rejectionRate: float = 0.05,
     sigma: float = 2.0,
+    disableGaussian: bool = False,
 ) -> "Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]":
     """
     Generates the Embedding Graphs.
@@ -71,6 +72,7 @@ def convertNPtoEGs(
         indices (list[str]): the list of indices.
         rejectionRate (float): the rejection rate for the VNFs.
         sigma (float): the standard deviation for the Gaussian distribution used for host selection.
+        disableGaussian (bool): whether to disable the Gaussian distribution for host selection.
 
     Returns:
         Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
@@ -135,7 +137,11 @@ def convertNPtoEGs(
 
                 return
             else:
-                hostIndex = abs(int(random.gauss(cl, sigma)))
+                hostIndex: int = 0
+                if disableGaussian:
+                    hostIndex = int(abs(cl))
+                else:
+                    hostIndex = abs(int(random.gauss(cl, sigma)))
                 hostIndex = hostIndex % noHosts
 
                 vnfDict["vnf"] = {"id": vnf}
@@ -223,6 +229,7 @@ def generateEGs(
     noOfNeurons: int,
     rejectionRate: float = 0.05,
     sigma: float = 2.0,
+    disableGaussian: bool = False,
 ) -> Tuple[
     "list[EmbeddingGraph]",
     dict[str, list[str]],
@@ -239,6 +246,7 @@ def generateEGs(
         noOfNeurons (int): the number of neurons in the hidden layer.
         rejectionRate (float): the rejection rate for the VNFs.
         sigma (float): the standard deviation for the Gaussian distribution used for host selection.
+        disableGaussian (bool): whether to disable the Gaussian distribution for host selection.
 
     Returns:
         Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
@@ -247,7 +255,7 @@ def generateEGs(
     data, indices = convertFGsToNP(fgs)
     data = getConfidenceValues(data, pdWeights, weights, noOfNeurons, topology)
     egs, nodes, embeddingData = convertNPtoEGs(
-        data, fgs, topology, indices, rejectionRate, sigma
+        data, fgs, topology, indices, rejectionRate, sigma, disableGaussian
     )
 
     return egs, nodes, embeddingData
