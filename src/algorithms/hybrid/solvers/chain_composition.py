@@ -40,7 +40,7 @@ def convertSFCRsToNP(sfcrs: "list[SFCRequest]") -> np.ndarray:
 
     return np.array(data, dtype=np.float64)
 
-def getPriorityValue(data: np.ndarray, predefinedWeights: "list[float]", weights: list[float], noOfNeurons: int) -> np.array:
+def getPriorityValue(data: np.ndarray, predefinedWeights: "list[float]", weights: list[float], noOfNeurons: int, activation: str = "sin") -> np.array:
     """
     Get the priority value of VNFs using a NN.
 
@@ -49,6 +49,7 @@ def getPriorityValue(data: np.ndarray, predefinedWeights: "list[float]", weights
         predefinedWeights (list[float]): the predefined weights.
         weights (list[float]): the weights.
         noOfNeurons (int): the number of neurons in the hidden layer.
+        activation (str): the type of activation function to apply.
 
     Returns:
         np.ndarray: Array containing the priority values of VNFs.
@@ -58,11 +59,11 @@ def getPriorityValue(data: np.ndarray, predefinedWeights: "list[float]", weights
     npPDWeights: np.ndarray = np.array(predefinedWeights, dtype=np.float64)
     npPDWeights = npPDWeights.reshape(-1, noOfNeurons if noOfNeurons > 0 else 1)
     copiedData = np.matmul(copiedData, npPDWeights)
-    priorityValues = activationFunction(copiedData)
+    priorityValues = activationFunction(copiedData, activation=activation)
     if noOfNeurons > 0:
         npWeights: np.ndarray = np.array(weights, dtype=np.float64).reshape(-1, 1)
         priorityValues: np.ndarray = np.matmul(priorityValues, npWeights)
-        priorityValues = activationFunction(priorityValues)
+        priorityValues = activationFunction(priorityValues, activation=activation)
 
     return priorityValues
 
@@ -127,7 +128,7 @@ def convertNPtoFGs(
 
     return fgs
 
-def generateFGs(sfcrs: "list[SFCRequest]", pdWeights: "list[float]", weights: "list[float]", noOfNeurons: int) -> dict[str, list[str]]:
+def generateFGs(sfcrs: "list[SFCRequest]", pdWeights: "list[float]", weights: "list[float]", noOfNeurons: int, activation: str = "sin") -> dict[str, list[str]]:
     """
     Generates the EmbeddingGraphs for the given SFCRequests.
 
@@ -136,6 +137,7 @@ def generateFGs(sfcrs: "list[SFCRequest]", pdWeights: "list[float]", weights: "l
         pdWeights (list[float]): the predefined weights.
         weights (list[float]): the weights.
         noOfNeurons (int): the number of neurons in the hidden layer.
+        activation (str): the type of activation function to apply.
 
     Returns:
         dict[str, list[str]]: the dictionary of ordered VNFs in every SFCR.
@@ -145,7 +147,7 @@ def generateFGs(sfcrs: "list[SFCRequest]", pdWeights: "list[float]", weights: "l
     data: np.ndarray = convertSFCRsToNP(sfcrs)
 
     # Get the priority value
-    data = getPriorityValue(data, pdWeights, weights, noOfNeurons)
+    data = getPriorityValue(data, pdWeights, weights, noOfNeurons, activation=activation)
 
     # Convert the Numpy array to a list of EmbeddingGraphs
     forwardingGraphs: dict[str, list[str]] = convertNPtoFGs(data, sfcrs)

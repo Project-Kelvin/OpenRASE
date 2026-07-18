@@ -191,6 +191,7 @@ def getConfidenceValues(
     weights: "list[float]",
     noOfNeurons: int,
     topology: Topology,
+    activation: str = "sin",
 ) -> np.ndarray:
     """
     Gets the confidence values.
@@ -201,6 +202,7 @@ def getConfidenceValues(
         weights (list[float]): the weights.
         noOfNeurons (int): the number of neurons in the hidden layer.
         topology (Topology): the topology.
+        activation (str): the type of activation function to apply.
 
     Returns:
         np.ndarray: the confidence values.
@@ -212,11 +214,11 @@ def getConfidenceValues(
         -1, noOfNeurons if noOfNeurons > 0 else 1
     )
     confidenceValues: np.ndarray = np.matmul(copiedData, npWeights)
-    confidenceValues = activationFunction(confidenceValues)
+    confidenceValues = activationFunction(confidenceValues, activation=activation)
     if noOfNeurons > 0:
         npWeights = np.array(weights, dtype=np.float64).reshape(-1, 1)
         confidenceValues = np.matmul(confidenceValues, npWeights)
-        confidenceValues = noOfHosts * activationFunction(confidenceValues)
+        confidenceValues = noOfHosts * activationFunction(confidenceValues, activation=activation)
 
     return confidenceValues
 
@@ -230,6 +232,7 @@ def generateEGs(
     rejectionRate: float = 0.05,
     sigma: float = 2.0,
     disableGaussian: bool = False,
+    activation: str = "sin",
 ) -> Tuple[
     "list[EmbeddingGraph]",
     dict[str, list[str]],
@@ -247,13 +250,14 @@ def generateEGs(
         rejectionRate (float): the rejection rate for the VNFs.
         sigma (float): the standard deviation for the Gaussian distribution used for host selection.
         disableGaussian (bool): whether to disable the Gaussian distribution for host selection.
+        activation (str): the type of activation function to apply.
 
     Returns:
         Tuple[list[EmbeddingGraph], dict[str, list[str]], dict[str, dict[str, list[Tuple[str, int]]]]]: (the Embedding Graphs, hosts in the order they should be linked, the embedding data containing the VNFs in hosts).
     """
 
     data, indices = convertFGsToNP(fgs)
-    data = getConfidenceValues(data, pdWeights, weights, noOfNeurons, topology)
+    data = getConfidenceValues(data, pdWeights, weights, noOfNeurons, topology, activation=activation)
     egs, nodes, embeddingData = convertNPtoEGs(
         data, fgs, topology, indices, rejectionRate, sigma, disableGaussian
     )

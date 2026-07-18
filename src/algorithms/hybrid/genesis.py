@@ -49,6 +49,7 @@ def solve(
     staticChain: bool = False,
     dijkstra: bool = False,
     disableGaussian: bool = False,
+    activation: str = "sin",
 ) -> None:
     """
     Evolves the weights of the Neural Network.
@@ -74,6 +75,7 @@ def solve(
         staticChain (bool): whether to use static chain decoding.
         dijkstra (bool): whether to use Dijkstra's algorithm for pathfinding.
         disableGaussian (bool): whether to disable the Gaussian distribution for host selection.
+        activation (str): the type of activation function to apply.
 
     Returns:
         None
@@ -98,7 +100,7 @@ def solve(
             list[GenesisUtils.DecodedIndividual]: the decoded population.
         """
 
-        return GenesisUtils.decodePop(pop, topology, sfcrs, staticChain, dijkstra, disableGaussian)
+        return GenesisUtils.decodePop(pop, topology, sfcrs, staticChain, dijkstra, disableGaussian, activation)
 
     hybridEvolution: HybridEvolution = HybridEvolution(
         dirName,

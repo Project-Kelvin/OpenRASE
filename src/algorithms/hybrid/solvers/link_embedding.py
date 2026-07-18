@@ -160,7 +160,8 @@ class EmbedLinks:
         egs: "list[EmbeddingGraph]",
         predefinedWeights: "list[float]",
         weights: "list[float]",
-        noOfNeurons: int
+        noOfNeurons: int,
+        activation: str = "sin",
     ) -> None:
         """
         Initializes the link embedding.
@@ -172,6 +173,7 @@ class EmbedLinks:
             predefinedWeights (list[float]): the predefined weights.
             weights (list[float]): the weights.
             noOfNeurons (int): the number of neurons in the hidden layer.
+            activation (str): the type of activation function to apply.
 
         Returns:
             None
@@ -188,8 +190,10 @@ class EmbedLinks:
         self._convertToHotCodes()
         self._hCost: dict[str, dict[str, dict[str, float]]] = {}
         self._links: list[str] = []
+        self._activation: str = activation
         self._data: np.ndarray = self._predictCost()
         self._linkData: Optional[LinkData] = None
+
 
     def _isHost(self, node: str) -> bool:
         """
@@ -304,12 +308,12 @@ class EmbedLinks:
         data = self._constructNP()
         npWeights = np.array(self._pdWeights, dtype=np.float64).reshape(-1, self._noOfNeurons if self._noOfNeurons > 0 else 1)
         heuristicCosts: np.ndarray = np.matmul(data, npWeights)
-        heuristicCosts = abs(activationFunction(heuristicCosts))
+        heuristicCosts = abs(activationFunction(heuristicCosts, activation=self._activation))
 
         if self._noOfNeurons > 0:
             npWeights = np.array(self._weights, dtype=np.float64).reshape(-1, 1)
             heuristicCosts = np.matmul(heuristicCosts, npWeights)
-            heuristicCosts = abs(activationFunction(heuristicCosts))
+            heuristicCosts = abs(activationFunction(heuristicCosts, activation=self._activation))
 
         return heuristicCosts
 

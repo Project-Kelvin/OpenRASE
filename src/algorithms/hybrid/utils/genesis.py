@@ -103,6 +103,7 @@ class GenesisUtils:
         staticChain: bool = False,
         dijkstra: bool = False,
         disableGaussian: bool = False,
+        activation: str = "sin",
     ) -> DecodedIndividual:
         """
         Decodes an individual to an Embedding Graph.
@@ -114,7 +115,8 @@ class GenesisUtils:
             sfcrs (list[SFCRequest]): the list of SFCRequests
             staticChain (bool): whether to use static chain decoding.
             dijkstra (bool): whether to use Dijkstra's algorithm for pathfinding.
-            dsableGaussian (bool): whether to disable the Gaussian distribution for host selection.
+            disableGaussian (bool): whether to disable the Gaussian distribution for host selection.
+            activation (str): the type of activation function to apply.
 
         Returns:
             DecodedIndividual: A tuple containing the embedding graphs, embedding data, link data, and acceptance ratio.
@@ -139,7 +141,7 @@ class GenesisUtils:
                     fgs[sfcr["sfcrID"]] = sfcr["vnfs"]
             else:
                 fgs: dict[str, list[str]] = generateFGs(
-                    sfcrs, ccPDWeights, ccWeights, GenesisUtils.noOfNeurons
+                    sfcrs, ccPDWeights, ccWeights, GenesisUtils.noOfNeurons, activation=activation
                 )
             egs, nodes, embedData = generateEGs(
                 fgs,
@@ -150,12 +152,13 @@ class GenesisUtils:
                 individual.metaIndividual[0],
                 individual.metaIndividual[1],
                 disableGaussian,
+                activation=activation
             )
             embedLinks: Optional[EmbedLinks] = None
             linkData: Optional[LinkData] = None
             if len(egs) > 0:
                 embedLinks = EmbedLinks(
-                    topology, sfcrs, egs, linkPDWeights, linkWeights, GenesisUtils.noOfNeurons
+                    topology, sfcrs, egs, linkPDWeights, linkWeights, GenesisUtils.noOfNeurons, activation=activation
                 )
                 egs = embedLinks.embedLinks(nodes, dijkstra=dijkstra)
                 linkData = embedLinks.getLinkData()
@@ -168,7 +171,7 @@ class GenesisUtils:
 
     @staticmethod
     def decodePop(
-        pop: list[Individual], topology: Topology, sfcrs: "list[SFCRequest]", staticChain: bool = False, dijkstra: bool = False, disableGaussian: bool = False
+        pop: list[Individual], topology: Topology, sfcrs: "list[SFCRequest]", staticChain: bool = False, dijkstra: bool = False, disableGaussian: bool = False, activation: str = "sin"
     ) -> list[DecodedIndividual]:
         """
         Generates the Embedding Graphs.
@@ -180,6 +183,7 @@ class GenesisUtils:
             staticChain (bool): whether to use static chain decoding.
             dijkstra (bool): whether to use Dijkstra's algorithm for pathfinding.
             disableGaussian (bool): whether to disable the Gaussian distribution for host selection.
+            activation (str): the type of activation function to apply.
 
         Returns:
             list[DecodedIndividual]: A list consisting of tuples containing the embedding graphs, embedding data, link data, and acceptance ratio.
@@ -198,7 +202,8 @@ class GenesisUtils:
                     sfcrs,
                     staticChain,
                     dijkstra,
-                    disableGaussian
+                    disableGaussian,
+                    activation
                 )
                 for index, individual in enumerate(pop)
             ]

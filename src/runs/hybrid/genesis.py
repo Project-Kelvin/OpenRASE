@@ -30,7 +30,8 @@ from utils.tui import TUI
 @click.option("--staticChain", is_flag=True, default=False, help="Use static chain decoding.")
 @click.option("--dijkstra", is_flag=True, default=False, help="Use Dijkstra's algorithm for pathfinding.")
 @click.option("--disableGaussian", is_flag=True, default=False, help="Disable the Gaussian distribution for host selection.")
-def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bool, disableGaussian: bool) -> None:
+@click.option("--activation", type=click.Choice(["sin", "relu", "tanh", "linear"]), default="sin", help="Activation function to use in the neural network.")
+def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bool, disableGaussian: bool, activation: str) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -41,6 +42,7 @@ def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bo
         staticChain (bool): Whether to use static chain decoding.
         dijkstra (bool): Whether to use Dijkstra's algorithm for pathfinding.
         disableGaussian (bool): Whether to disable the Gaussian distribution for host selection.
+        activation (str): The activation function to use in the neural network.
 
     Returns:
         None
@@ -252,7 +254,8 @@ def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bo
                                 f"{exp['name']}_{i}",
                                 staticChain=staticChain,
                                 dijkstra=dijkstra,
-                                disableGaussian=disableGaussian
+                                disableGaussian=disableGaussian,
+                                activation=activation
                             )
 
 
