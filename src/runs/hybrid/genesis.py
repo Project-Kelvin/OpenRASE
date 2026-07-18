@@ -27,7 +27,9 @@ from utils.tui import TUI
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
 @click.option("--ga", is_flag=True, default=False, help="Run in GA hyperparameter tuning mode.")
 @click.option("--genesis", is_flag=True, default=False, help="Run in GENESIS hyperparameter tuning mode.")
-def run(headless: bool, ga: bool, genesis: bool) -> None:
+@click.option("--staticChain", is_flag=True, default=False, help="Use static chain decoding.")
+@click.option("--dijkstra", is_flag=True, default=False, help="Use Dijkstra's algorithm for pathfinding.")
+def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -35,6 +37,8 @@ def run(headless: bool, ga: bool, genesis: bool) -> None:
         headless (bool): Whether to run the emulator in headless mode.
         ga (bool): Whether to run in GA hyperparameter tuning mode.
         genesis (bool): Whether to run in GENESIS hyperparameter tuning mode.
+        staticChain (bool): Whether to use static chain decoding.
+        dijkstra (bool): Whether to use Dijkstra's algorithm for pathfinding.
 
     Returns:
         None
@@ -46,18 +50,18 @@ def run(headless: bool, ga: bool, genesis: bool) -> None:
     rejectionRates: list[float] = [0.05, 0.07, 0.1]
     sigmas: list[float] = [0.0, 2.0, 5.0, 10.0]
 
-    experimentsIncludeFilter: list[dict[str, Any]] = [
+    experimentsIncludeFilter: list[tuple[int, float, bool, int, int]] = [
         (12, 0.2, False, 5, 1), # Hard
         (8, 0.2, False, 10, 2), # Medium
         (8, 0.1, False, 10, 2), # Easy
     ]
 
     if ga or genesis:
-        experimentsIncludeFilter = [experimentsIncludeFilter[1]]  # Only run the medium experiment for hyperparameter tuning
+        experimentsIncludeFilter = [experimentsIncludeFilter[0]]  # Only run the medium experiment for hyperparameter tuning
 
     noOfRuns: int = 20
 
-    experimentsExcludeFilter: list[dict[str, Any]] = []
+    experimentsExcludeFilter: list[tuple[int, float, bool, int, int]] = []
     experimentPriority: list[str] = []
     experimentsToRun: list[dict[str, Any]] = []
 
@@ -244,6 +248,8 @@ def run(headless: bool, ga: bool, genesis: bool) -> None:
                                 topology,
                                 "genesis",
                                 f"{exp['name']}_{i}",
+                                staticChain=staticChain,
+                                dijkstra=dijkstra,
                             )
 
 

@@ -2,9 +2,11 @@
 This defines the functions used for VNF link embedding.
 """
 
-from typing import cast
+from typing import Union, cast
 import networkx as nx
 import heapq
+from dijkstar import Graph, find_path
+from shared.models import topology
 from shared.models.sfc_request import SFCRequest
 from algorithms.hybrid.utils.solvers import activationFunction
 from algorithms.models.embedding import LinkData
@@ -403,18 +405,26 @@ class EmbedLinks:
 
         return self._linkData
 
-    def embedLinks(self, nodes: "dict[str, list[str]]") -> "list[EmbeddingGraph]":
+    def embedLinks(self, nodes: "dict[str, list[str]]", dijkstra: bool = False) -> "list[EmbeddingGraph]":
         """
         Embeds the links.
 
         Parameters:
             nodes (dict[str, list[str]]): the nodes to be linked.
+            dijkstra (bool): whether to use Dijkstra's algorithm.
 
         Returns:
             list[EmbeddingGraph]: the EGs.
         """
 
         for eg in self._egs:
+            graph: Union[Graph, None] = None
+            if dijkstra:
+                graph = Graph()
+                for link in self._topology["links"]:
+                    graph.add_edge(link["source"], link["destination"], link["bandwidth"] if "bandwidth" in link and link["bandwidth"] is not None else 1)
+                    graph.add_edge(link["destination"], link["source"], link["bandwidth"] if "bandwidth" in link and link["bandwidth"] is not None else 1)
+
             paths: "dict[str, list[str]]" = {}
             if "links" not in eg:
                 eg["links"] = []
@@ -430,9 +440,12 @@ class EmbedLinks:
 
                     if srcDst not in paths and dstSrc not in paths:
                         try:
-                            path = self._findPath(
-                                eg["sfcID"], nodeList[i], nodeList[i + 1]
-                            )
+                            if dijkstra:
+                                path = find_path(graph, nodeList[i], nodeList[i + 1]).nodes
+                            else:
+                                path = self._findPath(
+                                    eg["sfcID"], nodeList[i], nodeList[i + 1]
+                                )
                             paths[srcDst] = path
                         except Exception as e:
                             TUI.appendToSolverLog(f"Error: {e}", True)

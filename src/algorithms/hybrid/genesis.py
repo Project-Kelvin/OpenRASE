@@ -9,9 +9,10 @@ from shared.models.traffic_design import TrafficDesign
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from algorithms.hybrid.constants.genesis_objective import LATENCY
-from algorithms.hybrid.models.individuals import GenesisIndividual
+from algorithms.hybrid.models.individuals import GenesisIndividual, Individual
 from algorithms.hybrid.utils.genesis import GenesisUtils
 from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution
+from algorithms.models.embedding import DecodedIndividual
 from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 
@@ -45,6 +46,8 @@ def solve(
     sigma: float = SIGMA,
     rejectionRate: float = REJECTION_RATE,
     evaluateOnline: bool = True,
+    staticChain: bool = False,
+    dijkstra: bool = False,
 ) -> None:
     """
     Evolves the weights of the Neural Network.
@@ -67,6 +70,8 @@ def solve(
         sigma (float): the standard deviation for the Gaussian noise.
         rejectionRate (float): the rate at which individuals are rejected.
         evaluateOnline (bool): whether to evaluate the solution online or offline.
+        staticChain (bool): whether to use static chain decoding.
+        dijkstra (bool): whether to use Dijkstra's algorithm for pathfinding.
 
     Returns:
         None
@@ -74,9 +79,28 @@ def solve(
 
     GenesisUtils.init(sfcrs, topology, NO_OF_NEURONS, rejectionRate, sigma)
 
+    def decodePopWrapper(
+        pop: list[Individual],
+        topology: Topology,
+        sfcrs: "list[SFCRequest]"
+    ) -> list[DecodedIndividual]:
+        """
+        A thunk function to decode the population.
+
+        Parameters:
+            pop (list[Individual]): the population.
+            topology (Topology): the topology.
+            sfcrs (list[SFCRequest]): the list of Service Function Chains.
+
+        Returns:
+            list[GenesisUtils.DecodedIndividual]: the decoded population.
+        """
+
+        return GenesisUtils.decodePop(pop, topology, sfcrs, staticChain, dijkstra)
+
     hybridEvolution: HybridEvolution = HybridEvolution(
         dirName,
-        GenesisUtils.decodePop,
+        decodePopWrapper,
         GenesisUtils.generateRandomGenesisIndividual,
         GenesisUtils.genesisCrossover,
         GenesisUtils.genesisMutate,
