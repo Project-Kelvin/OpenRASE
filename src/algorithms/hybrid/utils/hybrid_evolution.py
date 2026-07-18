@@ -41,7 +41,7 @@ Crossover = Callable[
     [Individual, Individual],
     Tuple[Individual, Individual],
 ]
-Mutate = Callable[[Individual, float], tuple[Individual]]
+Mutate = Callable[[Individual, float], Individual]
 
 
 class HybridEvolution:

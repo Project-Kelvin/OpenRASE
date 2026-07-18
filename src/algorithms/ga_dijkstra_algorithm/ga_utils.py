@@ -340,16 +340,16 @@ def evaluation(
     return (acceptanceRatio, round(latency))
 
 
-def mutate(individual: "list[list[int]]", indpb: float) -> "list[list[int]]":
+def mutate(individual: Individual, indpb: float) -> Individual:
     """
     Mutate the individual.
 
     Parameters:
-        individual (list[list[int]]): the individual to mutate.
+        individual (Individual): the individual to mutate.
         indpb (float): the probability of mutation.
 
     Returns:
-        list[list[int]]: the mutated individual.
+        Individual: the mutated individual.
     """
 
     mutatedIndividual: "list[list[int]]" = deepcopy(individual)

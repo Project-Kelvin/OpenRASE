@@ -5,7 +5,7 @@ This defines the util class used by the GA algorithm developed by Mohammad Ali K
 from concurrent.futures import ProcessPoolExecutor
 import copy
 import random
-from typing import cast
+from typing import Type, cast
 import numpy as np
 from algorithms.hybrid.models.individuals import Individual
 from algorithms.mak_ga.models.embedding import EmbeddingData
@@ -34,9 +34,6 @@ class MakGAUtils:
     """
 
     _demandPredictions: DemandPredictions = DemandPredictions()
-    _topology = None
-    _trafficDesign = None
-    _fgrs = None
 
     def __init__(
         self,
@@ -50,18 +47,18 @@ class MakGAUtils:
 
     def generateRandomIndividual(
         self,
-        container: list,
-    ) -> list[int]:
+        container: Type[Individual],
+    ) -> Individual:
         """
         Generates a random individual for the genetic algorithm.
 
         Parameters:
-            container (list): The container to hold the individual.
+            container (Type[Individual]): The type of individual to generate.
         Returns:
-            list[int]: A list of integers representing the random individual.
+            Individual: The generated random individual.
         """
 
-        individual: list[int] = container()
+        individual: Individual = container()
         noOfVNFs: int = len(getVNFsFromFGRs(self._fgrs))
         noOfHosts: int = len(self._topology["hosts"])
         isValid: bool = False
@@ -85,7 +82,27 @@ class MakGAUtils:
 
         return individual
 
-    def _convertIndividualToEmbeddingGraphs(self, individual: list[int], popIndex: int) -> tuple[
+    def mutate(self, individual: Individual, indpb: float) -> Individual:
+        """
+        Mutates an individual by randomly changing its genes based on a given probability.
+
+        Parameters:
+            individual (Individual): The individual to mutate.
+            indpb (float): The probability of mutating each gene.
+
+        Returns:
+            Individual: The mutated individual.
+        """
+
+        noOfHosts: int = len(self._topology["hosts"])
+        for i in range(len(individual)):
+            if random.random() < indpb:
+                host: int = random.randint(1, noOfHosts)
+                individual[i] = host
+
+        return individual
+
+    def _convertIndividualToEmbeddingGraphs(self, individual: Individual, popIndex: int) -> tuple[
         list[EmbeddingGraph],
         EmbeddingData,
         LinkData,
@@ -96,7 +113,7 @@ class MakGAUtils:
         Converts a list of integers representing an individual into a list of EmbeddingGraph objects.
 
         Parameters:
-            individual (list[int]): A list of integers where each integer represents the index of a host.
+            individual (Individual): The individual to convert.
             popIndex (int): The index of the individual in the population.
 
         Returns:
@@ -332,16 +349,7 @@ class MakGAUtils:
             popIndex,
         )
 
-    def decodePop(self, pop: list[Individual]) -> list[
-        tuple[
-            int,
-            list[EmbeddingGraph],
-            EmbeddingData,
-            LinkData,
-            float,
-            dict[str, list[tuple[str, int]]],
-        ]
-    ]:
+    def decodePop(self, pop: list[Individual]) -> list[DecodedIndividual]:
         """
         Decodes a population of individuals into EmbeddingGraph objects and calculates the total cost.
 
@@ -349,7 +357,7 @@ class MakGAUtils:
             pop (list[Individual]): A list of individuals, where each individual is an Individual object.
 
         Returns:
-            list[tuple[int, list[EmbeddingGraph], EmbeddingData, LinkData, float, dict[str, list[tuple[str, int]]]]]:A list containing a tuple that consists of the index, embedding graphs, embedding data, link data, acceptance ratio, and VNF data for each individual.
+            list[DecodedIndividual]: A list containing a tuple that consists of the index, embedding graphs, embedding data, link data, acceptance ratio, and VNF data for each individual.
         """
 
         decodedPop: list[DecodedIndividual] = []
