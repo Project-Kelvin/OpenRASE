@@ -40,14 +40,14 @@ def run(headless: bool, hyper: bool) -> None:
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
 
-    experimentsIncludeFilter: list[tuple[int, float, bool, int, float]] = [
-        (12, 0.2, False, 5, 1), # Hard
-        (8, 0.2, False, 10, 2), # Medium
+    experimentsIncludeFilter: list[tuple[int, float, bool, int, int]] = [
+        (25, 0.1, False, 10, 1), # Hard
+        (12, 0.1, False, 10, 2), # Medium
         (8, 0.1, False, 10, 2), # Easy
     ]
 
     if hyper:
-        experimentsIncludeFilter = [experimentsIncludeFilter[2]]  # Only run the medium experiment for hyperparameter tuning
+        experimentsIncludeFilter = [experimentsIncludeFilter[2]]  # Only run the easy experiment for hyperparameter tuning
 
     noOfRuns: int = 20
 
@@ -73,7 +73,7 @@ def run(headless: bool, hyper: bool) -> None:
     ]
     experimentsToRun: list[dict[str, Any]] = []
 
-    for noOfCopy in [12, 8]:
+    for noOfCopy in [25, 12, 8]:
         for trafficScale in [0.1, 0.2]:
             for trafficPattern in [False, True]:
                 for linkBandwidth in [10, 5]:

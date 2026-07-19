@@ -30,11 +30,11 @@ CX_PB: float = 0.7
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
 @click.option("--ga", is_flag=True, default=False, help="Run in GA hyperparameter tuning mode.")
 @click.option("--genesis", is_flag=True, default=False, help="Run in GENESIS hyperparameter tuning mode.")
-@click.option("--staticChain", is_flag=True, default=False, help="Use static chain decoding.")
+@click.option("--chain", is_flag=True, default=False, help="Use static chain decoding.")
 @click.option("--dijkstra", is_flag=True, default=False, help="Use Dijkstra's algorithm for pathfinding.")
-@click.option("--disableGaussian", is_flag=True, default=False, help="Disable the Gaussian distribution for host selection.")
+@click.option("--gaussian", is_flag=True, default=True, help="Disable the Gaussian distribution for host selection.")
 @click.option("--activation", type=click.Choice(["sin", "relu", "tanh", "linear"]), default="sin", help="Activation function to use in the neural network.")
-def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bool, disableGaussian: bool, activation: str) -> None:
+def run(headless: bool, ga: bool, genesis: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -42,9 +42,9 @@ def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bo
         headless (bool): Whether to run the emulator in headless mode.
         ga (bool): Whether to run in GA hyperparameter tuning mode.
         genesis (bool): Whether to run in GENESIS hyperparameter tuning mode.
-        staticChain (bool): Whether to use static chain decoding.
+        chain (bool): Whether to use static chain decoding.
         dijkstra (bool): Whether to use Dijkstra's algorithm for pathfinding.
-        disableGaussian (bool): Whether to disable the Gaussian distribution for host selection.
+        gaussian (bool): Whether to disable the Gaussian distribution for host selection.
         activation (str): The activation function to use in the neural network.
 
     Returns:
@@ -55,16 +55,16 @@ def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bo
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     rejectionRates: list[float] = [0.05, 0.07, 0.1]
-    sigmas: list[float] = [0.0, 2.0, 5.0, 10.0]
+    sigmas: list[float] = [0.0, 1.0, 2.0, 4.0]
 
     experimentsIncludeFilter: list[tuple[int, float, bool, int, int]] = [
-        (12, 0.2, False, 5, 1), # Hard
-        (8, 0.2, False, 10, 2), # Medium
+        (25, 0.1, False, 10, 1), # Hard
+        (12, 0.1, False, 10, 2), # Medium
         (8, 0.1, False, 10, 2), # Easy
     ]
 
     if ga or genesis:
-        experimentsIncludeFilter = [experimentsIncludeFilter[0]]  # Only run the medium experiment for hyperparameter tuning
+        experimentsIncludeFilter = [experimentsIncludeFilter[0]]  # Only run the Hard experiment for hyperparameter tuning
 
     noOfRuns: int = 20
 
@@ -72,7 +72,7 @@ def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bo
     experimentPriority: list[str] = []
     experimentsToRun: list[dict[str, Any]] = []
 
-    for noOfCopy in [12, 8]:
+    for noOfCopy in [25, 12, 8]:
         for trafficScale in [0.1, 0.2]:
             for trafficPattern in [False, True]:
                 for linkBandwidth in [10, 5]:
@@ -209,7 +209,7 @@ def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bo
                         for crossPb in crossoverProbabilities:
                             for mutPb in mutationProbabilities:
                                 for indPb in individualProbabilities:
-                                    for i in range(20):
+                                    for i in range(noOfRuns):
                                         solve(
                                             requests,
                                             self._orchestrator.sendEmbeddingGraphs,
@@ -228,7 +228,7 @@ def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bo
                     elif genesis:
                         for sigma in sigmas:
                             for rejectionRate in rejectionRates:
-                                for i in range(5):
+                                for i in range(noOfRuns):
                                     solve(
                                         requests,
                                         self._orchestrator.sendEmbeddingGraphs,
@@ -255,9 +255,9 @@ def run(headless: bool, ga: bool, genesis: bool, staticChain: bool, dijkstra: bo
                                 topology,
                                 "genesis",
                                 f"{exp['name']}_{i}",
-                                staticChain=staticChain,
+                                staticChain=chain,
                                 dijkstra=dijkstra,
-                                disableGaussian=disableGaussian,
+                                disableGaussian=not gaussian,
                                 activation=activation
                             )
 
