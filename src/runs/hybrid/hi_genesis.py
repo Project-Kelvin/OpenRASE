@@ -26,17 +26,24 @@ from utils.tui import TUI
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
 @click.option("--client", is_flag=True, default=False, help="Run in client mode.")
-def run(headless: bool, client: bool) -> None:
+@click.option("--hyper", is_flag=True, default=False, help="Run in hyperparameter tuning mode.")
+def run(headless: bool, client: bool, hyper: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
     Parameters:
         headless (bool): Whether to run the emulator in headless mode.
         client (bool): Whether to run the algorithm in client mode.
+        hyper (bool): Whether to run the algorithm in hyperparameter tuning mode.
 
     Returns:
         None
     """
+
+    mutationProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
+    individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
+    crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
+    noOfRuns: int = 20
 
     design: TrafficDesign = generateTrafficDesignFromFile(
         os.path.join(
@@ -53,7 +60,7 @@ def run(headless: bool, client: bool) -> None:
     )
 
     steps: int = len(design)
-    segments: int = 10
+    segments: int = 10 if not hyper else 1
     stepsPerSegment: int = steps // segments
     trafficSegments: "list[TrafficDesign]" = []
     for segment in range(segments):
@@ -171,20 +178,52 @@ def run(headless: bool, client: bool) -> None:
                     #     continue
 
                     self._trafficGenerator.setDesign([trafficSegments[segment]])
-                    solve(
-                        allRequestsReceived,
-                        self._orchestrator.sendEmbeddingGraphs,
-                        self._orchestrator.deleteEmbeddingGraphs,
-                        [trafficSegments[segment]],
-                        self._trafficGenerator,
-                        self._orchestrator.getTelemetry(),
-                        topologyToUse,
-                        "hi_genesis",
-                        f"{len(allRequestsReceived)}_0.1_False_10_2_{segment}",
-                        LATENCY,
-                        True,
-                        client,
-                    )
+
+                    if hyper:
+                        for crossPb in crossoverProbabilities:
+                            for mutPb in mutationProbabilities:
+                                for indPb in individualProbabilities:
+                                    for i in range(noOfRuns):
+                                        TUI.appendToSolverLog(
+                                            f"Running experiment {segment} with mutPb={mutPb} and indPb={indPb}."
+                                        )
+                                        solve(
+                                            allRequestsReceived,
+                                            self._orchestrator.sendEmbeddingGraphs,
+                                            self._orchestrator.deleteEmbeddingGraphs,
+                                            [trafficSegments[segment]],
+                                            self._trafficGenerator,
+                                            self._orchestrator.getTelemetry(),
+                                            topologyToUse,
+                                            "hi_genesis",
+                                            f"{len(allRequestsReceived)}_{mutPb}_{indPb}_{crossPb}_{segment}_{i}",
+                                            LATENCY,
+                                            True,
+                                            client,
+                                            mutPb = mutPb,
+                                            indPb = indPb,
+                                            cxPb = crossPb
+                                        )
+                    else:
+                        TUI.appendToSolverLog(
+                            f"Running experiment {segment} with default parameters."
+                        )
+
+                        for i in range(noOfRuns):
+                            solve(
+                                allRequestsReceived,
+                                self._orchestrator.sendEmbeddingGraphs,
+                                self._orchestrator.deleteEmbeddingGraphs,
+                                [trafficSegments[segment]],
+                                self._trafficGenerator,
+                                self._orchestrator.getTelemetry(),
+                                topologyToUse,
+                                "hi_genesis",
+                                f"{len(allRequestsReceived)}_0.1_False_10_2_{segment}_{i}",
+                                LATENCY,
+                                True,
+                                client,
+                            )
 
             except Exception as e:
                 TUI.appendToSolverLog(str(e), True)

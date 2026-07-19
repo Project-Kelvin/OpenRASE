@@ -5,6 +5,7 @@ GA is used for VNf Embedding and Dijkstra is used for link embedding.
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from copy import deepcopy
+from datetime import datetime
 import os
 import random
 import timeit
@@ -463,7 +464,8 @@ class HybridEvolution:
         popSize: int,
         experiment: str,
         type=LATENCY,
-        retainPopulation: bool = False
+        retainPopulation: bool = False,
+        linesToWrite: list[str] = [],
     ) -> None:
         """
         Run the Genetic Algorithm + Dijkstra Algorithm.
@@ -610,6 +612,8 @@ class HybridEvolution:
             "w",
             encoding="utf8",
         ) as expFile:
+            expFile.write(f"Experiment Name: {experiment}\n")
+            expFile.write(f"Completed Date: {datetime.today().strftime('%Y-%m-%d %H:%M:%S')}\n")
             expFile.write(f"No. of SFCRs: {4 * int(names[0])}\n")
             expFile.write(f"Traffic Scale: {float(names[1]) * 10}\n")
             expFile.write(
@@ -629,6 +633,9 @@ class HybridEvolution:
             expFile.write(f"Gene Mutation Probability: {self._indPb}\n")
             expFile.write(f"Crossover Probability: {self._cxpPb}\n")
             expFile.write(f"Evaluation Type: {'Hybrid' if self._evaluateOnline else 'Offline'}\n")
+
+            for line in linesToWrite:
+                expFile.write(f"{line}\n")
 
 
         self._toolbox.unregister("individual")

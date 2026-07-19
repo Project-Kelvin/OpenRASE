@@ -96,7 +96,7 @@ def getWeightsLength(noOfNeurons: int) -> int:
 
 
 def generatePredefinedWeights(
-    sfcrs: "list[SFCRequest]", topology: Topology, noOfNeurons: int
+    sfcrs: "list[SFCRequest]", topology: Topology, noOfNeurons: int, initLimit: float
 ) -> "list[float]":
     """
     Generates the predefined weights.
@@ -105,6 +105,7 @@ def generatePredefinedWeights(
         sfcrs (list[SFCRequest]): the list of SFCRequests.
         topology (Topology): the topology.
         noOfNeurons (int): the number of neurons in the hidden layer.
+        initLimit (float): the limit to use for generating the predefined weights.
 
     Returns:
         list[float]: the predefined weights.
@@ -112,7 +113,7 @@ def generatePredefinedWeights(
 
     totalWeights: int = getPredefinedWeightsLength(sfcrs, topology, noOfNeurons)
 
-    return [generateRandomWeight() for _ in range(totalWeights)]
+    return [generateRandomWeight(initLimit) for _ in range(totalWeights)]
 
 
 def getPredefinedWeights(
@@ -181,12 +182,15 @@ def getWeights(individual: "list[float]", noOfNeurons: int) -> GenesisWeights:
     )
 
 
-def generateRandomWeight() -> float:
+def generateRandomWeight(initLimit: float) -> float:
     """
     Generates a random weight.
+
+    Parameters:
+        initLimit (float): the limit to use for generating the random weight.
 
     Returns:
         float: a random weight.
     """
 
-    return random.uniform(-1 * np.pi, 1 * np.pi)
+    return random.uniform(0, initLimit)

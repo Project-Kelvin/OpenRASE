@@ -49,6 +49,9 @@ def solve(
     type: str = LATENCY,
     retainPopulation: bool = False,
     isClientMode: bool = False,
+    mutPb: float = META_MUTPB,
+    indPb: float = META_INDPB,
+    cxPb: float = META_CXPB
 ) -> None:
     """
     Evolves the weights of the Neural Network.
@@ -66,6 +69,9 @@ def solve(
         type (str): the type of the objective function to optimize. Defaults to LATENCY.
         retainPopulation (bool): specifies if the population should be retained in memory.
         isClientMode (bool): specifies if the algorithm should run in client mode.
+        mutPb (float): the mutation probability.
+        indPb (float): the individual mutation probability.
+        cxPb (float): the crossover probability.
 
     Returns:
         None
@@ -76,11 +82,11 @@ def solve(
     hiGenesis: Union[HierarchicalEvolutionClient, HierarchicalEvolution] = HiGenesisClass(
         POP_SIZE,
         MAX_GEN,
-        META_CXPB,
+        cxPb,
         GENESIS_CXPB,
-        META_MUTPB,
+        mutPb,
         GENESIS_MUTPB,
-        META_INDPB,
+        indPb,
         GENESIS_INDPB,
         MIN_AR,
         MAX_LATENCY if type == LATENCY else MAX_POWER,

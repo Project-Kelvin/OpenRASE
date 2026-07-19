@@ -2,7 +2,8 @@
 This defines the GA that evolves teh weights of the Neural Network.
 """
 
-from typing import Callable
+from typing import Callable, Type
+import numpy as np
 import tensorflow as tf
 from shared.models.sfc_request import SFCRequest
 from shared.models.traffic_design import TrafficDesign
@@ -26,6 +27,8 @@ SIGMA: float = 2.0
 MUTPB: float = 0.7
 INDPB: float = 0.7
 CXPB: float = 1.0
+ACTIVATION: str = "sin"
+INIT_LIMIT: float = 2 * np.pi
 
 
 def solve(
@@ -49,7 +52,8 @@ def solve(
     staticChain: bool = False,
     dijkstra: bool = False,
     disableGaussian: bool = False,
-    activation: str = "sin",
+    activation: str = ACTIVATION,
+    initLimit: float = INIT_LIMIT
 ) -> None:
     """
     Evolves the weights of the Neural Network.
@@ -76,6 +80,7 @@ def solve(
         dijkstra (bool): whether to use Dijkstra's algorithm for pathfinding.
         disableGaussian (bool): whether to disable the Gaussian distribution for host selection.
         activation (str): the type of activation function to apply.
+        initLimit (float): the limit to use for generating the predefined weights.
 
     Returns:
         None
@@ -102,12 +107,52 @@ def solve(
 
         return GenesisUtils.decodePop(pop, topology, sfcrs, staticChain, dijkstra, disableGaussian, activation)
 
+    def mutateWrapper(
+        individual: Individual,
+        indpb: float
+    ) -> Individual:
+        """
+        A thunk function to mutate an individual.
+
+        Parameters:
+            individual (Individual): the individual to mutate.
+            indpb (float): the individual mutation probability.
+
+        Returns:
+            Individual: the mutated individual.
+        """
+
+        return GenesisUtils.genesisMutate(individual, indpb, initLimit=initLimit)
+
+    def generateRandomIndividualWrapper(container: Type[Individual], topology: Topology, sfcrs: "list[SFCRequest]") -> Individual:
+        """
+        A thunk function to generate a random individual.
+
+        Parameters:
+            container (Type[Individual]): the type of individual to generate.
+            topology (Topology): the topology.
+            sfcrs (list[SFCRequest]): the list of Service Function Chains.
+
+        Returns:
+            Individual: the generated individual.
+        """
+
+        return GenesisUtils.generateRandomGenesisIndividual(container, topology, sfcrs, initLimit=initLimit)
+
+    linesToWrite: list[str] = [
+        f"Is VNF CC Disabled: {staticChain}",
+        f"Is Dijkstra Used: {dijkstra}",
+        f"Is Gaussian Disabled: {disableGaussian}",
+        f"Activation Function: {activation}",
+        f"Initial Weight Limit: {initLimit}"
+    ]
+
     hybridEvolution: HybridEvolution = HybridEvolution(
         dirName,
         decodePopWrapper,
-        GenesisUtils.generateRandomGenesisIndividual,
+        generateRandomIndividualWrapper,
         GenesisUtils.genesisCrossover,
-        GenesisUtils.genesisMutate,
+        mutateWrapper,
         GenesisIndividual,
         mutPb,
         cxPb,
@@ -127,4 +172,5 @@ def solve(
         experimentName,
         type,
         retainPopulation,
+        linesToWrite=linesToWrite
     )

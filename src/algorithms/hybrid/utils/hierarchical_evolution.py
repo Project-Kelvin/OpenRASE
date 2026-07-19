@@ -65,6 +65,7 @@ class HierarchicalEvolution:
         deleteEGs: Callable[[list[EmbeddingGraph]], None],
         dominanceThreshold: float,
         retainPopulation: bool = False,
+        rootIndividual: int = -1,
     ) -> None:
         """
         Initializes the hierarchical evolution.
@@ -93,6 +94,7 @@ class HierarchicalEvolution:
             deleteEGs (Callable[[list[EmbeddingGraph]], None]): the function to delete the Embedding Graphs.
             dominanceThreshold (float): the threshold for determining if a Pareto front is dominated by another.
             retainPopulation (bool): specifies if the population should be retained in memory after evolution.
+            rootIndividual (int): the index of the root individual to be used in the evolution.
 
         Returns:
             None
@@ -131,6 +133,7 @@ class HierarchicalEvolution:
         self._rootEvolver: RootEvolver = RootEvolver(popSize)
         self._metaPopSize: int = 0
         self._genesisPopSize: int = 0
+        self._rootIndividual: int = rootIndividual
 
     def _computeMetaAndGenesisPopSize(self, root: int) -> tuple[int, int]:
         """
@@ -417,7 +420,7 @@ class HierarchicalEvolution:
         """
 
         return [
-            abs(round(random.gauss(1 - self._minAR, 0.1), 2)),
+            abs(round(random.uniform(0, 1), 2)),
             round(random.uniform(0, 10), 2),
         ]
 
@@ -520,16 +523,23 @@ class HierarchicalEvolution:
                 self._toolbox.metaMate(child, child2)
 
                 if child[0] < 0:
-                    child[0] = abs(child[0])
+                    child[0] = 0
+
+                if child[0] > 1:
+                    child[0] = 1
 
                 if child[1] < 0:
-                    child[1] = abs(child[1])
+                    child[1] = 0
+
 
                 if child2[0] < 0:
-                    child2[0] = abs(child2[0])
+                    child2[0] = 0
+
+                if child2[0] > 1:
+                    child2[0] = 1
 
                 if child2[1] < 0:
-                    child2[1] = abs(child2[1])
+                    child2[1] = 0
 
                 del child.fitness.values
                 del child2.fitness.values
@@ -955,6 +965,22 @@ class HierarchicalEvolution:
 
         return newPop
 
+    def _getWorstFitness(self, population: list[Individual]) -> tuple[float, float]:
+        """
+        Gets the worst fitness of the population.
+
+        Parameters:
+            population (list[Individual]): the population to get the worst fitness from.
+
+        Returns:
+            tuple[float, float]: the worst fitness of the population.
+        """
+
+        worstAR: float = min([ind.fitness.values[0] for ind in population])
+        worstLatency: float = max([ind.fitness.values[1] for ind in population])
+
+        return worstAR, worstLatency
+
     def evolve(self) -> None:
         """
         Evolves the meta-individuals.
@@ -978,6 +1004,11 @@ class HierarchicalEvolution:
         ):
             TUI.appendToSolverLog("Root not retained. Generating random root.")
             RootEvolver.setRootIndividual(self._rootEvolver.generateRandomRoot())
+
+        if self._rootIndividual != -1:
+            TUI.appendToSolverLog(f"Root predefined. Using root: {self._rootIndividual}.")
+            RootEvolver.setRootIndividual(self._rootIndividual)
+
         self._rootEvolver.addRootToExploredRoot(RootEvolver.getRootIndividual())
 
         TUI.appendToSolverLog(f"Root is: {RootEvolver.getRootIndividual()}.")
@@ -1015,6 +1046,7 @@ class HierarchicalEvolution:
         shouldMetaGenContinue: bool = True
         shouldGenesisGenContinue: bool = True
         prevRootIndividual: int = RootEvolver.getRootIndividual()
+        hyperVolumeReferencePoint: tuple[float, float] = (0.0, 0.0)
 
         while (
             len(qualifiedIndividuals) < self._minQualInd and gen < self._maxGen
@@ -1109,6 +1141,10 @@ class HierarchicalEvolution:
                     evaluatedPop, qualInd, popEG = self._performGAOperationsGenesis(
                         gen, rootGen, metaGen, genesisGen, cast(list[Individual], genesisOffSpring), cast(list[Individual], HierarchicalEvolution._genesisPopulation), popEG
                     )
+
+                    if gen == 1:
+                        hyperVolumeReferencePoint = self._getWorstFitness(evaluatedPop)
+
                     qualifiedIndividuals.extend(qualInd)
                     newGenesisPF: tools.ParetoFront = tools.ParetoFront()
                     newGenesisPF.update(evaluatedPop)
@@ -1139,7 +1175,7 @@ class HierarchicalEvolution:
                 newMetaPF.update(HierarchicalEvolution._genesisPopulation)
                 shouldMetaGenContinue = self._isParetoDominated(
                     metaPF, newMetaPF
-                )
+                ) or self._rootIndividual == -1
                 dominance: float = self._calculateParetoDominatedPercentage(metaPF, newMetaPF)
                 self._writeMetaLog(rootGen, metaGen, metaOffspring, dominance)
                 metaPF = newMetaPF

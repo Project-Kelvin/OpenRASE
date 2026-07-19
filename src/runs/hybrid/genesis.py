@@ -7,6 +7,7 @@ import os
 from time import sleep
 from typing import Any
 import click
+import numpy as np
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
@@ -33,8 +34,9 @@ CX_PB: float = 0.7
 @click.option("--chain", is_flag=True, default=False, help="Use static chain decoding.")
 @click.option("--dijkstra", is_flag=True, default=False, help="Use Dijkstra's algorithm for pathfinding.")
 @click.option("--gaussian", is_flag=True, default=True, help="Disable the Gaussian distribution for host selection.")
-@click.option("--activation", type=click.Choice(["sin", "relu", "tanh", "linear"]), default="sin", help="Activation function to use in the neural network.")
-def run(headless: bool, ga: bool, genesis: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str) -> None:
+@click.option("--activation", is_flag=True, default=False, help="Test activation functions in the neural network.")
+@click.option("--init", is_flag=True, default=False, help="Test the limit to use for generating the predefined weights.")
+def run(headless: bool, ga: bool, genesis: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -45,7 +47,8 @@ def run(headless: bool, ga: bool, genesis: bool, chain: bool, dijkstra: bool, ga
         chain (bool): Whether to use static chain decoding.
         dijkstra (bool): Whether to use Dijkstra's algorithm for pathfinding.
         gaussian (bool): Whether to disable the Gaussian distribution for host selection.
-        activation (str): The activation function to use in the neural network.
+        activation (str): Whether to test activation functions in the neural network.
+        init (bool): Whether to test the limit to use for generating the predefined weights.
 
     Returns:
         None
@@ -56,9 +59,11 @@ def run(headless: bool, ga: bool, genesis: bool, chain: bool, dijkstra: bool, ga
     crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     rejectionRates: list[float] = [0.05, 0.07, 0.1]
     sigmas: list[float] = [0.0, 1.0, 2.0, 4.0]
+    activations: list[str] = ["sin", "tanh", "relu", "linear"]
+    initLimit: list[float] = [1, 2, np.pi, 2 * np.pi]
 
     experimentsIncludeFilter: list[tuple[int, float, bool, int, int]] = [
-        (25, 0.1, False, 10, 1), # Hard
+        (20, 0.1, False, 10, 1), # Hard
         (12, 0.1, False, 10, 2), # Medium
         (8, 0.1, False, 10, 2), # Easy
     ]
@@ -72,7 +77,7 @@ def run(headless: bool, ga: bool, genesis: bool, chain: bool, dijkstra: bool, ga
     experimentPriority: list[str] = []
     experimentsToRun: list[dict[str, Any]] = []
 
-    for noOfCopy in [25, 12, 8]:
+    for noOfCopy in [20, 12, 8]:
         for trafficScale in [0.1, 0.2]:
             for trafficPattern in [False, True]:
                 for linkBandwidth in [10, 5]:
@@ -243,6 +248,55 @@ def run(headless: bool, ga: bool, genesis: bool, chain: bool, dijkstra: bool, ga
                                         rejectionRate=rejectionRate,
                                         evaluateOnline=False
                                     )
+                    elif activation:
+                        for activationFunction in activations:
+                            for i in range(noOfRuns):
+                                solve(
+                                    requests,
+                                    self._orchestrator.sendEmbeddingGraphs,
+                                    self._orchestrator.deleteEmbeddingGraphs,
+                                    trafficDesign,
+                                    self._trafficGenerator,
+                                    self._orchestrator.getTelemetry(),
+                                    topology,
+                                    "genesis",
+                                    f"{exp['name']}_activation_{activationFunction}_{i}",
+                                    activation=activationFunction,
+                                    evaluateOnline=False
+                                )
+                    elif init:
+                        for initLimitValue in initLimit:
+                            for i in range(noOfRuns):
+                                solve(
+                                    requests,
+                                    self._orchestrator.sendEmbeddingGraphs,
+                                    self._orchestrator.deleteEmbeddingGraphs,
+                                    trafficDesign,
+                                    self._trafficGenerator,
+                                    self._orchestrator.getTelemetry(),
+                                    topology,
+                                    "genesis",
+                                    f"{exp['name']}_initLimit_{initLimitValue}_{i}",
+                                    initLimit=initLimitValue,
+                                    evaluateOnline=False
+                                )
+                    elif chain or dijkstra or gaussian:
+                        for i in range(noOfRuns):
+                            solve(
+                                requests,
+                                self._orchestrator.sendEmbeddingGraphs,
+                                self._orchestrator.deleteEmbeddingGraphs,
+                                trafficDesign,
+                                self._trafficGenerator,
+                                self._orchestrator.getTelemetry(),
+                                topology,
+                                "genesis",
+                                f"{exp['name']}_chain_{chain}_dijkstra_{dijkstra}_gaussian_{gaussian}_{i}",
+                                staticChain=chain,
+                                dijkstra=dijkstra,
+                                disableGaussian=not gaussian,
+                                evaluateOnline=False
+                            )
                     else:
                         for i in range(noOfRuns):
                             solve(
@@ -254,11 +308,7 @@ def run(headless: bool, ga: bool, genesis: bool, chain: bool, dijkstra: bool, ga
                                 self._orchestrator.getTelemetry(),
                                 topology,
                                 "genesis",
-                                f"{exp['name']}_{i}",
-                                staticChain=chain,
-                                dijkstra=dijkstra,
-                                disableGaussian=not gaussian,
-                                activation=activation
+                                f"{exp['name']}_{i}"
                             )
 
 

@@ -3,6 +3,7 @@ Defines the utils for the GENESIS algorithm.
 """
 
 from concurrent.futures import ProcessPoolExecutor
+from copy import deepcopy
 import timeit
 from typing import  Optional, Tuple, Type, cast
 from uuid import UUID, uuid4
@@ -44,6 +45,7 @@ class GenesisUtils:
         noOfNeurons: int,
         rejectionRate: float,
         sigma: float,
+        initLimit: float = 2 * np.pi,
     ) -> None:
         """
         Sets the predefined weights.
@@ -54,6 +56,7 @@ class GenesisUtils:
             noOfNeurons (int): the number of neurons in the hidden layer.
             rejectionRate (float): the rejection rate to use for decoding the individuals.
             sigma (float): the sigma to use for decoding the individuals.
+            initLimit (float): the limit to use for generating the predefined weights.
 
         Returns:
             None
@@ -61,7 +64,7 @@ class GenesisUtils:
 
         cls.noOfNeurons = noOfNeurons
         cls.predefinedWeights = getPredefinedWeights(
-            generatePredefinedWeights(sfcrs, topology, cls.noOfNeurons),
+            generatePredefinedWeights(sfcrs, topology, cls.noOfNeurons, initLimit),
             sfcrs,
             topology,
             cls.noOfNeurons,
@@ -220,7 +223,7 @@ class GenesisUtils:
 
     @staticmethod
     def generateRandomGenesisIndividual(
-        container: Type[Individual], topology: Topology, sfcrs: "list[SFCRequest]"
+        container: Type[Individual], topology: Topology, sfcrs: "list[SFCRequest]", initLimit: float = 2 * np.pi
     ) -> Individual:
         """
         Generates a random individual.
@@ -229,6 +232,7 @@ class GenesisUtils:
             container (Type[Individual]): the container for the individual.
             topology (Topology): the topology.
             sfcrs (list[SFCRequest]): the list of SFCRequests.
+            initLimit (float): the limit to use for generating the random weight.
 
         Returns:
             Individual: An individual randomly generated.
@@ -240,7 +244,7 @@ class GenesisUtils:
 
         weightLength: int = getWeightsLength(GenesisUtils.noOfNeurons)
         for _ in range(weightLength):
-            individual.append(generateRandomWeight())
+            individual.append(generateRandomWeight(initLimit))
 
         return individual
 
@@ -266,6 +270,7 @@ class GenesisUtils:
     def genesisMutate(
         individual: Individual,
         indpb: float,
+        initLimit: float = 2 * np.pi
     ) -> Individual:
         """
         Mutates an individual.
@@ -273,9 +278,16 @@ class GenesisUtils:
         Parameters:
             individual (Individual): the individual to mutate.
             indpb (float): the independent probability for each attribute to be mutated.
+            initLimit (float): the limit to use for generating the random weight.
 
         Returns:
             Individual: the mutated individual.
         """
 
-        return tools.mutGaussian(individual, mu=0.0, sigma=np.pi, indpb=indpb)[0]
+        mutatedIndividual: Individual = deepcopy(individual)
+
+        for gene in range(len(mutatedIndividual)):
+            if np.random.random() < indpb:
+                mutatedIndividual[gene] = generateRandomWeight(initLimit)
+
+        return mutatedIndividual
