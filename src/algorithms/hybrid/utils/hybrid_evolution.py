@@ -619,6 +619,17 @@ class HybridEvolution:
             expFile.write(f"No. of CPUs: {names[4]}\n")
             expFile.write(f"Time taken: {expEndTime - expStartTime:.2f}\n")
             expFile.write(f"Qualified Individuals: {len(qualifiedIndividuals)}\n")
+            expFile.write(f"Minimum Acceptance Rate: {MIN_AR}\n")
+            expFile.write(f"Maximum Latency: {MAX_LATENCY}\n")
+            expFile.write(f"Minimum Qualified Individuals: {MIN_QUAL_IND}\n")
+            expFile.write(f"Population Size: {popSize}\n")
+            expFile.write(f"Maximum Number of Generations: {NGEN}\n")
+            expFile.write(f"Maximum Memory Demand: {MAX_MEMORY_DEMAND}\n")
+            expFile.write(f"Mutation Probability: {self._mutPb}\n")
+            expFile.write(f"Gene Mutation Probability: {self._indPb}\n")
+            expFile.write(f"Crossover Probability: {self._cxpPb}\n")
+            expFile.write(f"Evaluation Type: {'Hybrid' if self._evaluateOnline else 'Offline'}\n")
+
 
         self._toolbox.unregister("individual")
         self._toolbox.unregister("population")

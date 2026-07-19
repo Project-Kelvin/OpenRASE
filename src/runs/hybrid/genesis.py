@@ -22,6 +22,9 @@ from utils.topology import generateFatTreeTopology
 from utils.traffic_design import generateTrafficDesignFromFile
 from utils.tui import TUI
 
+MUT_PB: float = 1.0
+GENE_MUT_PB: float = 0.2
+CX_PB: float = 0.7
 
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
