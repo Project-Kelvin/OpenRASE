@@ -30,20 +30,22 @@ CX_PB: float = 0.7
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
 @click.option("--ga", is_flag=True, default=False, help="Run in GA hyperparameter tuning mode.")
-@click.option("--genesis", is_flag=True, default=False, help="Run in GENESIS hyperparameter tuning mode.")
+@click.option("--rr", is_flag=True, default=False, help="Run in Rejection Rate tuning mode.")
+@click.option("--sigma", is_flag=True, default=False, help="Run in sigma hyperparameter tuning mode.")
 @click.option("--chain", is_flag=True, default=False, help="Use static chain decoding.")
 @click.option("--dijkstra", is_flag=True, default=False, help="Use Dijkstra's algorithm for pathfinding.")
 @click.option("--gaussian", is_flag=True, default=True, help="Disable the Gaussian distribution for host selection.")
 @click.option("--activation", is_flag=True, default=False, help="Test activation functions in the neural network.")
 @click.option("--init", is_flag=True, default=False, help="Test the limit to use for generating the predefined weights.")
-def run(headless: bool, ga: bool, genesis: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool) -> None:
+def run(headless: bool, ga: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
     Parameters:
         headless (bool): Whether to run the emulator in headless mode.
         ga (bool): Whether to run in GA hyperparameter tuning mode.
-        genesis (bool): Whether to run in GENESIS hyperparameter tuning mode.
+        rr (bool): Whether to run in Rejection Rate tuning mode.
+        sigma (bool): Whether to run in sigma hyperparameter tuning mode.
         chain (bool): Whether to use static chain decoding.
         dijkstra (bool): Whether to use Dijkstra's algorithm for pathfinding.
         gaussian (bool): Whether to disable the Gaussian distribution for host selection.
@@ -230,9 +232,8 @@ def run(headless: bool, ga: bool, genesis: bool, chain: bool, dijkstra: bool, ga
                                             cxPb=crossPb,
                                             evaluateOnline=False
                                         )
-                    elif genesis:
-                        for sigma in sigmas:
-                            for rejectionRate in rejectionRates:
+                    elif sigma:
+                        for sigmaVal in sigmas:
                                 for i in range(noOfRuns):
                                     solve(
                                         requests,
@@ -243,11 +244,26 @@ def run(headless: bool, ga: bool, genesis: bool, chain: bool, dijkstra: bool, ga
                                         self._orchestrator.getTelemetry(),
                                         topology,
                                         "genesis",
-                                        f"{exp['name']}_sigma_{sigma}_rejectionRate_{rejectionRate}_{i}",
-                                        sigma=sigma,
-                                        rejectionRate=rejectionRate,
+                                        f"{exp['name']}_sigma_{sigmaVal}_{i}",
+                                        sigma=sigmaVal,
                                         evaluateOnline=False
                                     )
+                    elif rr:
+                        for rejectionRate in rejectionRates:
+                            for i in range(noOfRuns):
+                                solve(
+                                    requests,
+                                    self._orchestrator.sendEmbeddingGraphs,
+                                    self._orchestrator.deleteEmbeddingGraphs,
+                                    trafficDesign,
+                                    self._trafficGenerator,
+                                    self._orchestrator.getTelemetry(),
+                                    topology,
+                                    "genesis",
+                                    f"{exp['name']}_rejectionRate_{rejectionRate}_{i}",
+                                    rejectionRate=rejectionRate,
+                                    evaluateOnline=False
+                                )
                     elif activation:
                         for activationFunction in activations:
                             for i in range(noOfRuns):
