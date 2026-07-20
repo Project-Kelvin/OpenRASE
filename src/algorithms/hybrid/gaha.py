@@ -30,7 +30,7 @@ def solve(
     telemetry: Telemetry,
     experiment: str,
     mutPb: float = MUTPB,
-    cxpPb: float = CXPB,
+    cxPb: float = CXPB,
     indPb: float = INDPB,
     evaluateOnline: bool = True,
 ) -> None:
@@ -47,7 +47,7 @@ def solve(
         telemetry (Telemetry): telemetry instance.
         experiment (str): the experiment name.
         mutPb (float): the mutation probability.
-        cxpPb (float): the crossover probability.
+        cxPb (float): the crossover probability.
         indPb (float): the individual mutation probability.
         evaluateOnline (bool): whether to evaluate the solution online or offline.
 
@@ -75,7 +75,7 @@ def solve(
         gahaUtils.mutate,
         Individual,
         mutPb,
-        cxpPb,
+        cxPb,
         indPb,
         evaluateOnline=evaluateOnline
     )

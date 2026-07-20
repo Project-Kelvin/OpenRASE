@@ -25,11 +25,12 @@ from utils.tui import TUI
 
 MUT_PB: float = 1.0
 GENE_MUT_PB: float = 0.2
-CX_PB: float = 0.7
+CX_PB: float = 1.0
 
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
-@click.option("--ga", is_flag=True, default=False, help="Run in GA hyperparameter tuning mode.")
+@click.option("--mutation", is_flag=True, default=False, help="Run in mutation pbs hyperparameter tuning mode.")
+@click.option("--cx", is_flag=True, default=False, help="Run in crossover pb hyperparameter tuning mode.")
 @click.option("--rr", is_flag=True, default=False, help="Run in Rejection Rate tuning mode.")
 @click.option("--sigma", is_flag=True, default=False, help="Run in sigma hyperparameter tuning mode.")
 @click.option("--chain", is_flag=True, default=False, help="Use static chain decoding.")
@@ -37,13 +38,14 @@ CX_PB: float = 0.7
 @click.option("--gaussian", is_flag=True, default=True, help="Disable the Gaussian distribution for host selection.")
 @click.option("--activation", is_flag=True, default=False, help="Test activation functions in the neural network.")
 @click.option("--init", is_flag=True, default=False, help="Test the limit to use for generating the predefined weights.")
-def run(headless: bool, ga: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool) -> None:
+def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
     Parameters:
         headless (bool): Whether to run the emulator in headless mode.
-        ga (bool): Whether to run in GA hyperparameter tuning mode.
+        mutation (bool): Whether to run in mutation probability hyperparameter tuning mode.
+        cx (bool): Whether to run in crossover probability hyperparameter tuning mode.
         rr (bool): Whether to run in Rejection Rate tuning mode.
         sigma (bool): Whether to run in sigma hyperparameter tuning mode.
         chain (bool): Whether to use static chain decoding.
@@ -70,7 +72,7 @@ def run(headless: bool, ga: bool, rr: bool, sigma: bool, chain: bool, dijkstra: 
         (8, 0.1, False, 10, 2), # Easy
     ]
 
-    if ga or genesis:
+    if mutation or cx or rr or sigma or activation or init or chain or dijkstra or gaussian:
         experimentsIncludeFilter = [experimentsIncludeFilter[0]]  # Only run the Hard experiment for hyperparameter tuning
 
     noOfRuns: int = 20
@@ -212,26 +214,40 @@ def run(headless: bool, ga: bool, rr: bool, sigma: bool, chain: bool, dijkstra: 
                         requests.append(self._requests.get())
                         sleep(0.1)
 
-                    if ga:
-                        for crossPb in crossoverProbabilities:
-                            for mutPb in mutationProbabilities:
-                                for indPb in individualProbabilities:
-                                    for i in range(noOfRuns):
-                                        solve(
-                                            requests,
-                                            self._orchestrator.sendEmbeddingGraphs,
-                                            self._orchestrator.deleteEmbeddingGraphs,
-                                            trafficDesign,
-                                            self._trafficGenerator,
-                                            self._orchestrator.getTelemetry(),
-                                            topology,
-                                            "genesis",
-                                            f"{exp['name']}_mutPb_{mutPb}_indPb_{indPb}_cxPb_{crossPb}_{i}",
-                                            mutPb=mutPb,
-                                            indPb=indPb,
-                                            cxPb=crossPb,
-                                            evaluateOnline=False
-                                        )
+                    if mutation:
+                        for mutPb in mutationProbabilities:
+                            for indPb in individualProbabilities:
+                                for i in range(noOfRuns):
+                                    solve(
+                                        requests,
+                                        self._orchestrator.sendEmbeddingGraphs,
+                                        self._orchestrator.deleteEmbeddingGraphs,
+                                        trafficDesign,
+                                        self._trafficGenerator,
+                                        self._orchestrator.getTelemetry(),
+                                        topology,
+                                        "genesis",
+                                        f"{exp['name']}_mutPb_{mutPb}_indPb_{indPb}_{i}",
+                                        mutPb=mutPb,
+                                        indPb=indPb,
+                                        evaluateOnline=False
+                                    )
+                    elif cx:
+                        for cxPb in crossoverProbabilities:
+                            for i in range(noOfRuns):
+                                solve(
+                                    requests,
+                                    self._orchestrator.sendEmbeddingGraphs,
+                                    self._orchestrator.deleteEmbeddingGraphs,
+                                    trafficDesign,
+                                    self._trafficGenerator,
+                                    self._orchestrator.getTelemetry(),
+                                    topology,
+                                    "genesis",
+                                    f"{exp['name']}_cxPb_{cxPb}_{i}",
+                                    cxPb=cxPb,
+                                    evaluateOnline=False
+                                )
                     elif sigma:
                         for sigmaVal in sigmas:
                                 for i in range(noOfRuns):
@@ -324,7 +340,10 @@ def run(headless: bool, ga: bool, rr: bool, sigma: bool, chain: bool, dijkstra: 
                                 self._orchestrator.getTelemetry(),
                                 topology,
                                 "genesis",
-                                f"{exp['name']}_{i}"
+                                f"{exp['name']}_{i}",
+                                mutPb=MUT_PB,
+                                indPb=GENE_MUT_PB,
+                                cxPb=CX_PB,
                             )
 
 

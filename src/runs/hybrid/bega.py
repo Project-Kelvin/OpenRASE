@@ -23,14 +23,16 @@ from utils.tui import TUI
 
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
-@click.option("--hyper", is_flag=True, default=False, help="Run in hyperparameter tuning mode.")
-def run(headless: bool, hyper: bool) -> None:
+@click.option("--mutation", is_flag=True, default=False, help="Run in mutation probability hyperparameter tuning mode.")
+@click.option("--cx", is_flag=True, default=False, help="Run in crossover probability hyperparameter tuning mode.")
+def run(headless: bool, mutation: bool, cx: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
     Parameters:
         headless (bool): Whether to run the emulator in headless mode.
-        hyper (bool): Whether to run in hyperparameter tuning mode.
+        mutation (bool): Whether to run in mutation probability hyperparameter tuning mode.
+        cx (bool): Whether to run in crossover probability hyperparameter tuning mode.
 
     Returns:
         None
@@ -46,7 +48,7 @@ def run(headless: bool, hyper: bool) -> None:
         (8, 0.1, False, 10, 2), # Easy
     ]
 
-    if hyper:
+    if mutation or cx:
         experimentsIncludeFilter = [experimentsIncludeFilter[2]]  # Only run the easy experiment for hyperparameter tuning
 
     noOfRuns: int = 20
@@ -204,28 +206,44 @@ def run(headless: bool, hyper: bool) -> None:
                         requests.append(self._requests.get())
                         sleep(0.1)
 
-                    if hyper:
-                        for crossPb in crossoverProbabilities:
-                            for mutPb in mutationProbabilities:
-                                for indPb in individualProbabilities:
-                                    for i in range(20):
-                                        TUI.appendToSolverLog(
-                                            f"Running experiment {exp['name']} with mutPb={mutPb} and indPb={indPb}."
-                                        )
-                                        solve(
-                                            topology,
-                                            requests,
-                                            self._orchestrator.sendEmbeddingGraphs,
-                                            self._orchestrator.deleteEmbeddingGraphs,
-                                            trafficDesign,
-                                            self._trafficGenerator,
-                                            self._orchestrator.getTelemetry(),
-                                            f"{exp['name']}_mutPb{mutPb}_indPb{indPb}_cxPb{crossPb}_{i}",
-                                            mutPb = mutPb,
-                                            indPb = indPb,
-                                            cxpPb = crossPb,
-                                            evaluateOnline = False,
-                                        )
+                    if mutation:
+                        for mutPb in mutationProbabilities:
+                            for indPb in individualProbabilities:
+                                for i in range(noOfRuns):
+                                    TUI.appendToSolverLog(
+                                        f"Running experiment {exp['name']} with mutPb={mutPb} and indPb={indPb}."
+                                    )
+                                    solve(
+                                        topology,
+                                        requests,
+                                        self._orchestrator.sendEmbeddingGraphs,
+                                        self._orchestrator.deleteEmbeddingGraphs,
+                                        trafficDesign,
+                                        self._trafficGenerator,
+                                        self._orchestrator.getTelemetry(),
+                                        f"{exp['name']}_mutPb{mutPb}_indPb{indPb}_{i}",
+                                        mutPb = mutPb,
+                                        indPb = indPb,
+                                        evaluateOnline = False,
+                                    )
+                    elif cx:
+                        for cxPb in crossoverProbabilities:
+                            for i in range(noOfRuns):
+                                TUI.appendToSolverLog(
+                                    f"Running experiment {exp['name']} with cxPb={cxPb}."
+                                )
+                                solve(
+                                    topology,
+                                    requests,
+                                    self._orchestrator.sendEmbeddingGraphs,
+                                    self._orchestrator.deleteEmbeddingGraphs,
+                                    trafficDesign,
+                                    self._trafficGenerator,
+                                    self._orchestrator.getTelemetry(),
+                                    f"{exp['name']}_cxPb{cxPb}_{i}",
+                                    cxpPb = cxPb,
+                                    evaluateOnline = False,
+                                )
                     else:
                         TUI.appendToSolverLog(
                             f"Running experiment {exp['name']} with default parameters."
