@@ -23,8 +23,8 @@ from utils.topology import generateFatTreeTopology
 from utils.traffic_design import generateTrafficDesignFromFile
 from utils.tui import TUI
 
-MUT_PB: float = 1.0
-GENE_MUT_PB: float = 0.2
+MUT_PB: float = 0.7 # Experimentally determined mutation probability for the GA
+GENE_MUT_PB: float = 0.7 # Experimentally determined gene mutation probability for the GA
 CX_PB: float = 1.0
 
 @click.command()

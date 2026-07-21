@@ -14,7 +14,7 @@ def run() -> None:
     """
 
     rootDir: str = getConfig()["repoAbsolutePath"]
-    script: str = os.path.join(rootDir, "src", "algorithms", "hybrid", "utils", "root_service.py")
+    script: str = os.path.join(rootDir, "src", "algorithms", "hybrid", "utils", "root", "root_service.py")
     cmd: list[str] = [sys.executable, script]
     subprocess.run(
         cmd,

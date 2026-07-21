@@ -9,7 +9,6 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from algorithms.hybrid.constants.genesis_objective import LATENCY
 from algorithms.hybrid.utils.hierarchical_evolution import HierarchicalEvolution
-from algorithms.hybrid.utils.hierarchical_evolution_client import HierarchicalEvolutionClient
 from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
@@ -77,9 +76,7 @@ def solve(
         None
     """
 
-    HiGenesisClass = HierarchicalEvolutionClient if isClientMode else HierarchicalEvolution
-
-    hiGenesis: Union[HierarchicalEvolutionClient, HierarchicalEvolution] = HiGenesisClass(
+    hiGenesis: HierarchicalEvolution = HierarchicalEvolution(
         POP_SIZE,
         MAX_GEN,
         cxPb,
@@ -105,6 +102,7 @@ def solve(
         deleteEGs,
         DOMINANCE_THRESHOLD,
         retainPopulation,
+        isClientMode
     )
 
     try:

@@ -22,7 +22,7 @@ from algorithms.hybrid.constants.genesis_objective import LATENCY, POWER
 from algorithms.hybrid.models.individuals import GenesisIndividual, Individual
 from algorithms.hybrid.utils.genesis import GenesisUtils
 from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
-from algorithms.hybrid.utils.root_evolver import RootEvolver
+from algorithms.hybrid.utils.root.root_evolver import RootEvolver
 from algorithms.models.embedding import DecodedIndividual
 from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
@@ -66,6 +66,7 @@ class HierarchicalEvolution:
         dominanceThreshold: float,
         retainPopulation: bool = False,
         rootIndividual: int = -1,
+        isClientMode: bool = False
     ) -> None:
         """
         Initializes the hierarchical evolution.
@@ -95,6 +96,7 @@ class HierarchicalEvolution:
             dominanceThreshold (float): the threshold for determining if a Pareto front is dominated by another.
             retainPopulation (bool): specifies if the population should be retained in memory after evolution.
             rootIndividual (int): the index of the root individual to be used in the evolution.
+            isClientMode (bool): specifies if the hierarchical evolution should operate in client mode.
 
         Returns:
             None
@@ -130,10 +132,10 @@ class HierarchicalEvolution:
         self._deleteEGs: Callable[[list[EmbeddingGraph]], None] = deleteEGs
         self._dominanceThreshold: float = dominanceThreshold
         self._maxGen: int = maxGen
-        self._rootEvolver: RootEvolver = RootEvolver(popSize)
         self._metaPopSize: int = 0
         self._genesisPopSize: int = 0
         self._rootIndividual: int = rootIndividual
+        self._rootEvolver: RootEvolver = RootEvolver(popSize, isClientMode=isClientMode)
 
     def _computeMetaAndGenesisPopSize(self, root: int) -> tuple[int, int]:
         """
@@ -150,6 +152,78 @@ class HierarchicalEvolution:
         genesisPopSize: int = self._popSize // metaPopSize
 
         return metaPopSize, genesisPopSize
+
+
+    def _calculateShortestEuclideanDistanceToThreshold(self, pf: tools.ParetoFront) -> float:
+        """
+        Computes the Euclidean distance from each individual in the Pareto front to a threshold.
+
+        Parameters:
+            pf (tools.ParetoFront): The Pareto front.
+
+        Returns:
+            float: The computed Euclidean distance.
+        """
+
+        distances: list[float] = []
+        for individual in pf:
+            distance: float = 0.0
+
+            if individual.fitness.values[0] >= self._minAR and individual.fitness.values[1] <= self._maxSecondObjective:
+                distance = 0.0
+            else:
+                distance: float = np.sqrt(
+                    (individual.fitness.values[0] - self._minAR) ** 2
+                    + (individual.fitness.values[1] - self._maxSecondObjective) ** 2
+                )
+            distances.append(distance)
+
+        return min(distances) if distances else 1000.0
+
+    def _calculateDifferenceInEuclideanDistance(self, newPF: tools.ParetoFront, oldPF: tools.ParetoFront) -> float:
+        """
+        Calculates the difference in Euclidean distance between two Pareto fronts.
+
+        Parameters:
+            newPF (tools.ParetoFront): The new Pareto front.
+            oldPF (tools.ParetoFront): The old Pareto front.
+s
+        Returns:
+            float: The difference in Euclidean distance between the two Pareto fronts.
+        """
+
+        distance1: float = self._calculateShortestEuclideanDistanceToThreshold(newPF)
+        distance2: float = self._calculateShortestEuclideanDistanceToThreshold(oldPF)
+
+        return distance2 - distance1
+
+    def _isThereImprovement(self, newPF: tools.ParetoFront, oldPF: tools.ParetoFront) -> bool:
+        """
+        Determines if there is an improvement in the Pareto front based on the difference in Euclidean distance.
+
+        Parameters:
+            newPF (tools.ParetoFront): The new Pareto front.
+            oldPF (tools.ParetoFront): The old Pareto front.
+
+        Returns:
+            bool: True if there is an improvement, False otherwise.
+        """
+
+        return self._calculateDifferenceInEuclideanDistance(newPF, oldPF) > 0
+
+    def _calculateImprovement(self, newDistance: float, oldDistance: float) -> float:
+        """
+        Calculates the improvement in the Pareto front based on the difference in Euclidean distance.
+
+        Parameters:
+            newDistance (float): The Euclidean distance of the new Pareto front.
+            oldDistance (float): The Euclidean distance of the old Pareto front.
+
+        Returns:
+            float: The improvement in the Pareto front.
+        """
+
+        return (newDistance - oldDistance) / oldDistance if oldDistance != 0 else 0.0
 
 
     def _calculateParetoDominatedPercentage(self, pf1: tools.ParetoFront, pf2: tools.ParetoFront) -> float:
@@ -965,22 +1039,6 @@ class HierarchicalEvolution:
 
         return newPop
 
-    def _getWorstFitness(self, population: list[Individual]) -> tuple[float, float]:
-        """
-        Gets the worst fitness of the population.
-
-        Parameters:
-            population (list[Individual]): the population to get the worst fitness from.
-
-        Returns:
-            tuple[float, float]: the worst fitness of the population.
-        """
-
-        worstAR: float = min([ind.fitness.values[0] for ind in population])
-        worstLatency: float = max([ind.fitness.values[1] for ind in population])
-
-        return worstAR, worstLatency
-
     def evolve(self) -> None:
         """
         Evolves the meta-individuals.
@@ -998,21 +1056,20 @@ class HierarchicalEvolution:
         GenesisUtils.init(self._sfcrs, self._topology, self._noOfNeurons, 0.0, 0.0)
         self._initialiseMetaEvolver()
 
-        if (
-            not self._retainPopulation
-            or RootEvolver.getRootIndividual() == -1
-        ):
-            TUI.appendToSolverLog("Root not retained. Generating random root.")
-            RootEvolver.setRootIndividual(self._rootEvolver.generateRandomRoot())
+        if self._retainPopulation:
+            if RootEvolver.getRoot() == -1:
+                TUI.appendToSolverLog("Root not retained. Generating random root.")
+                self._rootEvolver.generateRandomRoot()
+        else:
+            if self._rootIndividual == -1:
+                TUI.appendToSolverLog("Root not predefined. Generating random root.")
+                self._rootEvolver.generateRandomRoot()
+            else:
+                TUI.appendToSolverLog(f"Root predefined. Using root: {self._rootIndividual}.")
+                RootEvolver.setRoot(self._rootIndividual)
 
-        if self._rootIndividual != -1:
-            TUI.appendToSolverLog(f"Root predefined. Using root: {self._rootIndividual}.")
-            RootEvolver.setRootIndividual(self._rootIndividual)
-
-        self._rootEvolver.addRootToExploredRoot(RootEvolver.getRootIndividual())
-
-        TUI.appendToSolverLog(f"Root is: {RootEvolver.getRootIndividual()}.")
-        self._metaPopSize, self._genesisPopSize = self._computeMetaAndGenesisPopSize(RootEvolver.getRootIndividual())
+        TUI.appendToSolverLog(f"Root is: {RootEvolver.getRoot()}.")
+        self._metaPopSize, self._genesisPopSize = self._computeMetaAndGenesisPopSize(RootEvolver.getRoot())
         TUI.appendToSolverLog(f"Meta pop size: {self._metaPopSize}, Genesis pop size: {self._genesisPopSize}")
 
         if (
@@ -1042,11 +1099,9 @@ class HierarchicalEvolution:
         rootPF: tools.ParetoFront = tools.ParetoFront()
         metaPF: tools.ParetoFront = tools.ParetoFront()
         genesisPF: tools.ParetoFront = tools.ParetoFront()
-        rootRadius: float = 0.0
         shouldMetaGenContinue: bool = True
         shouldGenesisGenContinue: bool = True
-        prevRootIndividual: int = RootEvolver.getRootIndividual()
-        hyperVolumeReferencePoint: tuple[float, float] = (0.0, 0.0)
+        oldDifference: float = -1.0
 
         while (
             len(qualifiedIndividuals) < self._minQualInd and gen < self._maxGen
@@ -1142,15 +1197,14 @@ class HierarchicalEvolution:
                         gen, rootGen, metaGen, genesisGen, cast(list[Individual], genesisOffSpring), cast(list[Individual], HierarchicalEvolution._genesisPopulation), popEG
                     )
 
-                    if gen == 1:
-                        hyperVolumeReferencePoint = self._getWorstFitness(evaluatedPop)
-
                     qualifiedIndividuals.extend(qualInd)
                     newGenesisPF: tools.ParetoFront = tools.ParetoFront()
                     newGenesisPF.update(evaluatedPop)
-                    shouldGenesisGenContinue = self._isParetoDominated(
+
+                    shouldGenesisGenContinue = self._isThereImprovement(
                         genesisPF, newGenesisPF
                     )
+
                     genesisPF = newGenesisPF
                     HierarchicalEvolution._genesisPopulation = deepcopy(
                         cast(list[GenesisIndividual], evaluatedPop)
@@ -1173,41 +1227,36 @@ class HierarchicalEvolution:
                 )
                 newMetaPF: tools.ParetoFront = tools.ParetoFront()
                 newMetaPF.update(HierarchicalEvolution._genesisPopulation)
-                shouldMetaGenContinue = self._isParetoDominated(
+
+                shouldMetaGenContinue = self._isThereImprovement(
                     metaPF, newMetaPF
-                ) or self._rootIndividual == -1
+                ) or self._rootIndividual != -1
+
                 dominance: float = self._calculateParetoDominatedPercentage(metaPF, newMetaPF)
                 self._writeMetaLog(rootGen, metaGen, metaOffspring, dominance)
                 metaPF = newMetaPF
                 shouldGenesisGenContinue = True
 
+            newRootPF: tools.ParetoFront = tools.ParetoFront()
+            newRootPF.update(HierarchicalEvolution._genesisPopulation)
+
+            difference: float = self._calculateDifferenceInEuclideanDistance(newRootPF, rootPF)
+            improvement: float = self._calculateImprovement(difference, oldDifference)
+            self._rootEvolver.setRootFitness(RootEvolver.getRoot(), improvement)
+
             if len(qualifiedIndividuals) >= self._minQualInd or gen >= self._maxGen:
                 break
             TUI.appendToSolverLog("Exiting meta evolution and moving to the next generation of root.")
-            newRootPF: tools.ParetoFront = tools.ParetoFront()
-            newRootPF.update(HierarchicalEvolution._genesisPopulation)
-            isCurrentRootDominant = self._isParetoDominated(
-                rootPF, newRootPF
-            )
-            dominance: float = self._calculateParetoDominatedPercentage(rootPF, newRootPF)
-            self._writeRootLog(rootGen, dominance)
-            currentRootIndividual = RootEvolver.getRootIndividual()
-            if isCurrentRootDominant:
-                prevRootIndividual = RootEvolver.getRootIndividual()
-                rootRadius = 1 - dominance
-                RootEvolver.setRootIndividual(self._rootEvolver.selectRootNeighbour(
-                    RootEvolver.getRootIndividual(), rootRadius
-                ))
-            else:
-                TUI.appendToSolverLog("Root is not dominated by previous root.")
-                RootEvolver.setRootIndividual(self._rootEvolver.selectRootNeighbour(
-                    prevRootIndividual, rootRadius
-                ))
-            self._rootEvolver.addRootToExploredRoot(RootEvolver.getRootIndividual())
-            TUI.appendToSolverLog(f"New root: {RootEvolver.getRootIndividual()}")
-            self._metaPopSize, self._genesisPopSize = self._computeMetaAndGenesisPopSize(RootEvolver.getRootIndividual())
+
+            self._rootEvolver.selectNextRoot(RootEvolver.getRoot(), 1 - improvement)
+            oldDifference = difference
+
+            self._writeRootLog(rootGen, improvement)
+
+            TUI.appendToSolverLog(f"New root: {RootEvolver.getRoot()}")
+            self._metaPopSize, self._genesisPopSize = self._computeMetaAndGenesisPopSize(RootEvolver.getRoot())
             TUI.appendToSolverLog(f"Meta pop size: {self._metaPopSize}, Genesis pop size: {self._genesisPopSize}")
-            self._recomposeEvolvers(currentRootIndividual)
+            self._recomposeEvolvers(self._rootEvolver.getRoot())
 
             rootPF = newRootPF
             shouldMetaGenContinue = True
