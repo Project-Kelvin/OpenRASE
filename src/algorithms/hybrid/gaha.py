@@ -62,7 +62,7 @@ def solve(
     )
 
     def decodePopWrapper(pop: list[Individual], topology: Topology, sfcr: list[SFCRequest]) -> list[DecodedIndividual]:
-        return gahaUtils.decodePop(pop)
+        return gahaUtils.decodePop(pop, ignoreVNFInstances=True)
 
     def generateRandomIndividual(container: Type[Individual], topology: Topology, sfcr: list[SFCRequest]) -> Individual:
         return gahaUtils.generateRandomIndividual(container)

@@ -102,7 +102,7 @@ class MakGAUtils:
 
         return individual
 
-    def _convertIndividualToEmbeddingGraphs(self, individual: Individual, popIndex: int) -> tuple[
+    def _convertIndividualToEmbeddingGraphs(self, individual: Individual, popIndex: int, ignoreVNFInstances: bool = False) -> tuple[
         list[EmbeddingGraph],
         EmbeddingData,
         LinkData,
@@ -115,6 +115,7 @@ class MakGAUtils:
         Parameters:
             individual (Individual): The individual to convert.
             popIndex (int): The index of the individual in the population.
+            ignoreVNFInstances (bool): Whether to ignore VNF instances.
 
         Returns:
             tuple[list[EmbeddingGraph], EmbeddingData, LinkData, dict[str, list[tuple[str, int]]]]:
@@ -192,23 +193,44 @@ class MakGAUtils:
                 vnfInstances[fgr["sfcID"]] = {vnf["vnf"]["id"]: 1}
 
             if fgr["sfcID"] not in vnfData:
-                vnfData[fgr["sfcID"]] = [(vnf["vnf"]["id"], vnfInstance, depth)]
+                if ignoreVNFInstances:
+                    vnfData[fgr["sfcID"]] = [(vnf["vnf"]["id"], depth)]
+                else:
+                    vnfData[fgr["sfcID"]] = [(vnf["vnf"]["id"], vnfInstance, depth)]
             else:
-                vnfData[fgr["sfcID"]].append((vnf["vnf"]["id"], vnfInstance, depth))
+                if ignoreVNFInstances:
+                    vnfData[fgr["sfcID"]].append((vnf["vnf"]["id"], depth))
+                else:
+                    vnfData[fgr["sfcID"]].append((vnf["vnf"]["id"], vnfInstance, depth))
 
             if vnf["host"]["id"] in embeddingData:
                 if fgr["sfcID"] in embeddingData[vnf["host"]["id"]]:
-                    embeddingData[vnf["host"]["id"]][fgr["sfcID"]].append(
-                        [vnf["vnf"]["id"], vnfInstance, depth]
-                    )
+                    if ignoreVNFInstances:
+                        embeddingData[vnf["host"]["id"]][fgr["sfcID"]].append(
+                            [vnf["vnf"]["id"], depth]
+                        )
+                    else:
+                        embeddingData[vnf["host"]["id"]][fgr["sfcID"]].append(
+                            [vnf["vnf"]["id"], vnfInstance, depth]
+                        )
                 else:
-                    embeddingData[vnf["host"]["id"]][fgr["sfcID"]] = [
-                        [vnf["vnf"]["id"], vnfInstance, depth]
-                    ]
+                    if ignoreVNFInstances:
+                        embeddingData[vnf["host"]["id"]][fgr["sfcID"]] = [
+                            [vnf["vnf"]["id"], depth]
+                        ]
+                    else:
+                        embeddingData[vnf["host"]["id"]][fgr["sfcID"]] = [
+                            [vnf["vnf"]["id"], vnfInstance, depth]
+                        ]
             else:
-                embeddingData[vnf["host"]["id"]] = {
-                    fgr["sfcID"]: [[vnf["vnf"]["id"], vnfInstance, depth]]
-                }
+                if ignoreVNFInstances:
+                    embeddingData[vnf["host"]["id"]] = {
+                        fgr["sfcID"]: [[vnf["vnf"]["id"], depth]]
+                    }
+                else:
+                    embeddingData[vnf["host"]["id"]] = {
+                        fgr["sfcID"]: [[vnf["vnf"]["id"], vnfInstance, depth]]
+                    }
 
         for index, fgr in enumerate(self._fgrs):
             copiedFGR: EmbeddingGraph = copy.deepcopy(fgr)
@@ -349,12 +371,13 @@ class MakGAUtils:
             popIndex,
         )
 
-    def decodePop(self, pop: list[Individual]) -> list[DecodedIndividual]:
+    def decodePop(self, pop: list[Individual], ignoreVNFInstances: bool = False) -> list[DecodedIndividual]:
         """
         Decodes a population of individuals into EmbeddingGraph objects and calculates the total cost.
 
         Parameters:
             pop (list[Individual]): A list of individuals, where each individual is an Individual object.
+            ignoreVNFInstances (bool): If True, ignores VNF instances when decoding.
 
         Returns:
             list[DecodedIndividual]: A list containing a tuple that consists of the index, embedding graphs, embedding data, link data, acceptance ratio, and VNF data for each individual.
@@ -368,7 +391,8 @@ class MakGAUtils:
                 executor.submit(
                     self._convertIndividualToEmbeddingGraphs,
                     individual,
-                    index
+                    index,
+                    ignoreVNFInstances
                 )
                 for index, individual in enumerate(pop)
             ]
