@@ -18,9 +18,9 @@ from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 
 POP_SIZE: int = 20
-INDPB: float = 0.5
-MUTPB: float = 0.5
-CXPB: float = 1.0
+INDPB: float = 0.7 # Experimentally determined gene mutation probability for the GA
+MUTPB: float = 0.7 # Experimentally determined mutation probability for the GA
+CXPB: float = 1.0 # Experimentally determined crossover probability for the GA
 
 def solve(
     topology: Topology,
