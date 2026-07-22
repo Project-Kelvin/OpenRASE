@@ -16,8 +16,8 @@ from sfc.traffic_generator import TrafficGenerator
 from algorithms.mak_ga.mak_ga_utils import MakGAUtils
 
 POP_SIZE: int = 20
-INDPB: float = 0.5
-MUTPB: float = 0.5
+INDPB: float = 0.7 # Experimentally determined gene mutation probability for the GA
+MUTPB: float = 0.7 # Experimentally determined mutation probability for the GA
 CXPB: float = 1.0
 
 def solve(
