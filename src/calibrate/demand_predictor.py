@@ -26,6 +26,16 @@ class DemandPredictor:
             for metric in METRICS:
                 self._getVNFResourceDemandModel(vnf, metric)
 
+    def getVNFModels(self) -> "dict[str, dict[str, Any]]":
+        """
+        Get the models of the VNFs.
+
+        Returns:
+            dict[str, dict[str, Any]]: The models of the VNFs.
+        """
+
+        return self._models
+
     def _getVNFResourceDemandModel(self, vnf: str, metric: str) -> Any:
         """
         Get the resource demand model of the given metric and VNF.

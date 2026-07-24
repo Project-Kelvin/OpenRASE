@@ -25,7 +25,7 @@ from utils.tui import TUI
 
 MUT_PB: float = 0.7 # Experimentally determined mutation probability for the GA
 GENE_MUT_PB: float = 0.7 # Experimentally determined gene mutation probability for the GA
-CX_PB: float = 1.0
+CX_PB: float = 1.0 # Experimentally determined crossover probability for the GA
 
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
@@ -312,7 +312,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                                     initLimit=initLimitValue,
                                     evaluateOnline=False
                                 )
-                    elif chain or dijkstra or gaussian:
+                    elif chain or dijkstra or not gaussian:
                         for i in range(noOfRuns):
                             solve(
                                 requests,

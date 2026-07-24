@@ -209,7 +209,7 @@ def run(headless: bool, mutation: bool, cx: bool) -> None:
                     if mutation:
                         for mutPb in mutationProbabilities:
                             for indPb in individualProbabilities:
-                                for i in range(20):
+                                for i in range(noOfRuns):
                                     TUI.appendToSolverLog(
                                         f"Running experiment {exp['name']} with mutPb={mutPb} and indPb={indPb}."
                                     )
@@ -228,7 +228,7 @@ def run(headless: bool, mutation: bool, cx: bool) -> None:
                                     )
                     elif cx:
                         for cxPb in crossoverProbabilities:
-                            for i in range(20):
+                            for i in range(noOfRuns):
                                 TUI.appendToSolverLog(
                                     f"Running experiment {exp['name']} with cxPb={cxPb}."
                                 )

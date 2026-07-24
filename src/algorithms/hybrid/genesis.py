@@ -26,7 +26,7 @@ REJECTION_RATE: float = 0.05
 SIGMA: float = 2.0
 MUTPB: float = 0.7 # Experimentally determined mutation probability for the GA
 INDPB: float = 0.7 # Experimentally determined gene mutation probability for the GA
-CXPB: float = 1.0
+CXPB: float = 1.0 # Experimentally determined crossover probability for the GA
 ACTIVATION: str = "sin"
 INIT_LIMIT: float = 2 * np.pi
 
@@ -144,7 +144,9 @@ def solve(
         f"Is Dijkstra Used: {dijkstra}",
         f"Is Gaussian Disabled: {disableGaussian}",
         f"Activation Function: {activation}",
-        f"Initial Weight Limit: {initLimit}"
+        f"Initial Weight Limit: {initLimit}",
+        f"Rejection Rate: {rejectionRate}",
+        f"Sigma: {sigma}",
     ]
 
     hybridEvolution: HybridEvolution = HybridEvolution(
