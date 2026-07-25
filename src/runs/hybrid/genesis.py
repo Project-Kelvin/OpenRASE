@@ -32,7 +32,7 @@ from utils.tui import TUI
 @click.option("--sigma", is_flag=True, default=False, help="Run in sigma hyperparameter tuning mode.")
 @click.option("--chain", is_flag=True, default=False, help="Use static chain decoding.")
 @click.option("--dijkstra", is_flag=True, default=False, help="Use Dijkstra's algorithm for pathfinding.")
-@click.option("--gaussian", is_flag=True, default=True, help="Disable the Gaussian distribution for host selection.")
+@click.option("--gaussian", is_flag=True, default=False, help="Disable the Gaussian distribution for host selection.")
 @click.option("--activation", is_flag=True, default=False, help="Test activation functions in the neural network.")
 @click.option("--init", is_flag=True, default=False, help="Test the limit to use for generating the predefined weights.")
 def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool) -> None:
@@ -309,7 +309,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                                     initLimit=initLimitValue,
                                     evaluateOnline=False
                                 )
-                    elif chain or dijkstra or not gaussian:
+                    elif chain or dijkstra or gaussian:
                         for i in range(noOfRuns):
                             solve(
                                 requests,
@@ -323,7 +323,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                                 f"{exp['name']}_chain_{chain}_dijkstra_{dijkstra}_gaussian_{gaussian}_{i}",
                                 staticChain=chain,
                                 dijkstra=dijkstra,
-                                disableGaussian=not gaussian,
+                                disableGaussian=gaussian,
                                 evaluateOnline=False
                             )
                     else:
