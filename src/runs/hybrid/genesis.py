@@ -23,9 +23,6 @@ from utils.topology import generateFatTreeTopology
 from utils.traffic_design import generateTrafficDesignFromFile
 from utils.tui import TUI
 
-MUT_PB: float = 0.7 # Experimentally determined mutation probability for the GA
-GENE_MUT_PB: float = 0.7 # Experimentally determined gene mutation probability for the GA
-CX_PB: float = 1.0 # Experimentally determined crossover probability for the GA
 
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
@@ -63,10 +60,10 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
     crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     rejectionRates: list[float] = [0.05, 0.07, 0.1]
     sigmas: list[float] = [0.0, 1.0, 2.0, 4.0]
-    activations: list[str] = ["sin", "tanh", "relu", "linear"]
+    activations: list[str] = ["tanh", "sin", "relu", "linear"]
     initLimit: list[float] = [1, 2, np.pi, 2 * np.pi]
 
-    experimentsIncludeFilter: list[tuple[int, float, bool, int, int]] = [
+    experimentsIncludeFilter: list[tuple[int, float, bool, int, float]] = [
         (20, 0.1, False, 10, 1), # Hard
         (12, 0.1, False, 10, 2), # Medium
         (8, 0.1, False, 10, 2), # Easy
@@ -340,10 +337,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                                 self._orchestrator.getTelemetry(),
                                 topology,
                                 "genesis",
-                                f"{exp['name']}_{i}",
-                                mutPb=MUT_PB,
-                                indPb=GENE_MUT_PB,
-                                cxPb=CX_PB,
+                                f"{exp['name']}_{i}"
                             )
 
 

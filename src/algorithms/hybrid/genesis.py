@@ -22,13 +22,13 @@ tf.keras.utils.disable_interactive_logging()
 
 NO_OF_NEURONS: int = 2
 POP_SIZE: int = 20
-REJECTION_RATE: float = 0.05
-SIGMA: float = 2.0
+REJECTION_RATE: float = 0.05 # Experimentally determined rejection rate for the GA
+SIGMA: float = 1.0 # Experimentally determined standard deviation for the Gaussian noise
 MUTPB: float = 0.7 # Experimentally determined mutation probability for the GA
 INDPB: float = 0.7 # Experimentally determined gene mutation probability for the GA
 CXPB: float = 1.0 # Experimentally determined crossover probability for the GA
 ACTIVATION: str = "sin"
-INIT_LIMIT: float = 2 * np.pi
+INIT_LIMIT: float = np.pi # Experimentally determined limit
 
 
 def solve(

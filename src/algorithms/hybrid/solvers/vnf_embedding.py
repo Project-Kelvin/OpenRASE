@@ -218,8 +218,10 @@ def getConfidenceValues(
     if noOfNeurons > 0:
         npWeights = np.array(weights, dtype=np.float64).reshape(-1, 1)
         confidenceValues = np.matmul(confidenceValues, npWeights)
-        confidenceValues = noOfHosts * activationFunction(confidenceValues, activation=activation)
-
+        if activation == "sin":
+            confidenceValues = noOfHosts * activationFunction(confidenceValues, activation=activation)
+        else:
+            confidenceValues = activationFunction(confidenceValues, activation=activation)
     return confidenceValues
 
 
