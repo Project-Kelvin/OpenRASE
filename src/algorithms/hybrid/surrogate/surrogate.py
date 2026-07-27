@@ -4,6 +4,7 @@ This defines the surrogate model as a Bayesian Neural Network.
 
 import os
 import random
+import time
 from typing import Any
 import numpy as np
 import tensorflow as tf
@@ -11,7 +12,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from algorithms.hybrid.constants.surrogate import (
     SURROGACY_PATH,
+    SURROGATE_DATA_PATH,
+    SURROGATE_LOG_PATH,
     SURROGATE_MODELS_PATH,
+    SURROGATE_PATH,
 )
 from algorithms.hybrid.surrogate.combine_data import combineData
 
@@ -23,6 +27,21 @@ if not os.path.exists(modelPath):
     os.makedirs(modelPath)
 
 MODEL_PATH: str = os.path.join(SURROGATE_MODELS_PATH, "surrogate.keras")
+
+
+directory: str = SURROGACY_PATH
+if not os.path.exists(directory):
+    os.makedirs(directory)
+
+surrogateDirectory: str = SURROGATE_LOG_PATH
+if not os.path.exists(surrogateDirectory):
+    os.makedirs(surrogateDirectory)
+
+surrogateDataDirectory: str = SURROGATE_DATA_PATH
+if not os.path.exists(surrogateDataDirectory):
+    os.makedirs(surrogateDataDirectory)
+
+surrogateFile: str = os.path.join(SURROGATE_LOG_PATH, "validation_error.log")
 
 def train() -> None:
     """
@@ -74,11 +93,13 @@ def train() -> None:
 
     model.compile(
         optimizer=tf.keras.optimizers.Adamax(learning_rate=0.05),
-        loss="mse",
-        metrics=[tf.keras.metrics.RootMeanSquaredError()],
+        loss="mape",
     )
-    history: Any = model.fit(xTrain, yTrain, epochs=200, verbose=1, validation_split=0.1)
+    history: Any = model.fit(xTrain, yTrain, epochs=75, verbose=1, validation_split=0.1)
     print(model.evaluate(xTest, yTest))
+
+    with open(surrogateFile, "a", encoding="utf8") as f:
+        f.write(f"[{time.time()}] Validation Error: {model.evaluate(xTest, yTest)}\n")
 
     # Plotting the training history
     plt.figure(1, (8, 4), dpi=300)

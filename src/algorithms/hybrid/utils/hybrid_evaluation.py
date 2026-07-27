@@ -7,6 +7,7 @@ import copy
 import os
 import random
 from time import sleep
+import time
 import timeit
 from typing import Callable, Tuple, Union
 import numpy as np
@@ -17,11 +18,12 @@ from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Host, Topology
 from shared.models.traffic_design import TrafficDesign
 import tensorflow as tf
+from algorithms.hybrid.constants.surrogate import SURROGACY_PATH, SURROGATE_DATA_PATH, SURROGATE_PATH
 from algorithms.models.embedding import DecodedIndividual, EmbeddingData
 from algorithms.hybrid.models.traffic import TimeSFCRequests
 from algorithms.hybrid.utils.demand_predictions import DemandPredictions
 from algorithms.hybrid.utils.scorer import Scorer
-from algorithms.hybrid.surrogate.surrogate import getSurrogateModel
+from algorithms.hybrid.surrogate.surrogate import getSurrogateModel, train
 from mano.telemetry import Telemetry
 from models.calibrate import ResourceDemand
 from models.telemetry import HostData
@@ -31,6 +33,19 @@ from utils.traffic_design import (
     getTrafficDesignRate,
 )
 from utils.tui import TUI
+
+
+directory: str = SURROGACY_PATH
+if not os.path.exists(directory):
+    os.makedirs(directory)
+
+surrogateDirectory: str = SURROGATE_PATH
+if not os.path.exists(surrogateDirectory):
+    os.makedirs(surrogateDirectory)
+
+surrogateDataDirectory: str = SURROGATE_DATA_PATH
+if not os.path.exists(surrogateDataDirectory):
+    os.makedirs(surrogateDataDirectory)
 
 
 class HybridEvaluation:
@@ -747,6 +762,7 @@ class HybridEvaluation:
         trafficGenerator: TrafficGenerator,
         topology: Topology,
         maxMemoryDemand: float,
+        retrain: bool = False
     ) -> "tuple[float, float]":
         """
         Evaluate the individual.
@@ -762,6 +778,7 @@ class HybridEvaluation:
             trafficGenerator (TrafficGenerator): The Traffic Generator.
             topology (Topology): The Topology.
             maxMemoryDemand (float): The maximum memory demand.
+            retrain (bool): Specifies if BENNS should be retrained.
 
         Returns:
             tuple[float, float]: the fitness values (acceptance ratio and latency).
@@ -813,6 +830,19 @@ class HybridEvaluation:
 
                 latency = penaltyLatency
             else:
+                data: pl.DataFrame = HybridEvaluation.generateScoresForRealTrafficData(
+                    individual, trafficData, trafficDesign, topology, gen
+                )
+
+                with open(
+                    f"{surrogateDataDirectory}/{time.time()}.csv", mode="a", encoding="utf8"
+                ) as scoreFile:
+                    data.write_csv(
+                        scoreFile,
+                        include_header=True,
+                        separator=",",
+                    )
+
                 trafficData["_time"] = trafficData["_time"] // 1000000000
 
                 groupedTrafficData: pd.DataFrame = trafficData.groupby(
@@ -834,6 +864,12 @@ class HybridEvaluation:
                 ]
 
                 latency: float = groupedTrafficData["medianLatency"].mean()
+
+                if retrain:
+                    # Retrain BENNS
+                    TUI.appendToSolverLog("Retraining BENNS...")
+                    train()
+                    TUI.appendToSolverLog("Done retraining BENNS.")
 
             TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
             deleteEGs(individual[1])

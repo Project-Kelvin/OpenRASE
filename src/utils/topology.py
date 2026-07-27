@@ -7,14 +7,14 @@ from shared.models.topology import Host, Link, Switch, Topology
 from constants.topology import SERVER, SFCC
 
 
-def generateFatTreeTopology(k: int, bandwidth: int, cpu: int, memory: int, delay: int = None) -> Topology:
+def generateFatTreeTopology(k: int, bandwidth: int, cpu: float, memory: int, delay: int = None) -> Topology:
     """
     Generate a Fat Tree Topology.
 
     Parameters:
         k (int): the number of ports in a switch. Should be an even number.
         bandwidth (int): the bandwidth of the links in Mbit/s.
-        cpu (int): the CPU of the hosts.
+        cpu (float): the CPU of the hosts.
         memory (int): the memory of the hosts.
         delay (int): the delay of the links in ms.
 
@@ -78,13 +78,13 @@ def generateFatTreeTopology(k: int, bandwidth: int, cpu: int, memory: int, delay
 
     return Topology(hosts=hosts, switches=coreSwitches + aggrSwitches + edgeSwitches, links=links)
 
-def generateTopologyFromEdgeList(edgeListFile: str, cpus: int, memory: int, bandwidth: int, delay: int = None) -> Topology:
+def generateTopologyFromEdgeList(edgeListFile: str, cpus: float, memory: int, bandwidth: int, delay: int = None) -> Topology:
     """
     Generate a topology from an edge list.
 
     Parameters:
         edgeListFile (str): the path to the edge list file.
-        cpus (int): the CPU of the hosts.
+        cpus (float): the CPU of the hosts.
         memory (int): the memory of the hosts.
         bandwidth (int): the bandwidth of the links in Mbit/s.
         delay (int): the delay of the links in ms.

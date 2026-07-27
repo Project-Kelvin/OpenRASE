@@ -55,7 +55,8 @@ def solve(
     dijkstra: bool = False,
     disableGaussian: bool = False,
     activation: str = ACTIVATION,
-    initLimit: float = INIT_LIMIT
+    initLimit: float = INIT_LIMIT,
+    retrain: bool = False
 ) -> None:
     """
     Evolves the weights of the Neural Network.
@@ -83,6 +84,7 @@ def solve(
         disableGaussian (bool): whether to disable the Gaussian distribution for host selection.
         activation (str): the type of activation function to apply.
         initLimit (float): the limit to use for generating the predefined weights.
+        retrain (bool): Specifies if BENNS should be retrained.
 
     Returns:
         None
@@ -155,6 +157,7 @@ def solve(
         f"Initial Weight Limit: {initLimit}",
         f"Rejection Rate: {rejectionRate}",
         f"Sigma: {sigma}",
+        f"Retrain: {retrain}",
     ]
 
     hybridEvolution: HybridEvolution = HybridEvolution(
@@ -167,7 +170,8 @@ def solve(
         mutPb,
         cxPb,
         indPb,
-        evaluateOnline=evaluateOnline
+        evaluateOnline=evaluateOnline,
+        retrain=retrain
     )
 
     hybridEvolution.hybridSolve(

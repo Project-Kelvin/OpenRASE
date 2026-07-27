@@ -65,6 +65,7 @@ class HybridEvolution:
         cxpPb: float,
         indPb: float,
         evaluateOnline: bool = True,
+        retrain: bool = False
     ):
         """
         Initializes the HybridEvolution class.
@@ -80,6 +81,7 @@ class HybridEvolution:
             cxpPb (float): the crossover probability.
             indPb (float): the individual mutation probability.
             evaluateOnline (bool): whether to evaluate the solution online or offline.
+            retrain (bool): Specifies if BENNS should be retrained.
 
         Returns:
             None
@@ -100,6 +102,7 @@ class HybridEvolution:
         self._indPb: float = indPb
         self._cxpPb: float = cxpPb
         self._evaluateOnline: bool = evaluateOnline
+        self._retrain: bool = retrain
 
     def _select(
         self,
@@ -420,6 +423,7 @@ class HybridEvolution:
                             trafficGenerator,
                             topology,
                             maxMemoryDemand,
+                            self._retrain,
                         )
                     qualifiedIndividuals[i].fitness.values = (ar, latency)
 

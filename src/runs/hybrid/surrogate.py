@@ -104,7 +104,7 @@ def generateData(headless: bool) -> None:
 
     # Third round & Fourth round
     # trafficDesign: "list[TrafficDesign]" = [generateTrafficDesign(20, 25, 30)]
-    experimentTopologies: "list[tuple[int, Topology, TrafficDesign]]" = [
+    experimentTopologies: "list[tuple[str, Topology, TrafficDesign]]" = [
         ("1_5", generateFatTreeTopology(4, 5, 1, 5120, 1), generateTrafficDesign(1, 50, 300) ),
         ("0.5_20", generateFatTreeTopology(4, 20, 0.5, 5120, 1), generateTrafficDesign(1, 50, 300)),
         ("0.5_5", generateFatTreeTopology(4, 5, 0.5, 5120, 1), generateTrafficDesign(1, 50, 300)),

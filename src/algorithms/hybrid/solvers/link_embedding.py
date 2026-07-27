@@ -426,8 +426,8 @@ class EmbedLinks:
             if dijkstra:
                 graph = Graph()
                 for link in self._topology["links"]:
-                    graph.add_edge(link["source"], link["destination"], link["bandwidth"] if "bandwidth" in link and link["bandwidth"] is not None else 1)
-                    graph.add_edge(link["destination"], link["source"], link["bandwidth"] if "bandwidth" in link and link["bandwidth"] is not None else 1)
+                    graph.add_edge(link["source"], link["destination"], link["delay"] if "delay" in link and link["delay"] is not None else 1)
+                    graph.add_edge(link["destination"], link["source"], link["delay"] if "delay" in link and link["delay"] is not None else 1)
 
             paths: "dict[str, list[str]]" = {}
             if "links" not in eg:
