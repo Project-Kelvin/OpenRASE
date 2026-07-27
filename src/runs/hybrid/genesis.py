@@ -19,8 +19,8 @@ from sfc.fg_request_generator import FGRequestGenerator
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
 from sfc.solver import Solver
-from utils.topology import generateFatTreeTopology
-from utils.traffic_design import generateTrafficDesignFromFile
+from utils.topology import generateFatTreeTopology, generateTopologyFromEdgeList
+from utils.traffic_design import generateTrafficDesignFromFile, generateTrafficDesignFromIoTTrace
 from utils.tui import TUI
 
 
@@ -35,7 +35,10 @@ from utils.tui import TUI
 @click.option("--gaussian", is_flag=True, default=False, help="Disable the Gaussian distribution for host selection.")
 @click.option("--activation", is_flag=True, default=False, help="Test activation functions in the neural network.")
 @click.option("--init", is_flag=True, default=False, help="Test the limit to use for generating the predefined weights.")
-def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool) -> None:
+@click.option("--env", type=click.Choice(["dc", "milan", "25n50e"], case_sensitive=False), default="dc", help="The network environment to run the algorithm in.")
+@click.option("--retrain", is_flag=True, default=False, help="Specifies if BENNS should be retrained.")
+@click.option("--offline", is_flag=True, default=False, help="Run in offline mode.")
+def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool, env: str, retrain: bool, offline: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -50,6 +53,9 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
         gaussian (bool): Whether to disable the Gaussian distribution for host selection.
         activation (str): Whether to test activation functions in the neural network.
         init (bool): Whether to test the limit to use for generating the predefined weights.
+        env (str): The network environment to run the algorithm in.
+        retrain (bool): Whether to retrain the BENNS model.
+        offline (bool): Whether to run in offline mode.
 
     Returns:
         None
@@ -62,6 +68,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
     sigmas: list[float] = [0.0, 1.0, 2.0, 4.0]
     activations: list[str] = ["tanh", "sin", "relu", "linear"]
     initLimit: list[float] = [1, 2, np.pi, 2 * np.pi]
+    delay: int = 10
 
     experimentsIncludeFilter: list[tuple[int, float, bool, int, float]] = [
         (20, 0.1, False, 10, 1), # Hard
@@ -85,7 +92,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                     for noOfCPUs in [2, 1, 0.5]:
                         experimentsToRun.append(
                             {
-                                "name": f"{noOfCopy}_{trafficScale}_{trafficPattern}_{linkBandwidth}_{noOfCPUs}",
+                                "name": f"{noOfCopy}_{trafficScale}_{trafficPattern}_{linkBandwidth}_{noOfCPUs}_{delay}",
                                 "noOfCopies": noOfCopy,
                                 "trafficScale": trafficScale,
                                 "trafficPattern": trafficPattern,
@@ -172,26 +179,62 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
 
                 self._orchestrator.sendRequests(sfcrsToSend)
 
-        trafficDesign: "list[TrafficDesign]" = [
-            generateTrafficDesignFromFile(
+        if env == "dc":
+            trafficDesign: "list[TrafficDesign]" = [
+                generateTrafficDesignFromFile(
+                    os.path.join(
+                        f"{getConfig()['repoAbsolutePath']}",
+                        "src",
+                        "runs",
+                        "hybrid",
+                        "data",
+                        "requests.csv",
+                    ),
+                    exp["trafficScale"],
+                    4,
+                    False,
+                    exp["trafficPattern"],
+                )
+            ]
+
+
+            topology: Topology = generateFatTreeTopology(
+                4, exp["linkBandwidth"], exp["noOfCPUs"], exp["memory"], delay
+            )
+        else:
+            trafficDesign: list[TrafficDesign] = [generateTrafficDesignFromIoTTrace(
                 os.path.join(
                     f"{getConfig()['repoAbsolutePath']}",
                     "src",
                     "runs",
                     "hybrid",
                     "data",
-                    "requests.csv",
+                    "iot-trace.csv",
                 ),
-                exp["trafficScale"],
-                4,
-                False,
-                exp["trafficPattern"],
-            )
-        ]
+                60,
+                10000,
+            )]
 
-        topology: Topology = generateFatTreeTopology(
-            4, exp["linkBandwidth"], exp["noOfCPUs"], exp["memory"], 1
-        )
+            if env == "milan":
+                topology: Topology = generateTopologyFromEdgeList(
+                    os.path.join(
+                        getConfig()["repoAbsolutePath"], "src", "runs", "hybrid", "data", "milan.txt"
+                    ),
+                    exp["noOfCPUs"],
+                    exp["memory"],
+                    exp["linkBandwidth"],
+                    delay
+                )
+            if env == "25n50e":
+                topology: Topology = generateTopologyFromEdgeList(
+                    os.path.join(
+                        getConfig()["repoAbsolutePath"], "src", "runs", "hybrid", "data", "25n50e.txt"
+                    ),
+                    exp["noOfCPUs"],
+                    exp["memory"],
+                    exp["linkBandwidth"],
+                    delay
+                )
 
         class HybridSolver(Solver):
             """
@@ -338,6 +381,8 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                                 topology,
                                 "genesis",
                                 f"{exp['name']}_{i}"
+                                retrain=retrain,
+                                evaluateOnline = not offline
                             )
 
 

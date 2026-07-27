@@ -1,5 +1,5 @@
 """
-The defines teh script to run the hybrid online-offline algorithm.
+The defines the script to run the hybrid online-offline algorithm.
 """
 
 import json
@@ -16,8 +16,8 @@ from mano.orchestrator import Orchestrator
 from sfc.fg_request_generator import FGRequestGenerator
 from sfc.sfc_emulator import SFCEmulator
 from sfc.solver import Solver
-from utils.topology import generateFatTreeTopology
-from utils.traffic_design import generateTrafficDesignFromFile
+from utils.topology import generateFatTreeTopology, generateTopologyFromEdgeList
+from utils.traffic_design import generateTrafficDesignFromFile, generateTrafficDesignFromIoTTrace
 from utils.tui import TUI
 
 
@@ -25,7 +25,9 @@ from utils.tui import TUI
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
 @click.option("--mutation", is_flag=True, default=False, help="Run in mutation probability hyperparameter tuning mode.")
 @click.option("--cx", is_flag=True, default=False, help="Run in crossover probability hyperparameter tuning mode.")
-def run(headless: bool, mutation: bool, cx: bool) -> None:
+@click.option("--env", type=click.Choice(["dc", "milan", "25n50e"]), default="dc", help="Network environment to run the algorithm in.")
+@click.option("--offline", is_flag=True, default=False, help="Run in offline mode.")
+def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -33,6 +35,8 @@ def run(headless: bool, mutation: bool, cx: bool) -> None:
         headless (bool): Whether to run the emulator in headless mode.
         mutation (bool): Whether to run in mutation probability hyperparameter tuning mode.
         cx (bool): Whether to run in crossover probability hyperparameter tuning mode.
+        env (str): The network environment to run the algorithm in.
+        offline (bool): Whether to run in offline mode.
 
     Returns:
         None
@@ -41,7 +45,10 @@ def run(headless: bool, mutation: bool, cx: bool) -> None:
     mutationProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
+    delay: int = 1
 
+    # 12, 0.3, False, 5, 1
+    # 3, 0.2, False, 10, 0.5
     experimentsIncludeFilter: list[tuple[int, float, bool, int, int]] = [
         (20, 0.1, False, 10, 1), # Hard
         (12, 0.1, False, 10, 2), # Medium
@@ -49,27 +56,11 @@ def run(headless: bool, mutation: bool, cx: bool) -> None:
     ]
 
     if mutation or cx:
-        experimentsIncludeFilter = [experimentsIncludeFilter[2]]  # Only run the medium experiment for hyperparameter tuning
+        experimentsIncludeFilter = [experimentsIncludeFilter[0]]  # Only run the hard experiment for hyperparameter tuning
 
     noOfRuns: int = 20
 
     experimentsExcludeFilter: list[tuple[int, float, bool, int, float]] = [
-        # (16, 0.1, False, 5, 1),
-        # (16, 0.1, False, 5, 2),
-        # (16, 0.1, False, 10, 1),
-        # (16, 0.1, False, 10, 2),
-        # (16, 0.1, True, 5, 1),
-        # (16, 0.1, True, 5, 2),
-        # (16, 0.1, True, 10, 1),
-        # (16, 0.1, True, 10, 2),
-        # (16, 0.2, False, 5, 1), #incomplete
-        # (16, 0.2, False, 5, 2), #incomplete
-        # (16, 0.2, True, 5, 1), #not done
-        # (16, 0.2, True, 5, 2), #not done
-        # (16, 0.2, False, 10, 1),
-        # (16, 0.2, False, 10, 2),
-        # (16, 0.2, True, 10, 1), #incomplete
-        # (16, 0.2, True, 10, 2), #incomplete,
     ]
     experimentPriority: list[str] = [
     ]
@@ -82,7 +73,7 @@ def run(headless: bool, mutation: bool, cx: bool) -> None:
                     for noOfCPUs in [2, 1, 0.5]:
                         experimentsToRun.append(
                             {
-                                "name": f"{noOfCopy}_{trafficScale}_{trafficPattern}_{linkBandwidth}_{noOfCPUs}",
+                                "name": f"{noOfCopy}_{trafficScale}_{trafficPattern}_{linkBandwidth}_{noOfCPUs}_{delay}",
                                 "noOfCopies": noOfCopy,
                                 "trafficScale": trafficScale,
                                 "trafficPattern": trafficPattern,
@@ -145,7 +136,7 @@ def run(headless: bool, mutation: bool, cx: bool) -> None:
                         "runs",
                         "hybrid",
                         "configs",
-                        "forwarding-graphs.json",
+                        "sfcrs.json",
                     ),
                     "r",
                     encoding="utf8",
@@ -167,26 +158,62 @@ def run(headless: bool, mutation: bool, cx: bool) -> None:
 
                 self._orchestrator.sendRequests(fgsToSend)
 
-        trafficDesign: "list[TrafficDesign]" = [
-            generateTrafficDesignFromFile(
+
+        if env == "dc":
+            trafficDesign: "list[TrafficDesign]" = [
+                generateTrafficDesignFromFile(
+                    os.path.join(
+                        f"{getConfig()['repoAbsolutePath']}",
+                        "src",
+                        "runs",
+                        "hybrid",
+                        "data",
+                        "requests.csv",
+                    ),
+                    exp["trafficScale"],
+                    4,
+                    False,
+                    exp["trafficPattern"],
+                )
+            ]
+
+            topology: Topology = generateFatTreeTopology(
+                4, exp["linkBandwidth"], exp["noOfCPUs"], exp["memory"], delay
+            )
+        else:
+            trafficDesign: list[TrafficDesign] = [generateTrafficDesignFromIoTTrace(
                 os.path.join(
                     f"{getConfig()['repoAbsolutePath']}",
                     "src",
                     "runs",
                     "hybrid",
                     "data",
-                    "requests.csv",
+                    "iot-trace.csv",
                 ),
-                exp["trafficScale"],
-                4,
-                False,
-                exp["trafficPattern"],
-            )
-        ]
+                60,
+                10000,
+            )]
 
-        topology: Topology = generateFatTreeTopology(
-            4, exp["linkBandwidth"], exp["noOfCPUs"], exp["memory"], 1
-        )
+            if env == "milan":
+                topology: Topology = generateTopologyFromEdgeList(
+                    os.path.join(
+                        getConfig()["repoAbsolutePath"], "src", "runs", "hybrid", "data", "milan.txt"
+                    ),
+                    exp["noOfCPUs"],
+                    exp["memory"],
+                    exp["linkBandwidth"],
+                    delay
+                )
+            elif env == "25n50e":
+                topology: Topology = generateTopologyFromEdgeList(
+                    os.path.join(
+                        getConfig()["repoAbsolutePath"], "src", "runs", "hybrid", "data", "25n50e.txt"
+                    ),
+                    exp["noOfCPUs"],
+                    exp["memory"],
+                    exp["linkBandwidth"],
+                    delay
+                )
 
         class HybridSolver(Solver):
             """
@@ -259,6 +286,7 @@ def run(headless: bool, mutation: bool, cx: bool) -> None:
                                 self._trafficGenerator,
                                 self._orchestrator.getTelemetry(),
                                 f"{exp['name']}_{i}",
+                                evaluateOnline = not offline
                             )
 
                 except Exception as e:
