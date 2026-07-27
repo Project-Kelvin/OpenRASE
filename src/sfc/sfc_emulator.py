@@ -95,7 +95,7 @@ class SFCEmulator(Subscriber):
         NotificationSystem.unsubscribeAll()
 
         try:
-            client: DockerClient = from_env()
+            client: DockerClient = from_env(timeout=300)
             client.containers.prune()
             client.images.prune()
             client.networks.prune()
@@ -110,7 +110,7 @@ class SFCEmulator(Subscriber):
         Wait for all threads to finish.
         """
 
-        installTimeoutSec: float = 120.0
+        installTimeoutSec: float = 300.0
         startTime: float = monotonic()
 
         while not self._topologyInstalled and not self._topologyInstallFailed:
