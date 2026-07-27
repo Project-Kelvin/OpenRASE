@@ -13,6 +13,7 @@ from deap import base, creator, tools
 import numpy as np
 import pandas as pd
 from shared.models.embedding_graph import EmbeddingGraph
+from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
@@ -29,7 +30,7 @@ if not os.path.exists(artifactsDir):
 
 
 def gahaEvolve(
-    fgrs: list[EmbeddingGraph],
+    sfcrs: list[SFCRequest],
     topology: Topology,
     trafficDesign: list[TrafficDesign],
     sendEGs: "Callable[[list[EmbeddingGraph]], None]",
@@ -60,7 +61,7 @@ def gahaEvolve(
     MAX_LATENCY: float = 500.0
 
     noOfHosts: int = len(topology["hosts"])
-    makGAUtils: MakGAUtils = MakGAUtils(topology, trafficDesign[0], fgrs)
+    makGAUtils: MakGAUtils = MakGAUtils(topology, trafficDesign[0], sfcrs)
 
     selectionRate: int = round(POP_SIZE * (1 - ELITISM_RATE))
     elitismRate: int = POP_SIZE - selectionRate

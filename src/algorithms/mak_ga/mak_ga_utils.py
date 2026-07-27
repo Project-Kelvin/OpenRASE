@@ -5,8 +5,11 @@ This defines the util class used by the GA algorithm developed by Mohammad Ali K
 from concurrent.futures import ProcessPoolExecutor
 import copy
 import random
-from typing import Type, cast
+from typing import Tuple, Type, cast
 import numpy as np
+from shared.constants.embedding_graph import TERMINAL
+from shared.models.sfc_request import SFCRequest
+from shared.utils.config import getConfig
 from algorithms.hybrid.models.individuals import Individual
 from algorithms.mak_ga.models.embedding import EmbeddingData
 from utils.embedding_graph import traverseVNF
@@ -39,11 +42,73 @@ class MakGAUtils:
         self,
         topology: Topology,
         trafficDesign: TrafficDesign,
-        fgrs: list[EmbeddingGraph],
+        sfcrs: list[SFCRequest],
     ) -> None:
         self._topology = topology
         self._trafficDesign = trafficDesign
-        self._fgrs = fgrs
+        self._sfcrs = sfcrs
+        self._fgrs = self._convertSFCRsToEGs()
+
+
+    def _convertSFCRsToEGs(self) -> list[EmbeddingGraph]:
+        """
+        Converts a list of SFCRequests to a list of EmbeddingGraphs.
+
+        Returns:
+            list[EmbeddingGraph]: A list of EmbeddingGraphs.
+        """
+
+        egs: "list[EmbeddingGraph]" = []
+        embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" = {}
+        splitters: "list[str]" = getConfig()["vnfs"]["splitters"]
+
+        for sfcr in self._sfcrs:
+            sfcrID: str = sfcr["sfcrID"]
+            sortedVNFs: "list[str]" = sfcr["vnfs"]
+            forwardingGraph: EmbeddingGraph = {"sfcID": sfcrID, "vnfs": {}}
+            oldDepth: int = 1
+            depth: int = 1
+            vnfDict: VNF = forwardingGraph["vnfs"]
+
+            def addVNF(vnfs: "list[str]", vnfDict: VNF, depth: int) -> None:
+                """
+                Adds VNF to the EmbeddingGraph.
+
+                Parameters:
+                    vnfs (list[str]): the VNFs.
+                    vnfDict (VNF): the VNF dictionary.
+                    depth (int): the depth of the VNF.
+
+                Returns:
+                    None
+                """
+
+                nonlocal oldDepth, embeddingData, splitters
+
+
+                if len(vnfs) == 0:
+                    vnfDict["host"] = {"id": SERVER}
+                    vnfDict["next"] = TERMINAL
+
+                    return
+
+                vnf: str = vnfs.pop(0)
+                splitter: bool = vnf in splitters
+                vnfDict["next"] = [{}, {}] if splitter else {}
+
+                vnfDict["vnf"] = {"id": vnf}
+
+                if splitter:
+                    depth += 1
+                    for i in range(2):
+                        addVNF(vnfs.copy(), vnfDict["next"][i], depth)
+                else:
+                    addVNF(vnfs, vnfDict["next"], depth)
+
+            addVNF(sortedVNFs, vnfDict, depth)
+            egs.append(forwardingGraph)
+
+        return egs
 
     def generateRandomIndividual(
         self,
@@ -260,8 +325,8 @@ class MakGAUtils:
                         link["source"],
                         link["destination"],
                         (
-                            link["bandwidth"]
-                            if "bandwidth" in link and link["bandwidth"] is not None
+                            link["delay"]
+                            if "delay" in link and link["delay"] is not None
                             else 1
                         ),
                     )
@@ -269,8 +334,8 @@ class MakGAUtils:
                         link["destination"],
                         link["source"],
                         (
-                            link["bandwidth"]
-                            if "bandwidth" in link and link["bandwidth"] is not None
+                            link["delay"]
+                            if "delay" in link and link["delay"] is not None
                             else 1
                         ),
                     )
@@ -384,7 +449,7 @@ class MakGAUtils:
         """
 
         decodedPop: list[DecodedIndividual] = []
-        copiedFGRs: list[EmbeddingGraph] = copy.deepcopy(self._fgrs)
+        copiedFGRs: list[SFCRequest] = copy.deepcopy(self._fgrs)
 
         with ProcessPoolExecutor() as executor:
             futures = [

@@ -822,6 +822,17 @@ class HybridEvaluation:
                     medianLatency=("_value", "median"),
                 )
 
+                q1: float = groupedTrafficData["medianLatency"].quantile(0.25)
+                q3: float = groupedTrafficData["medianLatency"].quantile(0.75)
+                iqr: float = q3 - q1
+                lowerBound: float = q1 - 1.5 * iqr
+                upperBound: float = q3 + 1.5 * iqr
+
+                groupedTrafficData = groupedTrafficData[
+                    (groupedTrafficData["medianLatency"] >= lowerBound)
+                    & (groupedTrafficData["medianLatency"] <= upperBound)
+                ]
+
                 latency: float = groupedTrafficData["medianLatency"].mean()
 
             TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")

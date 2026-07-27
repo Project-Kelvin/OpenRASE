@@ -164,8 +164,8 @@ def convertIndividualToEmbeddingGraph(
                 eg["links"] = []
 
             for link in topology["links"]:
-                graph.add_edge(link["source"], link["destination"], link["bandwidth"] if "bandwidth" in link and link["bandwidth"] is not None else 1)
-                graph.add_edge(link["destination"], link["source"], link["bandwidth"] if "bandwidth" in link and link["bandwidth"] is not None else 1)
+                graph.add_edge(link["source"], link["destination"], link["delay"] if "delay" in link and link["delay"] is not None else 1)
+                graph.add_edge(link["destination"], link["source"], link["delay"] if "delay" in link and link["delay"] is not None else 1)
 
             sfcNodes, sfcDivisors = parseNodes(nodes[eg["sfcID"]])
             for nodeList, divisor in zip(sfcNodes, sfcDivisors):

@@ -2,6 +2,8 @@
 This defines the GA that evolves teh weights of the Neural Network.
 """
 
+from copy import deepcopy
+import random
 from typing import Callable, Type
 import numpy as np
 import tensorflow as tf
@@ -86,7 +88,13 @@ def solve(
         None
     """
 
-    GenesisUtils.init(sfcrs, topology, NO_OF_NEURONS, rejectionRate, sigma)
+    shuffledSFCRs: "list[SFCRequest]" = deepcopy(sfcrs)
+
+    if staticChain:
+        for sfcr in shuffledSFCRs:
+            random.shuffle(sfcr["vnfs"])
+
+    GenesisUtils.init(shuffledSFCRs, topology, NO_OF_NEURONS, rejectionRate, sigma)
 
     def decodePopWrapper(
         pop: list[Individual],
@@ -164,7 +172,7 @@ def solve(
 
     hybridEvolution.hybridSolve(
         topology,
-        sfcrs,
+        shuffledSFCRs,
         sendEGs,
         deleteEGs,
         trafficDesign,

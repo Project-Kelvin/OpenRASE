@@ -137,15 +137,9 @@ class GenesisUtils:
             vnfWeights: list[float] = weights[1]
             linkWeights: list[float] = weights[2]
 
-            fgs: dict[str, list[str]] = {}
-            if staticChain:
-                for sfcr in sfcrs:
-                    sfcr["strictOrder"] = sfcr["vnfs"]
-                    fgs[sfcr["sfcrID"]] = sfcr["vnfs"]
-            else:
-                fgs: dict[str, list[str]] = generateFGs(
-                    sfcrs, ccPDWeights, ccWeights, GenesisUtils.noOfNeurons, activation=activation
-                )
+            fgs: dict[str, list[str]] = generateFGs(
+                sfcrs, ccPDWeights, ccWeights, GenesisUtils.noOfNeurons, activation=activation
+            )
             egs, nodes, embedData = generateEGs(
                 fgs,
                 topology,
