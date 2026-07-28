@@ -4,6 +4,4 @@
 !experiments/hybrid/
 !experiments/hybrid/surrogate/
 !experiments/hybrid/surrogate/data/
-!experiments/hybrid/surrogate/models/
 !experiments/hybrid/surrogate/data/*
-!experiments/hybrid/surrogate/models/*
