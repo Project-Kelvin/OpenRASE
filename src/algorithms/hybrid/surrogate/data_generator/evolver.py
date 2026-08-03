@@ -37,7 +37,7 @@ if not os.path.exists(surrogateDataDirectory):
     os.makedirs(surrogateDataDirectory)
 
 isFirstSetWritten: bool = False
-hybridEvolution: "HybridEvaluation" = HybridEvaluation()
+hybridEvaluation: "HybridEvaluation" = HybridEvaluation()
 
 def evolveWeights(
     fgs: "list[EmbeddingGraph]",
@@ -85,15 +85,15 @@ def evolveWeights(
         decodedIndividual: DecodedIndividual = decodePop(
             [individual], topology, fgs
         )[0]
-        hybridEvolution.cacheForOnline([decodedIndividual], trafficDesign)
-        _maxCPU, maxMemory = hybridEvolution.getMaxCpuMemoryUsageOfHosts(
+        hybridEvaluation.cacheForOnline([decodedIndividual], trafficDesign)
+        _maxCPU, maxMemory = hybridEvaluation.getMaxCpuMemoryUsageOfHosts(
             decodedIndividual[1], topology, decodedIndividual[2], trafficDesign
         )
         if maxMemory <= MAX_MEMORY_DEMAND and decodedIndividual[4] > 0:
             pop.append(individual)
 
     decodedPop: list[DecodedIndividual] = decodePop(pop, topology, fgs)
-    hybridEvolution.cacheForOffline(
+    hybridEvaluation.cacheForOffline(
         decodedPop,
         trafficDesign,
         topology,
@@ -116,7 +116,7 @@ def evolveWeights(
         # process traffic data
         trafficData: pd.DataFrame = trafficGenerator.getData(f"{duration:.0f}s")
 
-        data: pl.DataFrame = hybridEvolution.generateScoresForRealTrafficData(
+        data: pl.DataFrame = hybridEvaluation.generateScoresForRealTrafficData(
             ind, trafficData, trafficDesign, topology, i
         )
 

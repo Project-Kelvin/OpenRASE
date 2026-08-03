@@ -27,7 +27,7 @@ from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 
-MAX_MEMORY_DEMAND: int = 1
+MAX_MEMORY_DEMAND: int = 10
 MAX_LATENCY: int = 100
 MAX_POWER: int = 300
 MIN_AR: float = 0.95

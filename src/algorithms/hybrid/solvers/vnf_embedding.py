@@ -169,11 +169,12 @@ def convertNPtoEGs(
             if splitter:
                 depth += 1
                 for i in range(2):
-                    addVNF(vnfs.copy(), vnfDict["next"][i], depth, i)
+                    addVNF(copy.deepcopy(vnfs), vnfDict["next"][i], depth, i)
             else:
                 addVNF(vnfs, vnfDict["next"], depth, 0)
 
-        addVNF(sortedVNFs, vnfDict, depth, 0)
+        copiedSortedVNFs: "list[str]" = copy.deepcopy(sortedVNFs)
+        addVNF(copiedSortedVNFs, vnfDict, depth, 0)
         if not embeddingNotFound:
             eg: EmbeddingGraph = copy.deepcopy(forwardingGraph)
             egs.append(eg)
@@ -218,10 +219,7 @@ def getConfidenceValues(
     if noOfNeurons > 0:
         npWeights = np.array(weights, dtype=np.float64).reshape(-1, 1)
         confidenceValues = np.matmul(confidenceValues, npWeights)
-        if activation == "sin":
-            confidenceValues = noOfHosts * activationFunction(confidenceValues, activation=activation)
-        else:
-            confidenceValues = activationFunction(confidenceValues, activation=activation)
+        confidenceValues = noOfHosts * activationFunction(confidenceValues, activation=activation)
     return confidenceValues
 
 
