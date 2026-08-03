@@ -210,3 +210,136 @@ def generateTopologyFromEdgeList(edgeListFile: str, cpus: float, memory: int, ba
         topology["links"] = links
 
     return topology
+
+def generateHeterogeneousTopologyFromEdgeList(edgeListFile: str, cpus: list[float], memory: int, bandwidth: list[float], delay: list[float] = None) -> Topology:
+    """
+    Generate a heterogeneous topology from an edge list.
+
+    Parameters:
+        edgeListFile (str): the path to the edge list file.
+        cpus (list[float]): the CPUs of the hosts.
+        memory (int): the memory of the hosts.
+        bandwidth (list[float]): the bandwidths of the links in Mbit/s.
+        delay (list[float]): the delays of the links in ms.
+
+    Returns:
+        Topology: the generated topology.
+    """
+
+    hostIDs: dict[int, Host] = {}
+    switchIDs: dict[int, Switch] = {}
+    linkIDs: list[str] = []
+    links: list[Link] = []
+    hosts: list[Host] = []
+    switches: list[Switch] = []
+    topology: Topology = {}
+
+
+    with open(edgeListFile, "r") as f:
+        i: int = 0
+        firstSwitchID: int = 0
+        lastSwitchID: int = 0
+
+        for line in f:
+            components: list[str] = line.split(" ")
+
+            if i == 0:
+                firstSwitchID = int(components[0])
+
+            lastSwitchID = int(components[0])
+
+            if int(components[0]) not in hostIDs:
+                host: Host = Host(
+                    id=f"h{int(components[0])}",
+                    cpu=cpus[i % len(cpus)],
+                    memory=memory,
+                )
+                switch: Switch = Switch(id=f"s{int(components[0])}")
+                hostIDs[int(components[0])] = host
+                switchIDs[int(components[0])] = switch
+                hosts.append(host)
+                switches.append(switch)
+                links.append(
+                    Link(
+                        source=f"h{int(components[0])}",
+                        destination=f"s{int(components[0])}",
+                        bandwidth=bandwidth[i % len(bandwidth)],
+                        delay=delay[i % len(delay)] if delay is not None else None,
+                    )
+                )
+            if int(components[1]) not in hostIDs:
+                host: Host = Host(
+                    id=f"h{int(components[1])}",
+                    cpu=cpus[i % len(cpus)],
+                    memory=memory,
+                )
+                switch: Switch = Switch(id=f"s{int(components[1])}")
+                hostIDs[int(components[1])] = host
+                switchIDs[int(components[1])] = switch
+                hosts.append(host)
+                switches.append(switch)
+                links.append(
+                    Link(
+                        source=f"h{int(components[1])}",
+                        destination=f"s{int(components[1])}",
+                        bandwidth=bandwidth[i % len(bandwidth)],
+                        delay=delay[i % len(delay)] if delay is not None else None,
+                    )
+                )
+            if (
+                f"{components[0]}-{components[1]}" not in linkIDs
+                and f"{components[1]}-{components[0]}" not in linkIDs
+            ):
+                linkIDs.append(f"{components[0]}-{components[1]}")
+                links.append(
+                    Link(
+                        source=f"s{int(components[0])}",
+                        destination=f"s{int(components[1])}",
+                        bandwidth=bandwidth[i % len(bandwidth)],
+                        delay=delay[i % len(delay)] if delay is not None else None,
+                    )
+                )
+            i += 1
+
+        serverSwitchID: str = "91"
+        sfccSwitchID: str = "92"
+        switches.append(Switch(id=f"s{serverSwitchID}"))
+        switches.append(Switch(id=f"s{sfccSwitchID}"))
+
+        links.append(
+            Link(
+                source=SERVER,
+                destination=f"s{serverSwitchID}",
+                bandwidth=bandwidth[i % len(bandwidth)],
+                delay=delay[i % len(delay)] if delay is not None else None,
+            )
+        )
+        links.append(
+            Link(
+                source=f"s{serverSwitchID}",
+                destination=f"s{lastSwitchID}",
+                bandwidth=bandwidth[i % len(bandwidth)],
+                delay=delay[i % len(delay)] if delay is not None else None,
+            )
+        )
+        links.append(
+            Link(
+                source=SFCC,
+                destination=f"s{sfccSwitchID}",
+                bandwidth=bandwidth[i % len(bandwidth)],
+                delay=delay[i % len(delay)] if delay is not None else None,
+            )
+        )
+        links.append(
+            Link(
+                source=f"s{sfccSwitchID}",
+                destination=f"s{firstSwitchID}",
+                bandwidth=bandwidth[i % len(bandwidth)],
+                delay=delay[i % len(delay)] if delay is not None else None,
+            )
+        )
+        topology["hosts"] = hosts
+        topology["switches"] = switches
+        topology["links"] = links
+
+    return topology
