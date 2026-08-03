@@ -145,5 +145,46 @@ def run() -> None:
 
     traverseVNF(eg["vnfs"], parseVNF)
 
-    for link in eg["links"]:
+    for link in eg["links"]:sud
         egLinksOrder[f"{link['source']['id']}-{link['destination']['id']}"] = link["links"]
+
+    egLinks: tuple[list[str], list[str], list[str]] = (
+        egLinksOrder[f"sfcc-{egHostOrder[0]}"],
+        egLinksOrder[f"{egHostOrder[0]}-{egHostOrder[1]}"],
+        egLinksOrder[f"{egHostOrder[1]}-server"]
+    )
+
+    database: dict[tuple[list[str], list[str], tuple[list[str], list[str], list[str]]], int] = {
+        (combination[0], combination[1], combination[2]): 0 for combination in combinations
+    }
+
+    def isCombinationInDatabase(ccOrder: list[str], hostOrder: list[str], linksOrder: tuple[list[str], list[str], list[str]]) -> bool:
+        """
+        Checks if a given combination of ccOrder, hostOrder, and linksOrder exists in the database.
+
+        Parameters:
+            ccOrder (list[str]): The order of VNFs.
+            hostOrder (list[str]): The order of hosts.
+            linksOrder (tuple[list[str], list[str], list[str]]): The order of links.
+
+        Returns:
+            bool: True if the combination exists in the database, False otherwise.
+        """
+
+        for key in database.keys():
+            if key[0] == ccOrder and key[1] == hostOrder and key[2] == (linksOrder[0], linksOrder[1], linksOrder[2]):
+                return True
+        return False
+
+    def isAllCombinationsInDatabase() -> bool:
+        """
+        Checks if all combinations are present in the database.
+
+        Returns:
+            bool: True if all combinations are present, False otherwise.
+        """
+
+        for combination in combinations:
+            if not isCombinationInDatabase(combination[0], combination[1], combination[2]):
+                return False
+        return True
