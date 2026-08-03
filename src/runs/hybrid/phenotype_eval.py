@@ -145,7 +145,7 @@ def run() -> None:
 
     traverseVNF(eg["vnfs"], parseVNF)
 
-    for link in eg["links"]:sud
+    for link in eg["links"]:
         egLinksOrder[f"{link['source']['id']}-{link['destination']['id']}"] = link["links"]
 
     egLinks: tuple[list[str], list[str], list[str]] = (
@@ -188,3 +188,8 @@ def run() -> None:
             if not isCombinationInDatabase(combination[0], combination[1], combination[2]):
                 return False
         return True
+
+    database[(egCcOrder, egHostOrder, egLinks)] += 1
+
+    if isAllCombinationsInDatabase():
+        print("All combinations are present in the database.")
