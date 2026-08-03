@@ -19,11 +19,11 @@ from shared.models.topology import Host, Topology
 from shared.models.traffic_design import TrafficDesign
 import tensorflow as tf
 from algorithms.hybrid.constants.surrogate import SURROGACY_PATH, SURROGATE_DATA_PATH, SURROGATE_PATH
-from algorithms.models.embedding import DecodedIndividual, EmbeddingData
+from algorithms.models.embedding import DecodedIndividual, EmbeddingData, LinkData
 from algorithms.hybrid.models.traffic import TimeSFCRequests
 from algorithms.hybrid.utils.demand_predictions import DemandPredictions
 from algorithms.hybrid.utils.scorer import Scorer
-from algorithms.hybrid.surrogate.surrogate import getSurrogateModel, train
+from algorithms.hybrid.surrogate.surrogate import getSurrogateModel, predictLatencyFromModel, train
 from mano.telemetry import Telemetry
 from models.calibrate import ResourceDemand
 from models.telemetry import HostData
@@ -54,8 +54,8 @@ class HybridEvaluation:
     """
 
     _demandPredictions: DemandPredictions = DemandPredictions()
-    _latencyPrediction: np.array = None
-    _powerUsage: np.array = None
+    _latencyPrediction: np.ndarray = None
+    _powerUsage: np.ndarray = None
     _surrogateModel: tf.keras.Sequential = getSurrogateModel()
 
     @staticmethod
@@ -193,12 +193,12 @@ class HybridEvaluation:
             tuple[float, float]: Maximum CPU and memory usage of hosts.
         """
 
-        data: pl.DataFrame = HybridEvaluation._generateTrafficData(
+        data: TimeSFCRequests = HybridEvaluation._generateTrafficData(
             egs, trafficDesign, isMaxOnly=True
         )
 
         scores: "dict[str, ResourceDemand]" = Scorer.getHostScores(
-            data, topology, embeddingData, HybridEvaluation._demandPredictions
+            data[0], topology, embeddingData, HybridEvaluation._demandPredictions
         )[1]
         maxMemory: float = max(
             [score["memory"] for score in scores.values()], default=0
@@ -240,10 +240,12 @@ class HybridEvaluation:
         trafficDesign: "list[TrafficDesign]",
         egs: "list[EmbeddingGraph]",
         topology: Topology,
-        embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]",
-        linkData: "dict[str, dict[str, float]]",
+        embeddingData: EmbeddingData,
+        linkData: LinkData,
+        individual: int,
+        gen: int,
         isAvgOnly: bool = False,
-    ) -> np.array:
+    ) -> Tuple[np.ndarray, int]:
         """
         Generate scores for the given traffic design and embedding graphs.
 
@@ -253,19 +255,23 @@ class HybridEvaluation:
             gen (int): The generation number.
             individualIndex (int): The index of the individual.
             topology (Topology): The topology to use for generating scores.
-            embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): Embedding data containing VNF and depth information.
-            linkData (dict[str, dict[str, float]]): Link data containing link capacities.
+            embeddingData (EmbeddingData): Embedding data containing VNF and depth information.
+            linkData (LinkData): Link data containing link capacities.
+            individual (int): The index of the individual.
+            gen (int): The generation number.
             isAvgOnly (bool): If True, only generate average scores.
 
         Returns:
-            np.array: A numpy array containing the generated scores.
+            Tuple[np.ndarray, int]: A tuple containing the generated scores and the individual index.
         """
 
         simulationData: TimeSFCRequests = HybridEvaluation._generateTrafficData(
             egs, trafficDesign, isMaxOnly=False, isAvgOnly=isAvgOnly
         )
 
-        scores: np.array = Scorer.getSFCScores(
+        scores: np.ndarray = Scorer.getSFCScores(
+            individual,
+            gen,
             simulationData,
             topology,
             egs,
@@ -274,7 +280,7 @@ class HybridEvaluation:
             HybridEvaluation._demandPredictions,
         )
 
-        return scores
+        return scores, individual
 
     @staticmethod
     def _generateHostResourceUsage(
@@ -282,25 +288,25 @@ class HybridEvaluation:
         topology: Topology,
         embeddingData: EmbeddingData,
         trafficDesign: "list[TrafficDesign]",
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         Generate host resource usage scores for the given embedding graphs.
 
         Parameters:
             egs (list[EmbeddingGraph]): List of embedding graphs to generate host resource usage for.
             topology (Topology): The topology to use for generating host resource usage.
-            embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): Embedding data containing VNF and depth information.
+            embeddingData (EmbeddingData): Embedding data containing VNF and depth information.
             trafficDesign (list[TrafficDesign]): Traffic design to use for generating host resource usage.
 
         Returns:
-            np.array: A numpy array containing the generated host resource usage scores.
+            np.ndarray: A numpy array containing the generated host resource usage scores.
         """
 
         simulationData: TimeSFCRequests = HybridEvaluation._generateTrafficData(
             egs, trafficDesign, isMaxOnly=False, isAvgOnly=True
         )
 
-        hostResourceUsage: pl.DataFrame = Scorer.getHostResourceUsage(
+        hostResourceUsage: np.ndarray = Scorer.getHostResourceUsage(
             simulationData, topology, embeddingData, HybridEvaluation._demandPredictions
         )
 
@@ -314,7 +320,7 @@ class HybridEvaluation:
         topology: Topology,
         embeddingData: EmbeddingData,
         trafficDesign: "list[TrafficDesign]",
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         Generate total resource usage scores for the given embedding graphs.
 
@@ -327,10 +333,10 @@ class HybridEvaluation:
             trafficDesign (list[TrafficDesign]): Traffic design to use for generating total resource usage.
 
         Returns:
-            np.array: A numpy array containing the generated total resource usage scores.
+            np.ndarray: A numpy array containing the generated total resource usage scores.
         """
 
-        hostResourceUsage: np.array = HybridEvaluation._generateHostResourceUsage(
+        hostResourceUsage: np.ndarray = HybridEvaluation._generateHostResourceUsage(
             egs, topology, embeddingData, trafficDesign
         )
 
@@ -347,66 +353,68 @@ class HybridEvaluation:
         return np.array([(gen, individualIndex, totalPower)], dtype=dt)
 
     @staticmethod
-    def _generateMeanScores(
+    def _generateMedianScores(
         trafficDesign: "list[TrafficDesign]",
         egs: "list[EmbeddingGraph]",
-        gen: int,
-        individualIndex: int,
         topology: Topology,
-        embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]",
-        linkData: "dict[str, dict[str, float]]",
-    ) -> np.array:
+        embeddingData: EmbeddingData,
+        linkData: LinkData,
+        individualIndex: int,
+        gen: int,
+    ) -> np.ndarray:
         """
         Generate scores for the given traffic design and embedding graphs.
 
         Parameters:
             trafficDesign (list[TrafficDesign]): The traffic design to use for generating scores.
             egs (list[EmbeddingGraph]): List of embedding graphs to use for generating scores.
-            gen (int): The generation number.
-            individualIndex (int): The index of the individual.
             topology (Topology): The topology to use for generating scores.
-            embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): Embedding data containing VNF and depth information.
-            linkData (dict[str, dict[str, float]]): Link data containing link capacities.
+            embeddingData (EmbeddingData): Embedding data containing VNF and depth information.
+            linkData (LinkData): Link data containing link capacities.
             acceptanceRatio (float): The acceptance ratio for the scores.
+            individualIndex (int): The index of the individual.
+            gen (int): The generation number.
 
         Returns:
-            np.array: A numpy array containing the generation index, individual index, mean link score and CPU score.
+            np.ndarray: A numpy array containing the generation index, individual index, median link score and CPU score.
         """
 
         dt = np.dtype(
             [
                 ("generation", np.int32),
                 ("individual", np.int32),
-                ("mean_max_link", np.float64),
-                ("mean_total_link", np.float64),
-                ("mean_total_delay", np.float64),
-                ("mean_cpu", np.float64),
+                ("max_link_score", np.float64),
+                ("total_link_score", np.float64),
+                ("total_delay", np.float64),
+                ("max_cpu", np.float64),
                 ("latency", np.float64),
             ]
         )
 
         try:
-            scores: np.array = HybridEvaluation._generateScores(
+            scores, _i = HybridEvaluation._generateScores(
                 trafficDesign,
                 egs,
                 topology,
                 embeddingData,
                 linkData,
+                individualIndex,
+                gen,
                 isAvgOnly=True,
             )
         except Exception as e:
             TUI.appendToSolverLog(f"Error generating scores: {e}")
             return np.array([(gen, individualIndex, 0.0, 0.0, 0.0, 0.0, 0.0)], dtype=dt)
 
-        mean_max_link = np.mean(scores[:]["max_link_score"])
-        mean_total_link = np.mean(scores[:]["total_link_score"])
-        mean_total_delay = np.mean(scores[:]["total_delay"])
-        mean_cpu = np.mean(scores[:]["max_cpu"])
+        mean_max_link = np.median(scores[:]["max_link_score"])
+        mean_total_link = np.median(scores[:]["total_link_score"])
+        mean_total_delay = np.median(scores[:]["total_delay"])
+        mean_cpu = np.median(scores[:]["max_cpu"])
 
         return np.array([(gen, individualIndex, mean_max_link, mean_total_link, mean_total_delay, mean_cpu, 0.0)], dtype=dt)
 
     @staticmethod
-    def _getPowerUsage(gen: int, inds: "list[DecodedIndividual]", topology: Topology, trafficDesign: "list[TrafficDesign]", ) -> np.array:
+    def _getPowerUsage(gen: int, inds: "list[DecodedIndividual]", topology: Topology, trafficDesign: "list[TrafficDesign]", ) -> np.ndarray:
         """
         Get the power usage for the given individuals.
 
@@ -417,10 +425,10 @@ class HybridEvaluation:
             trafficDesign (list[TrafficDesign]): Traffic design to use for getting power usage.
 
         Returns:
-            np.array: A numpy array containing the power usage for each individual.
+            np.ndarray: A numpy array containing the power usage for each individual.
         """
 
-        powerUsage: np.array = None
+        powerUsage: np.ndarray = None
 
         with ProcessPoolExecutor() as executor:
             try:
@@ -494,20 +502,20 @@ class HybridEvaluation:
         """
 
         start: float = timeit.default_timer()
-        scores: np.array = None
+        scores: np.ndarray = None
 
         with ProcessPoolExecutor() as executor:
             try:
                 futures = [
                     executor.submit(
-                        HybridEvaluation._generateMeanScores,
+                        HybridEvaluation._generateMedianScores,
                         trafficDesign,
                         ind[1],
-                        gen,
-                        ind[0],
                         topology,
                         ind[2],
                         ind[3],
+                        ind[0],
+                        gen,
                     )
                     for ind in inds
                     if len(ind[1]) > 0
@@ -526,18 +534,18 @@ class HybridEvaluation:
 
             return
 
-        inputData: np.array = np.concatenate(
+        inputData: np.ndarray = np.concatenate(
             (
-                scores[:]["mean_max_link"].reshape(-1, 1),
-                scores[:]["mean_cpu"].reshape(-1, 1),
+                scores[:]["max_link_score"].reshape(-1, 1),
+                scores[:]["max_cpu"].reshape(-1, 1),
             ),
             axis=1,
         )
 
-        data: np.array = HybridEvaluation._surrogateModel.predict(inputData, verbose=0)
+        data: np.ndarray = predictLatencyFromModel(inputData, HybridEvaluation._surrogateModel)
 
         scores[:]["latency"] = data[:, 0]
-        scores[:]["latency"] = scores[:]["latency"] + scores[:]["mean_total_delay"]
+        scores[:]["latency"] = scores[:]["latency"] + scores[:]["total_delay"]
 
         HybridEvaluation._latencyPrediction = scores
 
@@ -567,7 +575,7 @@ class HybridEvaluation:
         )
         rows = HybridEvaluation._latencyPrediction[mask]
 
-        return rows[0]["latency"] if rows.shape[0] > 0 else 0.0
+        return np.mean(rows[0]["latency"]) if rows.shape[0] > 0 else 0.0
 
     @staticmethod
     def cacheForOffline(
@@ -830,12 +838,20 @@ class HybridEvaluation:
 
                 latency = penaltyLatency
             else:
+                HybridEvaluation.cacheForOffline(
+                        [individual],
+                        trafficDesign,
+                        topology,
+                        gen
+                )
                 data: pl.DataFrame = HybridEvaluation.generateScoresForRealTrafficData(
                     individual, trafficData, trafficDesign, topology, gen
                 )
 
+                fileName: str = os.path.join(surrogateDataDirectory, f"{time.time()}.csv")
+                TUI.appendToSolverLog(f"Saving traffic data to {fileName}")
                 with open(
-                    f"{surrogateDataDirectory}/{time.time()}.csv", mode="a", encoding="utf8"
+                    fileName, mode="a", encoding="utf8"
                 ) as scoreFile:
                     data.write_csv(
                         scoreFile,
@@ -843,33 +859,44 @@ class HybridEvaluation:
                         separator=",",
                     )
 
-                trafficData["_time"] = trafficData["_time"] // 1000000000
-
-                groupedTrafficData: pd.DataFrame = trafficData.groupby(
-                    ["_time", "sfcID"]
-                ).agg(
-                    reqps=("_value", "count"),
-                    medianLatency=("_value", "median"),
+                TUI.appendToSolverLog(f"Cleaning traffic data...")
+                data = data.filter(pl.col("latency") != 0)
+                data = data.filter(
+                    (pl.col("reqps") - pl.col("real_reqps")).abs() <= 1
                 )
 
-                q1: float = groupedTrafficData["medianLatency"].quantile(0.25)
-                q3: float = groupedTrafficData["medianLatency"].quantile(0.75)
+                TUI.appendToSolverLog(f"Grouping data for analysis...")
+                groupedTrafficData: pl.DataFrame = data.group_by(
+                    ["time", "sfc"]
+                ).agg(
+                    pl.len().alias("reqps"),
+                    pl.col("latency").median().alias("medianLatency"),
+                    pl.col("real_reqps").first().alias("real_reqps"),
+                )
+
+                TUI.appendToSolverLog(f"Filtering outliers...")
+                q1: float = groupedTrafficData["medianLatency"].quantile(0.25) or 0.0
+                q3: float = groupedTrafficData["medianLatency"].quantile(0.75) or 0.0
                 iqr: float = q3 - q1
                 lowerBound: float = q1 - 1.5 * iqr
                 upperBound: float = q3 + 1.5 * iqr
 
-                groupedTrafficData = groupedTrafficData[
-                    (groupedTrafficData["medianLatency"] >= lowerBound)
-                    & (groupedTrafficData["medianLatency"] <= upperBound)
-                ]
+                groupedTrafficData = groupedTrafficData.filter(
+                    (pl.col("medianLatency") >= lowerBound)
+                    & (pl.col("medianLatency") <= upperBound)
+                )
 
-                latency: float = groupedTrafficData["medianLatency"].mean()
+                TUI.appendToSolverLog(f"Calculating median latency...")
+                medianLatency = groupedTrafficData["medianLatency"].cast(pl.Float64).median()
+                latency: float = medianLatency if isinstance(medianLatency, float) else 0.0
 
                 if retrain:
                     # Retrain BENNS
                     TUI.appendToSolverLog("Retraining BENNS...")
                     train()
                     TUI.appendToSolverLog("Done retraining BENNS.")
+                    HybridEvaluation._surrogateModel = getSurrogateModel()
+                    TUI.appendToSolverLog("Reloaded BENNS model.")
 
             TUI.appendToSolverLog(f"Deleting graphs belonging to generation {gen}")
             deleteEGs(individual[1])
@@ -1009,8 +1036,8 @@ class HybridEvaluation:
             medianLatency=("_value", "median"),
         )
 
-        scores: np.array = HybridEvaluation._generateScores(
-            trafficDesign, ind[1], topology, ind[2], ind[3]
+        scores, _indIndex = HybridEvaluation._generateScores(
+            trafficDesign, ind[1], topology, ind[2], ind[3], ind[0], gen
         )
 
         scores = pl.DataFrame(scores)

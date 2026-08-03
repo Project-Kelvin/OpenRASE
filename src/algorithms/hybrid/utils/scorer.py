@@ -2,7 +2,7 @@
 Defines the CPU, memory and link scorer.
 """
 
-from typing import Tuple
+from typing import Tuple, Union, cast
 import numpy as np
 import polars as pl
 from shared.models.embedding_graph import VNF, EmbeddingGraph
@@ -86,8 +86,8 @@ class Scorer:
         data: dict[str, float],
         topology: Topology,
         egs: "list[EmbeddingGraph]",
-        linkData: "dict[str, dict[str, tuple[float, float, int ]]]",
-    ) -> "dict[str, float]":
+        linkData: LinkData,
+    ) -> "dict[str, tuple[float, float, int ]]":
         """
         Gets the link scores.
 
@@ -95,7 +95,7 @@ class Scorer:
             data (dict[str, float]): dictionary containing SFCs and the reqs/s for the given time slot.
             topology (Topology): the topology.
             egs (list[EmbeddingGraph]): the Embedding Graphs.
-            linkData (dict[str, dict[str, float]]): the link data.
+            linkData (dict[str, dict[str, tuple[float, float, int ]]]): the link data.
 
         Returns:
             dict[str, tuple[float, float, int ]]: the link scores.
@@ -171,24 +171,30 @@ class Scorer:
 
     @staticmethod
     def getHostLinkScoresForEachSFC(
+        ind: int,
+        gen: int,
         time: int,
         sfc: str,
         sfcReqps: float,
         hostScores: "dict[str, ResourceDemand]",
-        linkScores: "dict[str, float]",
+        linkScores: "dict[str, tuple[float, float, int ]]",
         egs: "list[EmbeddingGraph]",
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         Adds the host and link scores for a specific SFC.
 
         Parameters:
-            sfcData (pl.Series): the SFC data.
+            ind (int): the individual index.
+            gen (int): the generation index.
+            time (int): the time slot.
+            sfc (str): the SFC ID.
+            sfcReqps (float): the SFC requests per second.
             hostScores (dict[str, ResourceDemand]): the host scores.
-            linkScores (dict[str, float]): the link scores.
+            linkScores (dict[str, tuple[float, float, int ]]): the link scores.
             egs (list[EmbeddingGraph]): the Embedding Graphs.
 
         Returns:
-            np.array : A numpy array with CPU, memory and link scores for the specific SFC in teh specific time slot.
+            np.ndarray : A numpy array with CPU, memory and link scores for the specific SFC in teh specific time slot.
         """
 
         eg: EmbeddingGraph = [graph for graph in egs if graph["sfcID"] == sfc][0]
@@ -228,6 +234,8 @@ class Scorer:
 
         dt = np.dtype(
             [
+                ("individual", np.int32),
+                ("generation", np.int32),
                 ("time", np.int32),
                 ("sfc", "U", 20),
                 ("reqps", np.float64),
@@ -236,11 +244,14 @@ class Scorer:
                 ("total_link_score", np.float64),
                 ("max_link_score", np.float64),
                 ("total_delay", np.int32),
+                ("latency", np.float64),
             ]
         )
-        newData: np.array = np.array(
+        newData: np.ndarray = np.array(
             [
                 (
+                    int(ind),
+                    int(gen),
                     int(time),
                     str(sfc),
                     float(sfcReqps),
@@ -249,6 +260,7 @@ class Scorer:
                     float(totalLinkScore),
                     float(maxLinkScore),
                     int(totalDelay),
+                    float(0.0),
                 )
             ],
             dtype=dt,
@@ -258,6 +270,8 @@ class Scorer:
 
     @staticmethod
     def getHostLinkScoresForEachTimeSlot(
+        ind: int,
+        gen: int,
         time: int,
         timeData: dict[str, float],
         topology: Topology,
@@ -265,16 +279,23 @@ class Scorer:
         embeddingData: EmbeddingData,
         linkData: LinkData,
         demandPredictor: DemandPredictions,
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         Adds the host and link scores for each time slot.
 
         Parameters:
+            ind (int): the individual index.
+            gen (int): the generation index.
             time (int): the time slot.
-            timeData (pl.DataFrame): the time data.
+            timeData (dict[str, float]): the time data.
+            topology (Topology): the topology.
+            egs (list[EmbeddingGraph]): the Embedding Graphs.
+            embeddingData (EmbeddingData): the embedding data.
+            linkData (LinkData): the link data.
+            demandPredictor (DemandPredictions): the demand predictor.
 
         Returns:
-            np.array: A numpy array with CPU, memory and link scores for the specific time slot.
+            np.ndarray: A numpy array with CPU, memory and link scores for the specific time slot.
         """
 
         hostScores: "dict[str, ResourceDemand]" = Scorer.getHostScores(
@@ -283,10 +304,10 @@ class Scorer:
         linkScores: "dict[str, tuple[float, float, int ]]" = Scorer.getLinkScores(
             timeData, topology, egs, linkData
         )
-        hostLinkScores: np.array = None
+        hostLinkScores: np.ndarray = None
         for key, value in timeData.items():
-            hostLinkScore: np.array = Scorer.getHostLinkScoresForEachSFC(
-                time, key, value, hostScores, linkScores, egs
+            hostLinkScore: np.ndarray = Scorer.getHostLinkScoresForEachSFC(
+                ind, gen, time, key, value, hostScores, linkScores, egs
             )
             if hostLinkScores is None:
                 hostLinkScores = hostLinkScore
@@ -302,7 +323,7 @@ class Scorer:
         topology: Topology,
         embeddingData: EmbeddingData,
         demandPredictor: DemandPredictions,
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         Gets the host resource usage data for each time slot.
 
@@ -330,10 +351,10 @@ class Scorer:
         hostResourceUsageData: "dict[str, ResourceDemand]" = Scorer.getHostScores(
             timeData, topology, embeddingData, demandPredictor
         )[0]
-        hostResourceUsageArray: np.array = None
+        hostResourceUsageArray: np.ndarray = None
 
         for host, resourceUsage in hostResourceUsageData.items():
-            hostResourceUsage: np.array = np.array(
+            hostResourceUsage: np.ndarray = np.array(
                 [
                     (
                         int(time),
@@ -357,31 +378,37 @@ class Scorer:
 
     @staticmethod
     def getSFCScores(
+        ind: int,
+        gen: int,
         data: TimeSFCRequests,
         topology: Topology,
         egs: "list[EmbeddingGraph]",
-        embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]",
-        linkData: "dict[str, dict[str, float]]",
+        embeddingData: EmbeddingData,
+        linkData: LinkData,
         demandPredictor: DemandPredictions,
-    ) -> pl.DataFrame:
+    ) -> np.ndarray:
         """
         Gets the SFC scores.
 
         Parameters:
-            data pl.DataFrame: the data.
+            ind (int): the individual index.
+            gen (int): the generation index.
+            data (TimeSFCRequests): the data.
             topology (Topology): the topology.
             egs (list[EmbeddingGraph]): the Embedding Graphs.
-            embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): the embedding data.
-            linkData (dict[str, dict[str, float]]): the link data.
-            demandPredictor (Predictions): the demand predictor.
+            embeddingData (EmbeddingData): the embedding data.
+            linkData (LinkData): the link data.
+            demandPredictor (DemandPredictions): the demand predictor.
 
         Returns:
-            np.array: the SFC scores (time, SFC ID, reqps, max CPU, max memory, link score).
+            np.ndarray: the SFC scores (time, SFC ID, reqps, max CPU, max memory, link score).
         """
 
-        outputData: np.array = None
+        outputData: Union[np.ndarray, None] = None
         for time, timeData in enumerate(data):
-            timeSlotData: np.array = Scorer.getHostLinkScoresForEachTimeSlot(
+            timeSlotData: np.ndarray = Scorer.getHostLinkScoresForEachTimeSlot(
+                ind,
+                gen,
                 time,
                 timeData,
                 topology,
@@ -395,32 +422,32 @@ class Scorer:
             else:
                 outputData = np.concatenate((outputData, timeSlotData))
 
-        return outputData
+        return cast(np.ndarray, outputData)
 
     @staticmethod
     def getHostResourceUsage(
         data: TimeSFCRequests,
         topology: Topology,
-        embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]",
+        embeddingData: EmbeddingData,
         demandPredictor: DemandPredictions,
-    ) -> np.array:
+    ) -> np.ndarray:
         """
         Gets the host resource usage.
 
         Parameters:
             data (TimeSFCRequests): the data.
             topology (Topology): the topology.
-            embeddingData (dict[str, dict[str, list[Tuple[str, int]]]]): the embedding data.
-            demandPredictor (Predictions): the demand predictor.
+            embeddingData (EmbeddingData): the embedding data.
+            demandPredictor (DemandPredictions): the demand predictor.
 
         Returns:
-            np.array: the host resource usage (time, host ID, CPU usage, memory usage).
+            np.ndarray: the host resource usage (time, host ID, CPU usage, memory usage).
         """
 
-        outputData: np.array = None
+        outputData: np.ndarray = None
 
         for time, timeData in enumerate(data):
-            timeSlotData: np.array = Scorer._getHostResourceUsageDataForEachTimeSlot(
+            timeSlotData: np.ndarray = Scorer._getHostResourceUsageDataForEachTimeSlot(
                 time,
                 timeData,
                 topology,
