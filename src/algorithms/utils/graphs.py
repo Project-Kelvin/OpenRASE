@@ -3,7 +3,13 @@ Defines util functions used to process graphs.
 """
 
 
+import copy
+from typing import Tuple
+
+from shared.constants.embedding_graph import TERMINAL
 from shared.models.embedding_graph import VNF, EmbeddingGraph
+from shared.models.sfc_request import SFCRequest
+from shared.utils.config import getConfig
 from algorithms.hybrid.constants.surrogate import BRANCH
 from constants.topology import SERVER
 from utils.embedding_graph import traverseVNF
@@ -92,3 +98,66 @@ def parseNodes(nodes: "list[str]") -> "tuple[list[list[str]], list[int]]":
             branch.append(node)
 
     return parsedNodes, parsedDivisors
+
+def convertSFCRsToEGs(sfcrs: list[SFCRequest]) -> list[EmbeddingGraph]:
+        """
+        Converts a list of SFCRequests to a list of EmbeddingGraphs.
+
+        Parameters:
+            sfcrs (list[SFCRequest]): A list of SFCRequests.
+
+        Returns:
+            list[EmbeddingGraph]: A list of EmbeddingGraphs.
+        """
+
+        egs: "list[EmbeddingGraph]" = []
+        embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" = {}
+        splitters: "list[str]" = getConfig()["vnfs"]["splitters"]
+
+        for sfcr in sfcrs:
+            sfcrID: str = sfcr["sfcrID"]
+            sortedVNFs: "list[str]" = copy.deepcopy(sfcr["vnfs"])
+            forwardingGraph: EmbeddingGraph = {"sfcID": sfcrID, "vnfs": {}}
+            oldDepth: int = 1
+            depth: int = 1
+            vnfDict: VNF = forwardingGraph["vnfs"]
+
+            def addVNF(vnfs: "list[str]", vnfDict: VNF, depth: int) -> None:
+                """
+                Adds VNF to the EmbeddingGraph.
+
+                Parameters:
+                    vnfs (list[str]): the VNFs.
+                    vnfDict (VNF): the VNF dictionary.
+                    depth (int): the depth of the VNF.
+
+                Returns:
+                    None
+                """
+
+                nonlocal oldDepth, embeddingData, splitters
+
+
+                if len(vnfs) == 0:
+                    vnfDict["host"] = {"id": SERVER}
+                    vnfDict["next"] = TERMINAL
+
+                    return
+
+                vnf: str = vnfs.pop(0)
+                splitter: bool = vnf in splitters
+                vnfDict["next"] = [{}, {}] if splitter else {}
+
+                vnfDict["vnf"] = {"id": vnf}
+
+                if splitter:
+                    depth += 1
+                    for i in range(2):
+                        addVNF(copy.deepcopy(vnfs), vnfDict["next"][i], depth)
+                else:
+                    addVNF(vnfs, vnfDict["next"], depth)
+
+            addVNF(sortedVNFs, vnfDict, depth)
+            egs.append(forwardingGraph)
+
+        return egs

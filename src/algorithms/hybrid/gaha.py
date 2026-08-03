@@ -35,6 +35,8 @@ def solve(
     cxPb: float = CXPB,
     indPb: float = INDPB,
     evaluateOnline: bool = True,
+    retrain: bool = False,
+    linesToWrite: list[str] = []
 ) -> None:
     """
     Solves the problem using a GA for VNF embedding and Dijkstra for link embedding.
@@ -52,6 +54,8 @@ def solve(
         cxPb (float): the crossover probability.
         indPb (float): the individual mutation probability.
         evaluateOnline (bool): whether to evaluate the solution online or offline.
+        retrain (bool): whether to retrain the surrogate model.
+        linesToWrite (list[str]): list of lines to write to the log file.
 
     Returns:
         None
@@ -83,7 +87,8 @@ def solve(
         mutPb,
         cxPb,
         indPb,
-        evaluateOnline=evaluateOnline
+        evaluateOnline=evaluateOnline,
+        retrain=retrain
     )
 
     hybridEvolution.hybridSolve(
@@ -95,5 +100,6 @@ def solve(
         trafficGenerator,
         telemetry,
         POP_SIZE,
-        experiment
+        experiment,
+        linesToWrite=linesToWrite
     )

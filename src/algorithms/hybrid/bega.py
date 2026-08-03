@@ -3,8 +3,11 @@ This defines a Genetic Algorithm (GA) to produce an Embedding Graph from a Forwa
 GA is used for VNf Embedding and Dijkstra is used for link embedding.
 """
 
+from copy import deepcopy
+import random
 from typing import Callable
 from deap import tools
+from shared.models.sfc_request import SFCRequest
 from shared.models.traffic_design import TrafficDesign
 from shared.models.topology import Topology
 from shared.models.embedding_graph import EmbeddingGraph
@@ -24,7 +27,7 @@ CXPB: float = 1.0 # Experimentally determined crossover probability for the GA
 
 def solve(
     topology: Topology,
-    fgrs: "list[EmbeddingGraph]",
+    sfcrs: "list[SFCRequest]",
     sendEGs: "Callable[[list[EmbeddingGraph]], None]",
     deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
     trafficDesign: "list[TrafficDesign]",
@@ -35,13 +38,14 @@ def solve(
     cxpPb: float = CXPB,
     indPb: float = INDPB,
     evaluateOnline: bool = True,
+    linesToWrite: list[str] = []
 ) -> None:
     """
     Solves the problem using a GA for VNF embedding and Dijkstra for link embedding.
 
     Parameters:
         topology (Topology): the topology to use for solving.
-        fgrs (list[EmbeddingGraph]): the list of Forwarding Graphs to embed.
+        sfcrs (list[SFCRequest]): the list of SFC Requests to embed.
         sendEGs (Callable[[list[EmbeddingGraph]], None]): the function to send the Embedding Graphs.
         deleteEGs (Callable[[list[EmbeddingGraph]], None]): the function to delete the Embedding Graphs.
         trafficDesign (list[TrafficDesign]): the traffic design to use for solving.
@@ -52,10 +56,15 @@ def solve(
         cxpPb (float): the crossover probability.
         indPb (float): the individual mutation probability.
         evaluateOnline (bool): whether to evaluate the solution online or offline.
+        linesToWrite (list[str]): list of lines to write to the log file.
 
     Returns:
         None
     """
+
+    shuffledSFCRs: "list[SFCRequest]" = deepcopy(sfcrs)
+    for sfcr in shuffledSFCRs:
+        random.shuffle(sfcr["vnfs"])
 
     hybridEvolution: HybridEvolution = HybridEvolution(
         "bega",
@@ -72,12 +81,13 @@ def solve(
 
     hybridEvolution.hybridSolve(
         topology,
-        fgrs,
+        shuffledSFCRs,
         sendEGs,
         deleteEGs,
         trafficDesign,
         trafficGenerator,
         telemetry,
         POP_SIZE,
-        experiment
+        experiment,
+        linesToWrite=linesToWrite
     )
