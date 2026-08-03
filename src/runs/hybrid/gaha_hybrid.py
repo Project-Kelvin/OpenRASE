@@ -2,12 +2,16 @@
 The defines the script to run the hybrid online-offline algorithm.
 """
 
+from copy import deepcopy
 import json
 import os
+import random
 from time import sleep
 from typing import Any
 import click
+import numpy as np
 from shared.models.embedding_graph import EmbeddingGraph
+from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
 from shared.utils.config import getConfig
@@ -20,6 +24,20 @@ from utils.topology import generateFatTreeTopology, generateTopologyFromEdgeList
 from utils.traffic_design import generateTrafficDesignFromFile, generateTrafficDesignFromIoTTrace
 from utils.tui import TUI
 
+def setRandomSeed() -> int:
+    """
+    Sets a random seed for the experiment.
+
+    Returns:
+        int: the random seed.
+    """
+
+    seed: int = random.randint(0, 10000000)
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    return seed
 
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
@@ -27,7 +45,9 @@ from utils.tui import TUI
 @click.option("--cx", is_flag=True, default=False, help="Run in crossover probability hyperparameter tuning mode.")
 @click.option("--env", type=click.Choice(["dc", "milan", "25n50e"]), default="dc", help="Network environment to run the algorithm in.")
 @click.option("--offline", is_flag=True, default=False, help="Run in offline mode.")
-def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> None:
+@click.option("--retrain", is_flag=True, default=False, help="Retrain the surrogate model.")
+@click.option("--test", is_flag=True, default=False, help="Run in test mode.")
+def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retrain: bool, test: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -37,6 +57,8 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> No
         cx (bool): Whether to run in crossover probability hyperparameter tuning mode.
         env (str): The network environment to run the algorithm in.
         offline (bool): Whether to run in offline mode.
+        retrain (bool): Whether to retrain the surrogate model.
+        test (bool): Whether to run in test mode.
 
     Returns:
         None
@@ -47,76 +69,41 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> No
     crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     delay: int = 1
 
-    # 12, 0.3, False, 5, 1
-    # 3, 0.2, False, 10, 0.5
-    experimentsIncludeFilter: list[tuple[int, float, bool, int, int]] = [
-        (20, 0.1, False, 10, 1), # Hard
-        (12, 0.1, False, 10, 2), # Medium
-        (8, 0.1, False, 10, 2), # Easy
+    #(15, 0.1, False, 10, 0.1) works
+    experiments: list[tuple[int, float, bool, float, float]] = [
+        (15, 0.23, False, 5, 0.5), # Used for ablation (DC)
+        (20, 0.1, False, 10, 1), # Used for hyperparameter tuning (DC),
+        (20, 0.1, False, 10, 1), # Used VNF embedding only experiment (Milan)
+        (10, 0.1, False, 10, 1), # Used VNF embedding only experiment (25N50E)
     ]
 
     if mutation or cx:
-        experimentsIncludeFilter = [experimentsIncludeFilter[0]]  # Only run the hard experiment for hyperparameter tuning
+        experiments = [experiments[1]]
+
+    if env == "dc":
+        experiments = [experiments[0]]
+
+    if env == "milan":
+        experiments = [experiments[2]]
+
+    if env == "25n50e":
+        experiments = [experiments[3]]
 
     noOfRuns: int = 20
 
-    experimentsExcludeFilter: list[tuple[int, float, bool, int, float]] = [
-    ]
-    experimentPriority: list[str] = [
-    ]
-    experimentsToRun: list[dict[str, Any]] = []
-
-    for noOfCopy in [20, 12, 8]:
-        for trafficScale in [0.1, 0.2]:
-            for trafficPattern in [False, True]:
-                for linkBandwidth in [10, 5]:
-                    for noOfCPUs in [2, 1, 0.5]:
-                        experimentsToRun.append(
-                            {
-                                "name": f"{noOfCopy}_{trafficScale}_{trafficPattern}_{linkBandwidth}_{noOfCPUs}_{delay}",
-                                "noOfCopies": noOfCopy,
-                                "trafficScale": trafficScale,
-                                "trafficPattern": trafficPattern,
-                                "linkBandwidth": linkBandwidth,
-                                "noOfCPUs": noOfCPUs,
-                                "memory": 5120,
-                            }
-                        )
-
-    if len(experimentPriority) > 0:
-        experimentsToRun = sorted(
-            experimentsToRun,
-            key=lambda x: experimentPriority.index(x["name"])
-            if x["name"] in experimentPriority
-            else len(experimentPriority),
+    for experiment in experiments:
+        noOfCopy, trafficScale, trafficPattern, linkBandwidth, noOfCPUs = experiment
+        exp: dict[str, Any] = dict(
+            {
+                "name": f"{noOfCopy}_{trafficScale}_{trafficPattern}_{linkBandwidth}_{noOfCPUs}_{delay}_{env}",
+                "noOfCopies": noOfCopy,
+                "trafficScale": trafficScale,
+                "trafficPattern": trafficPattern,
+                "linkBandwidth": linkBandwidth,
+                "noOfCPUs": noOfCPUs,
+                "memory": 5120,
+            }
         )
-
-    for exp in experimentsToRun:
-        if (
-            len(experimentsIncludeFilter) > 0
-            and (
-                exp["noOfCopies"],
-                exp["trafficScale"],
-                exp["trafficPattern"],
-                exp["linkBandwidth"],
-                exp["noOfCPUs"],
-            )
-            not in experimentsIncludeFilter
-        ):
-            continue
-
-        if (
-            len(experimentsExcludeFilter) > 0
-            and (
-                exp["noOfCopies"],
-                exp["trafficScale"],
-                exp["trafficPattern"],
-                exp["linkBandwidth"],
-                exp["noOfCPUs"],
-            )
-            in experimentsExcludeFilter
-        ):
-            continue
 
         class FGGen(FGRequestGenerator):
             """
@@ -152,7 +139,7 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> No
 
                 for i, fg in enumerate(self.fgs):
                     for c in range(exp["noOfCopies"]):
-                        fgToSend: EmbeddingGraph = fg.copy()
+                        fgToSend: EmbeddingGraph = deepcopy(fg)
                         fgToSend["sfcrID"] = f"sfcr{i}-{c}"
                         fgsToSend.append(fgToSend)
 
@@ -190,8 +177,8 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> No
                     "data",
                     "iot-trace.csv",
                 ),
-                60,
-                10000,
+                30,
+                1000 / exp["trafficScale"],
             )]
 
             if env == "milan":
@@ -207,7 +194,7 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> No
             elif env == "25n50e":
                 topology: Topology = generateTopologyFromEdgeList(
                     os.path.join(
-                        getConfig()["repoAbsolutePath"], "src", "runs", "hybrid", "data", "25n50e.txt"
+                        getConfig()["repoAbsolutePath"], "src", "runs", "hybrid", "data", "25N50E.txt"
                     ),
                     exp["noOfCPUs"],
                     exp["memory"],
@@ -237,6 +224,10 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> No
                         for mutPb in mutationProbabilities:
                             for indPb in individualProbabilities:
                                 for i in range(noOfRuns):
+                                    seed: int = setRandomSeed()
+                                    linesToWrite: list[str] = [
+                                        f"Seed: {seed}",
+                                    ]
                                     TUI.appendToSolverLog(
                                         f"Running experiment {exp['name']} with mutPb={mutPb} and indPb={indPb}."
                                     )
@@ -252,6 +243,7 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> No
                                         mutPb = mutPb,
                                         indPb = indPb,
                                         evaluateOnline = False,
+                                        linesToWrite=linesToWrite
                                     )
                     elif cx:
                         for cxPb in crossoverProbabilities:
@@ -259,6 +251,10 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> No
                                 TUI.appendToSolverLog(
                                     f"Running experiment {exp['name']} with cxPb={cxPb}."
                                 )
+                                seed: int = setRandomSeed()
+                                linesToWrite: list[str] = [
+                                    f"Seed: {seed}",
+                                ]
                                 solve(
                                     topology,
                                     requests,
@@ -270,6 +266,7 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> No
                                     f"{exp['name']}_cxPb{cxPb}_{i}",
                                     cxPb = cxPb,
                                     evaluateOnline = False,
+                                    linesToWrite=linesToWrite
                                 )
                     else:
                         TUI.appendToSolverLog(
@@ -277,6 +274,10 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> No
                         )
 
                         for i in range(noOfRuns):
+                            seed: int = setRandomSeed()
+                            linesToWrite: list[str] = [
+                                f"Seed: {seed}",
+                            ]
                             solve(
                                 topology,
                                 requests,
@@ -286,7 +287,9 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> No
                                 self._trafficGenerator,
                                 self._orchestrator.getTelemetry(),
                                 f"{exp['name']}_{i}",
-                                evaluateOnline = not offline
+                                evaluateOnline = not offline,
+                                retrain = retrain,
+                                linesToWrite=linesToWrite
                             )
 
                 except Exception as e:
@@ -294,9 +297,52 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool) -> No
 
                 TUI.appendToSolverLog("Finished experiment.")
 
-        sfcEm: SFCEmulator = SFCEmulator(FGGen, HybridSolver, headless)
-        sfcEm.startTest(
-            topology,
-            trafficDesign,
-        )
-        sfcEm.end()
+        if test:
+            TUI.disable()
+            fgsToSend: "list[SFCRequest]" = []
+            with open(
+                os.path.join(
+                    getConfig()["repoAbsolutePath"],
+                    "src",
+                    "runs",
+                    "hybrid",
+                    "configs",
+                    "sfcrs.json",
+                ),
+                "r",
+                encoding="utf8",
+            ) as f:
+                fgs = json.load(f)
+
+                for i, fg in enumerate(fgs):
+                    for c in range(exp["noOfCopies"]):
+                        fgToSend: SFCRequest = deepcopy(fg)
+                        fgToSend["sfcrID"] = f"sfcr{i}-{c}"
+                        fgsToSend.append(fgToSend)
+
+            TUI.appendToSolverLog(f"Running experiment {exp['name']} in test mode.")
+            for i in range(noOfRuns):
+                seed: int = setRandomSeed()
+                linesToWrite: list[str] = [
+                    f"Seed: {seed}",
+                ]
+                solve(
+                    topology,
+                    fgsToSend,
+                    None,
+                    None,
+                    trafficDesign,
+                    None,
+                    None,
+                    f"{exp['name']}_{i}",
+                    evaluateOnline = False,
+                    retrain = False,
+                    linesToWrite=linesToWrite
+                )
+        else:
+            sfcEm: SFCEmulator = SFCEmulator(FGGen, HybridSolver, headless)
+            sfcEm.startTest(
+                topology,
+                trafficDesign,
+            )
+            sfcEm.end()

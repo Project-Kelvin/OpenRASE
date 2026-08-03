@@ -4,6 +4,7 @@ The defines teh script to run the hybrid online-offline algorithm.
 
 import json
 import os
+import random
 from time import sleep
 from typing import Any
 import click
@@ -23,6 +24,55 @@ from utils.topology import generateFatTreeTopology, generateTopologyFromEdgeList
 from utils.traffic_design import generateTrafficDesignFromFile, generateTrafficDesignFromIoTTrace
 from utils.tui import TUI
 
+def setRandomSeed() -> int:
+    """
+    Sets a random seed for the experiment.
+
+    Returns:
+        int: the random seed.
+    """
+
+    seed: int = random.randint(0, 10000000)
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    return seed
+
+def generateSFCRs(noOfCopies: int) -> "list[SFCRequest]":
+    """
+    Generate the SFC Requests.
+
+    Parameters:
+        noOfCopies (int): The number of copies of each SFC Request to generate.
+
+    Returns:
+        list[SFCRequest]: A list of SFC Requests.
+    """
+
+    sfcrsToSend: "list[SFCRequest]" = []
+    with open(
+        os.path.join(
+            getConfig()["repoAbsolutePath"],
+            "src",
+            "runs",
+            "hybrid",
+            "configs",
+            "sfcrs.json",
+        ),
+        "r",
+        encoding="utf8",
+    ) as f:
+        sfcrs = json.load(f)
+
+        for i, sfcr in enumerate(sfcrs):
+            for c in range(noOfCopies):
+                sfcrToSend: SFCRequest = sfcr.copy()
+                sfcrToSend["sfcrID"] = f"sfcr{i}-{c}"
+                sfcrsToSend.append(sfcrToSend)
+
+    return sfcrsToSend
+
 
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
@@ -38,7 +88,10 @@ from utils.tui import TUI
 @click.option("--env", type=click.Choice(["dc", "milan", "25n50e"], case_sensitive=False), default="dc", help="The network environment to run the algorithm in.")
 @click.option("--retrain", is_flag=True, default=False, help="Specifies if BENNS should be retrained.")
 @click.option("--offline", is_flag=True, default=False, help="Run in offline mode.")
-def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool, env: str, retrain: bool, offline: bool) -> None:
+@click.option("--test", is_flag=True, default=False, help="Run in test mode.")
+@click.option("--random-input-weights", is_flag=True, default=False, help="Use random input weights instead of predefined weights.")
+@click.option("--neurons", is_flag=True, default=False, help="Test the number of neurons in the neural network.")
+def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool, env: str, retrain: bool, offline: bool, test: bool, random_input_weights: bool, neurons: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -56,6 +109,9 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
         env (str): The network environment to run the algorithm in.
         retrain (bool): Whether to retrain the BENNS model.
         offline (bool): Whether to run in offline mode.
+        test (bool): Whether to run in test mode.
+        random_input_weights (bool): Whether to use random input weights instead of predefined weights.
+        neurons (bool): Whether to test the number of neurons in the neural network.
 
     Returns:
         None
@@ -68,76 +124,43 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
     sigmas: list[float] = [0.0, 1.0, 2.0, 4.0]
     activations: list[str] = ["tanh", "sin", "relu", "linear"]
     initLimit: list[float] = [1, 2, np.pi, 2 * np.pi]
-    delay: int = 10
+    noOfNeurons: list[int] = [1, 4, 6]
+    delay: int = 1
 
-    experimentsIncludeFilter: list[tuple[int, float, bool, int, float]] = [
-        (20, 0.1, False, 10, 1), # Hard
-        (12, 0.1, False, 10, 2), # Medium
-        (8, 0.1, False, 10, 2), # Easy
+    experiments: list[tuple[int, float, bool, float, float]] = [
+        (15, 0.23, False, 5, 0.5), # Used for ablation (DC)
+        (20, 0.1, False, 10, 1), # Used for hyperparameter tuning (DC),
+        (20, 0.1, False, 10, 1), # Used VNF embedding only experiment (Milan)
+        (10, 0.1, False, 10, 1), # Used VNF embedding only experiment (25N50E)
     ]
 
-    if mutation or cx or rr or sigma or activation or init or chain or dijkstra or gaussian:
-        experimentsIncludeFilter = [experimentsIncludeFilter[0]]  # Only run the Hard experiment for hyperparameter tuning
+    if mutation or cx or rr or sigma or activation:
+        experiments = [experiments[1]]
+
+    if init or chain or dijkstra or gaussian or neurons or random_input_weights or env == "dc":
+        experiments = [experiments[0]]
+
+    if env == "milan":
+        experiments = [experiments[2]]
+
+    if env == "25n50e":
+        experiments = [experiments[3]]
 
     noOfRuns: int = 20
 
-    experimentsExcludeFilter: list[tuple[int, float, bool, int, int]] = []
-    experimentPriority: list[str] = []
-    experimentsToRun: list[dict[str, Any]] = []
-
-    for noOfCopy in [20, 12, 8]:
-        for trafficScale in [0.1, 0.2]:
-            for trafficPattern in [False, True]:
-                for linkBandwidth in [10, 5]:
-                    for noOfCPUs in [2, 1, 0.5]:
-                        experimentsToRun.append(
-                            {
-                                "name": f"{noOfCopy}_{trafficScale}_{trafficPattern}_{linkBandwidth}_{noOfCPUs}_{delay}",
-                                "noOfCopies": noOfCopy,
-                                "trafficScale": trafficScale,
-                                "trafficPattern": trafficPattern,
-                                "linkBandwidth": linkBandwidth,
-                                "noOfCPUs": noOfCPUs,
-                                "memory": 5120,
-                            }
-                        )
-
-    if len(experimentPriority) > 0:
-        experimentsToRun = sorted(
-            experimentsToRun,
-            key=lambda x: (
-                experimentPriority.index(x["name"])
-                if x["name"] in experimentPriority
-                else len(experimentPriority)
-            ),
+    for experiment in experiments:
+        noOfCopy, trafficScale, trafficPattern, linkBandwidth, noOfCPUs = experiment
+        exp: dict[str, Any] = dict(
+            {
+                "name": f"{noOfCopy}_{trafficScale}_{trafficPattern}_{linkBandwidth}_{noOfCPUs}_{delay}_{env}",
+                "noOfCopies": noOfCopy,
+                "trafficScale": trafficScale,
+                "trafficPattern": trafficPattern,
+                "linkBandwidth": linkBandwidth,
+                "noOfCPUs": noOfCPUs,
+                "memory": 5120,
+            }
         )
-
-    for exp in experimentsToRun:
-        if (
-            len(experimentsIncludeFilter) > 0
-            and (
-                exp["noOfCopies"],
-                exp["trafficScale"],
-                exp["trafficPattern"],
-                exp["linkBandwidth"],
-                exp["noOfCPUs"],
-            )
-            not in experimentsIncludeFilter
-        ):
-            continue
-
-        if (
-            len(experimentsExcludeFilter) > 0
-            and (
-                exp["noOfCopies"],
-                exp["trafficScale"],
-                exp["trafficPattern"],
-                exp["linkBandwidth"],
-                exp["noOfCPUs"],
-            )
-            in experimentsExcludeFilter
-        ):
-            continue
 
         class SFCRGen(SFCRequestGenerator):
             """
@@ -150,34 +173,14 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                 """
 
                 super().__init__(orchestrator)
-                with open(
-                    os.path.join(
-                        getConfig()["repoAbsolutePath"],
-                        "src",
-                        "runs",
-                        "hybrid",
-                        "configs",
-                        "sfcrs.json",
-                    ),
-                    "r",
-                    encoding="utf8",
-                ) as f:
-                    self.sfcrs = json.load(f)
 
-            def generateRequests(self) -> "list[EmbeddingGraph]":
+            def generateRequests(self) -> None:
                 """
                 Generate the FG Requests.
                 """
 
-                sfcrsToSend: "list[SFCRequest]" = []
+                self._orchestrator.sendRequests(generateSFCRs(exp["noOfCopies"]))
 
-                for i, sfcr in enumerate(self.sfcrs):
-                    for c in range(exp["noOfCopies"]):
-                        sfcrToSend: SFCRequest = sfcr.copy()
-                        sfcrToSend["sfcrID"] = f"sfcr{i}-{c}"
-                        sfcrsToSend.append(sfcrToSend)
-
-                self._orchestrator.sendRequests(sfcrsToSend)
 
         if env == "dc":
             trafficDesign: "list[TrafficDesign]" = [
@@ -211,8 +214,8 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                     "data",
                     "iot-trace.csv",
                 ),
-                60,
-                10000,
+                30,
+                1000 / exp["trafficScale"],
             )]
 
             if env == "milan":
@@ -228,7 +231,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
             if env == "25n50e":
                 topology: Topology = generateTopologyFromEdgeList(
                     os.path.join(
-                        getConfig()["repoAbsolutePath"], "src", "runs", "hybrid", "data", "25n50e.txt"
+                        getConfig()["repoAbsolutePath"], "src", "runs", "hybrid", "data", "25N50E.txt"
                     ),
                     exp["noOfCPUs"],
                     exp["memory"],
@@ -254,146 +257,237 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                         requests.append(self._requests.get())
                         sleep(0.1)
 
-                    if mutation:
-                        for mutPb in mutationProbabilities:
-                            for indPb in individualProbabilities:
-                                for i in range(noOfRuns):
-                                    solve(
-                                        requests,
-                                        self._orchestrator.sendEmbeddingGraphs,
-                                        self._orchestrator.deleteEmbeddingGraphs,
-                                        trafficDesign,
-                                        self._trafficGenerator,
-                                        self._orchestrator.getTelemetry(),
-                                        topology,
-                                        "genesis",
-                                        f"{exp['name']}_mutPb_{mutPb}_indPb_{indPb}_{i}",
-                                        mutPb=mutPb,
-                                        indPb=indPb,
-                                        evaluateOnline=False
-                                    )
-                    elif cx:
-                        for cxPb in crossoverProbabilities:
-                            for i in range(noOfRuns):
-                                solve(
-                                    requests,
-                                    self._orchestrator.sendEmbeddingGraphs,
-                                    self._orchestrator.deleteEmbeddingGraphs,
-                                    trafficDesign,
-                                    self._trafficGenerator,
-                                    self._orchestrator.getTelemetry(),
-                                    topology,
-                                    "genesis",
-                                    f"{exp['name']}_cxPb_{cxPb}_{i}",
-                                    cxPb=cxPb,
-                                    evaluateOnline=False
-                                )
-                    elif sigma:
-                        for sigmaVal in sigmas:
-                                for i in range(noOfRuns):
-                                    solve(
-                                        requests,
-                                        self._orchestrator.sendEmbeddingGraphs,
-                                        self._orchestrator.deleteEmbeddingGraphs,
-                                        trafficDesign,
-                                        self._trafficGenerator,
-                                        self._orchestrator.getTelemetry(),
-                                        topology,
-                                        "genesis",
-                                        f"{exp['name']}_sigma_{sigmaVal}_{i}",
-                                        sigma=sigmaVal,
-                                        evaluateOnline=False
-                                    )
-                    elif rr:
-                        for rejectionRate in rejectionRates:
-                            for i in range(noOfRuns):
-                                solve(
-                                    requests,
-                                    self._orchestrator.sendEmbeddingGraphs,
-                                    self._orchestrator.deleteEmbeddingGraphs,
-                                    trafficDesign,
-                                    self._trafficGenerator,
-                                    self._orchestrator.getTelemetry(),
-                                    topology,
-                                    "genesis",
-                                    f"{exp['name']}_rejectionRate_{rejectionRate}_{i}",
-                                    rejectionRate=rejectionRate,
-                                    evaluateOnline=False
-                                )
-                    elif activation:
-                        for activationFunction in activations:
-                            for i in range(noOfRuns):
-                                solve(
-                                    requests,
-                                    self._orchestrator.sendEmbeddingGraphs,
-                                    self._orchestrator.deleteEmbeddingGraphs,
-                                    trafficDesign,
-                                    self._trafficGenerator,
-                                    self._orchestrator.getTelemetry(),
-                                    topology,
-                                    "genesis",
-                                    f"{exp['name']}_activation_{activationFunction}_{i}",
-                                    activation=activationFunction,
-                                    evaluateOnline=False
-                                )
-                    elif init:
-                        for initLimitValue in initLimit:
-                            for i in range(noOfRuns):
-                                solve(
-                                    requests,
-                                    self._orchestrator.sendEmbeddingGraphs,
-                                    self._orchestrator.deleteEmbeddingGraphs,
-                                    trafficDesign,
-                                    self._trafficGenerator,
-                                    self._orchestrator.getTelemetry(),
-                                    topology,
-                                    "genesis",
-                                    f"{exp['name']}_initLimit_{initLimitValue}_{i}",
-                                    initLimit=initLimitValue,
-                                    evaluateOnline=False
-                                )
-                    elif chain or dijkstra or gaussian:
-                        for i in range(noOfRuns):
-                            solve(
-                                requests,
-                                self._orchestrator.sendEmbeddingGraphs,
-                                self._orchestrator.deleteEmbeddingGraphs,
-                                trafficDesign,
-                                self._trafficGenerator,
-                                self._orchestrator.getTelemetry(),
-                                topology,
-                                "genesis",
-                                f"{exp['name']}_chain_{chain}_dijkstra_{dijkstra}_gaussian_{gaussian}_{i}",
-                                staticChain=chain,
-                                dijkstra=dijkstra,
-                                disableGaussian=gaussian,
-                                evaluateOnline=False
-                            )
-                    else:
-                        for i in range(noOfRuns):
-                            solve(
-                                requests,
-                                self._orchestrator.sendEmbeddingGraphs,
-                                self._orchestrator.deleteEmbeddingGraphs,
-                                trafficDesign,
-                                self._trafficGenerator,
-                                self._orchestrator.getTelemetry(),
-                                topology,
-                                "genesis",
-                                f"{exp['name']}_{i}"
-                                retrain=retrain,
-                                evaluateOnline = not offline
-                            )
-
-
+                    for i in range(noOfRuns):
+                        seed: int = setRandomSeed()
+                        linesToWrite: list[str] = [
+                            f"Seed: {seed}",
+                            f"Environment: {env}",
+                        ]
+                        solve(
+                            requests,
+                            self._orchestrator.sendEmbeddingGraphs,
+                            self._orchestrator.deleteEmbeddingGraphs,
+                            trafficDesign,
+                            self._trafficGenerator,
+                            self._orchestrator.getTelemetry(),
+                            topology,
+                            "genesis",
+                            f"{exp['name']}_{i}",
+                            retrain=retrain,
+                            evaluateOnline = not offline,
+                            linesToWrite=linesToWrite
+                        )
                 except Exception as e:
                     TUI.appendToSolverLog(str(e), True)
 
                 TUI.appendToSolverLog("Finished experiment.")
 
-        sfcEm: SFCEmulator = SFCEmulator(SFCRGen, HybridSolver, headless)
-        sfcEm.startTest(
-            topology,
-            trafficDesign,
-        )
-        sfcEm.end()
+        if mutation or cx or rr or sigma or activation or init or chain or dijkstra or gaussian or test or random_input_weights or neurons:
+            TUI.disable()
+            sfcrsToSend: "list[SFCRequest]" = generateSFCRs(exp["noOfCopies"])
+
+            if mutation:
+                for mutPb in mutationProbabilities:
+                    for indPb in individualProbabilities:
+                        for i in range(noOfRuns):
+                            seed: int = setRandomSeed()
+                            linesToWrite: list[str] = [
+                                f"Seed: {seed}",
+                            ]
+                            solve(
+                                sfcrsToSend,
+                                None,
+                                None,
+                                trafficDesign,
+                                None,
+                                None,
+                                topology,
+                                "genesis",
+                                f"{exp['name']}_mutPb_{mutPb}_indPb_{indPb}_{i}",
+                                mutPb=mutPb,
+                                indPb=indPb,
+                                evaluateOnline=False,
+                                linesToWrite=linesToWrite
+                            )
+            elif cx:
+                for cxPb in crossoverProbabilities:
+                    for i in range(noOfRuns):
+                        seed: int = setRandomSeed()
+                        linesToWrite: list[str] = [
+                            f"Seed: {seed}",
+                            f"Environment: {env}",
+                        ]
+                        solve(
+                            sfcrsToSend,
+                            None,
+                            None,
+                            trafficDesign,
+                            None,
+                            None,
+                            topology,
+                            "genesis",
+                            f"{exp['name']}_cxPb_{cxPb}_{i}",
+                            cxPb=cxPb,
+                            evaluateOnline=False,
+                            linesToWrite=linesToWrite
+                        )
+            elif sigma:
+                for sigmaVal in sigmas:
+                        for i in range(noOfRuns):
+                            seed: int = setRandomSeed()
+                            linesToWrite: list[str] = [
+                                f"Seed: {seed}",
+                            ]
+                            solve(
+                                sfcrsToSend,
+                                None,
+                                None,
+                                trafficDesign,
+                                None,
+                                None,
+                                topology,
+                                "genesis",
+                                f"{exp['name']}_sigma_{sigmaVal}_{i}",
+                                sigma=sigmaVal,
+                                evaluateOnline=False,
+                                linesToWrite=linesToWrite
+                            )
+            elif rr:
+                for rejectionRate in rejectionRates:
+                    for i in range(noOfRuns):
+                        seed: int = setRandomSeed()
+                        linesToWrite: list[str] = [
+                            f"Seed: {seed}",
+                            f"Environment: {env}",
+                        ]
+                        solve(
+                            sfcrsToSend,
+                            None,
+                            None,
+                            trafficDesign,
+                            None,
+                            None,
+                            topology,
+                            "genesis",
+                            f"{exp['name']}_rejectionRate_{rejectionRate}_{i}",
+                            rejectionRate=rejectionRate,
+                            evaluateOnline=False,
+                            linesToWrite=linesToWrite
+                        )
+            elif activation:
+                for activationFunction in activations:
+                    for i in range(noOfRuns):
+                        seed: int = setRandomSeed()
+                        linesToWrite: list[str] = [
+                            f"Seed: {seed}",
+                            f"Environment: {env}",
+                        ]
+                        solve(
+                            sfcrsToSend,
+                            None,
+                            None,
+                            trafficDesign,
+                            None,
+                            None,
+                            topology,
+                            "genesis",
+                            f"{exp['name']}_activation_{activationFunction}_{i}",
+                            activation=activationFunction,
+                            evaluateOnline=False,
+                            linesToWrite=linesToWrite
+                        )
+            elif init:
+                for initLimitValue in initLimit:
+                    for i in range(noOfRuns):
+                        seed: int = setRandomSeed()
+                        linesToWrite: list[str] = [
+                            f"Seed: {seed}",
+                            f"Environment: {env}",
+                        ]
+                        solve(
+                            sfcrsToSend,
+                            None,
+                            None,
+                            trafficDesign,
+                            None,
+                            None,
+                            topology,
+                            "genesis",
+                            f"{exp['name']}_initLimit_{initLimitValue}_{i}",
+                            initLimit=initLimitValue,
+                            evaluateOnline=False,
+                            linesToWrite=linesToWrite
+                        )
+            elif chain or dijkstra or gaussian or random_input_weights:
+                for i in range(noOfRuns):
+                    seed: int = setRandomSeed()
+                    linesToWrite: list[str] = [
+                        f"Seed: {seed}",
+                    ]
+                    solve(
+                        sfcrsToSend,
+                        None,
+                        None,
+                        trafficDesign,
+                        None,
+                        None,
+                        topology,
+                        "genesis",
+                        f"{exp['name']}_chain_{chain}_dijkstra_{dijkstra}_gaussian_{gaussian}_random_input_weights_{random_input_weights}_{i}",
+                        staticChain=chain,
+                        dijkstra=dijkstra,
+                        disableGaussian=gaussian,
+                        randomInputWeights=random_input_weights,
+                        evaluateOnline=False,
+                        linesToWrite=linesToWrite
+                    )
+            elif test:
+                TUI.appendToSolverLog(f"Running experiment {exp['name']} in test mode.")
+                for i in range(noOfRuns):
+                    seed: int = setRandomSeed()
+                    linesToWrite: list[str] = [
+                        f"Seed: {seed}",
+                    ]
+                    solve(
+                        sfcrsToSend,
+                        None,
+                        None,
+                        trafficDesign,
+                        None,
+                        None,
+                        topology,
+                        "genesis",
+                        f"{exp['name']}_{i}",
+                        retrain=False,
+                        evaluateOnline = False,
+                        linesToWrite=linesToWrite
+                    )
+            elif neurons:
+                for noOfNeuronsValue in noOfNeurons:
+                    for i in range(noOfRuns):
+                        seed: int = setRandomSeed()
+                        linesToWrite: list[str] = [
+                            f"Seed: {seed}",
+                            f"Environment: {env}",
+                        ]
+                        solve(
+                            sfcrsToSend,
+                            None,
+                            None,
+                            trafficDesign,
+                            None,
+                            None,
+                            topology,
+                            "genesis_neurons",
+                            f"{exp['name']}_noOfNeurons_{noOfNeuronsValue}_{i}",
+                            noOfNeurons=noOfNeuronsValue,
+                            evaluateOnline=False,
+                            linesToWrite=linesToWrite
+                        )
+        else:
+            sfcEm: SFCEmulator = SFCEmulator(SFCRGen, HybridSolver, headless)
+            sfcEm.startTest(
+                topology,
+                trafficDesign,
+            )
+            sfcEm.end()
