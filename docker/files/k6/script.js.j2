@@ -21,7 +21,8 @@ export default function () {
         },
         tags: {
             sfcID: __ENV.SFC_ID
-        }
+        },
+        timeout: "{{TIMEOUT}}s"
     });
     check(res, {
         "is status 200": (r) => r.status === 200

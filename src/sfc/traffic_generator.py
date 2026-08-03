@@ -145,6 +145,7 @@ class TrafficGenerator(Subscriber):
         timeUnit: str = config["k6"]["timeUnit"]
         startRate: int = config["k6"]["startRate"]
         executor: str = config["k6"]["executor"]
+        timeout: int = config["general"]["requestTimeout"]
 
         config: Config = getConfig()
         templateFile: str = f"{config['repoAbsolutePath']}/docker/files/k6/script.js.j2"
@@ -160,6 +161,7 @@ class TrafficGenerator(Subscriber):
                     START_RATE=startRate,
                     EXECUTOR=executor,
                     MAX_VUS=maxVus,
+                    TIMEOUT=timeout
                 )
                 outputFileContent = templatedFile
 

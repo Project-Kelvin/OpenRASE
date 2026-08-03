@@ -29,7 +29,7 @@ sfcClassifier:
   port: 80
 
 general:
-  requestTimeout: 120
+  requestTimeout: 15
 
 repoAbsolutePath: "/home/thivi/OpenRASE"
 
