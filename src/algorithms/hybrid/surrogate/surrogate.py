@@ -3,10 +3,12 @@ This defines the surrogate model as a Bayesian Neural Network.
 """
 
 import os
+import pickle
 import random
 import time
 from typing import Any
 import numpy as np
+from sklearn.ensemble import RandomForestRegressor
 import tensorflow as tf
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -15,7 +17,6 @@ from algorithms.hybrid.constants.surrogate import (
     SURROGATE_DATA_PATH,
     SURROGATE_LOG_PATH,
     SURROGATE_MODELS_PATH,
-    SURROGATE_PATH,
 )
 from algorithms.hybrid.surrogate.combine_data import combineData
 
@@ -87,19 +88,25 @@ def train() -> None:
             tf.keras.layers.Dense(
                 16, kernel_initializer="glorot_normal", activation=activation
             ),
-            tf.keras.layers.Dense(1),
+            tf.keras.layers.Dense(1, kernel_initializer="he_normal", activation="relu"),
         ]
     )
 
     model.compile(
         optimizer=tf.keras.optimizers.Adamax(learning_rate=0.05),
-        loss="mape",
+        loss="mse",
+        metrics=["mape"],
     )
     history: Any = model.fit(xTrain, yTrain, epochs=75, verbose=1, validation_split=0.1)
-    print(model.evaluate(xTest, yTest))
 
     with open(surrogateFile, "a", encoding="utf8") as f:
         f.write(f"[{time.time()}] Validation Error: {model.evaluate(xTest, yTest)}\n")
+
+    # rf = RandomForestRegressor(n_estimators=200)
+    # rf.fit(xTrain, yTrain)
+
+    # with open(surrogateFile, "a", encoding="utf8") as f:
+    #     f.write(f"[{time.time()}] Validation Error: {rf.score(xTest, yTest)}\n")
 
     # Plotting the training history
     plt.figure(1, (8, 4), dpi=300)
@@ -112,8 +119,10 @@ def train() -> None:
     plt.savefig(f"{SURROGACY_PATH}/loss_vs_val_loss.png")
     plt.clf()
 
-    output: np.array = model.predict(xTest)
+    output: np.ndarray = model.predict(xTest)
     testData: pd.DataFrame = testData.assign(PredictedLatency=output.flatten())
+    # validationPrediction: np.ndarray = rf.predict(xTest)
+    # testData: pd.DataFrame = testData.assign(PredictedLatency=validationPrediction.flatten())
     testData.to_csv(f"{SURROGACY_PATH}/predictions.csv", index=False)
     testData = testData.sort_values(by=OUTPUT).reset_index(drop=True)
 
@@ -165,33 +174,36 @@ def train() -> None:
     plt.savefig(f"{SURROGACY_PATH}/latency_vs_predicted_latency_scatter_two_plots.png")
     plt.clf()
 
-    cpus: "list[float]" = [random.uniform(0, 1.75) for _ in range(1000000)]
-    links: "list[float]" = [random.uniform(0, 300) for _ in range(1000000)]
-    simData = pd.DataFrame({"max_cpu": cpus, "max_link_score": links})
+    # cpus: "list[float]" = [random.uniform(0, 1.75) for _ in range(1000000)]
+    # links: "list[float]" = [random.uniform(0, 300) for _ in range(1000000)]
+    # simData = pd.DataFrame({"max_cpu": cpus, "max_link_score": links})
 
-    output = model.predict(simData[features].values)
-    simData = simData.assign(PredictedLatency=output.flatten())
+    # output = model.predict(simData[features].values)
+    # simData = simData.assign(PredictedLatency=output.flatten())
 
-    # Scatter plot of max_cpu vs max_link_score for simulated data
-    fig, ax = plt.subplots()
-    fig.set_size_inches(6, 4)
-    fig.set_dpi(300)
-    points: Any = ax.scatter(
-        simData["max_cpu"],
-        simData["max_link_score"],
-        c=simData["PredictedLatency"],
-        vmin=0,
-        vmax=700,
-    )
-    ax.set_yticks(np.arange(0, 300, 50))
-    fig.colorbar(points, label="Traffic Latency (ms)")
-    ax.set_xlabel("Maximum CPU Demand", fontsize=10)
-    ax.set_ylabel("Maximum Bandwidth Demand", fontsize=10)
-    ax.grid(True)
-    plt.savefig(f"{SURROGACY_PATH}/simulated_latency_scatter.png")
-    plt.clf()
+    # # Scatter plot of max_cpu vs max_link_score for simulated data
+    # fig, ax = plt.subplots()
+    # fig.set_size_inches(6, 4)
+    # fig.set_dpi(300)
+    # points: Any = ax.scatter(
+    #     simData["max_cpu"],
+    #     simData["max_link_score"],
+    #     c=simData["PredictedLatency"],
+    #     vmin=0,
+    #     vmax=700,
+    # )
+    # ax.set_yticks(np.arange(0, 300, 50))
+    # fig.colorbar(points, label="Traffic Latency (ms)")
+    # ax.set_xlabel("Maximum CPU Demand", fontsize=10)
+    # ax.set_ylabel("Maximum Bandwidth Demand", fontsize=10)
+    # ax.grid(True)
+    # plt.savefig(f"{SURROGACY_PATH}/simulated_latency_scatter.png")
+    # plt.clf()
 
     model.save(MODEL_PATH)
+    # with open(MODEL_PATH, "wb") as f:
+    #     pickle.dump(rf, f)
+
 
 
 def predictLatency(data: pd.DataFrame) -> pd.DataFrame:
@@ -206,7 +218,7 @@ def predictLatency(data: pd.DataFrame) -> pd.DataFrame:
     """
 
     model: tf.keras.Sequential = getSurrogateModel()
-    output: np.array = model.predict(data[features], verbose=0)
+    output: np.ndarray = model.predict(data[features], verbose=0)
     data = data.assign(PredictedLatency=output.flatten())
 
     return data
@@ -221,7 +233,25 @@ def getSurrogateModel() -> tf.keras.Sequential:
 
     try:
         return tf.keras.models.load_model(MODEL_PATH)
+        # with open(MODEL_PATH, "rb") as f:
+        #     return pickle.load(f)
     except Exception as e:
         print(f"Error loading model: {e}")
 
         return None
+
+def predictLatencyFromModel(data: np.ndarray, model: Any) -> np.ndarray:
+    """
+    Predicts the latency from the model.
+
+    Parameters:
+        data (np.ndarray): the data.
+        model (Any): the model.
+
+    Returns:
+        np.ndarray: the predicted latency values.
+    """
+
+    output: np.ndarray = model.predict(data)
+
+    return output.reshape(-1, 1)
