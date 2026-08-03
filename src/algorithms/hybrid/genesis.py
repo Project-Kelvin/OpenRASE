@@ -56,7 +56,10 @@ def solve(
     disableGaussian: bool = False,
     activation: str = ACTIVATION,
     initLimit: float = INIT_LIMIT,
-    retrain: bool = False
+    retrain: bool = False,
+    randomInputWeights: bool = False,
+    noOfNeurons: int = NO_OF_NEURONS,
+    linesToWrite: list[str] = []
 ) -> None:
     """
     Evolves the weights of the Neural Network.
@@ -85,6 +88,9 @@ def solve(
         activation (str): the type of activation function to apply.
         initLimit (float): the limit to use for generating the predefined weights.
         retrain (bool): Specifies if BENNS should be retrained.
+        randomInputWeights (bool): whether to use random input weights or not.
+        noOfNeurons (int): the number of neurons in the neural network.
+        linesToWrite (list[str]): the lines to write to the log file.
 
     Returns:
         None
@@ -96,7 +102,7 @@ def solve(
         for sfcr in shuffledSFCRs:
             random.shuffle(sfcr["vnfs"])
 
-    GenesisUtils.init(shuffledSFCRs, topology, NO_OF_NEURONS, rejectionRate, sigma)
+    GenesisUtils.init(shuffledSFCRs, topology, noOfNeurons, rejectionRate, sigma, retainWeights=retainPopulation, initLimit=initLimit)
 
     def decodePopWrapper(
         pop: list[Individual],
@@ -115,7 +121,7 @@ def solve(
             list[GenesisUtils.DecodedIndividual]: the decoded population.
         """
 
-        return GenesisUtils.decodePop(pop, topology, sfcrs, staticChain, dijkstra, disableGaussian, activation)
+        return GenesisUtils.decodePop(pop, topology, sfcrs, staticChain, dijkstra, disableGaussian, activation, randomInputWeights)
 
     def mutateWrapper(
         individual: Individual,
@@ -132,7 +138,7 @@ def solve(
             Individual: the mutated individual.
         """
 
-        return GenesisUtils.genesisMutate(individual, indpb, initLimit=initLimit)
+        return GenesisUtils.genesisMutate(individual, indpb)
 
     def generateRandomIndividualWrapper(container: Type[Individual], topology: Topology, sfcrs: "list[SFCRequest]") -> Individual:
         """
@@ -147,9 +153,9 @@ def solve(
             Individual: the generated individual.
         """
 
-        return GenesisUtils.generateRandomGenesisIndividual(container, topology, sfcrs, initLimit=initLimit)
+        return GenesisUtils.generateRandomGenesisIndividual(container, topology, sfcrs)
 
-    linesToWrite: list[str] = [
+    linesToLog: list[str] = [
         f"Is VNF CC Disabled: {staticChain}",
         f"Is Dijkstra Used: {dijkstra}",
         f"Is Gaussian Disabled: {disableGaussian}",
@@ -158,7 +164,7 @@ def solve(
         f"Rejection Rate: {rejectionRate}",
         f"Sigma: {sigma}",
         f"Retrain: {retrain}",
-    ]
+    ] + linesToWrite
 
     hybridEvolution: HybridEvolution = HybridEvolution(
         dirName,
@@ -186,5 +192,5 @@ def solve(
         experimentName,
         type,
         retainPopulation,
-        linesToWrite=linesToWrite
+        linesToWrite=linesToLog
     )

@@ -5,7 +5,7 @@ Defines the utils for the GENESIS algorithm.
 from concurrent.futures import ProcessPoolExecutor
 from copy import deepcopy
 import timeit
-from typing import  Optional, Tuple, Type, cast
+from typing import Optional, Tuple, Type, cast
 from uuid import UUID, uuid4
 from deap import tools
 import numpy as np
@@ -45,7 +45,8 @@ class GenesisUtils:
         noOfNeurons: int,
         rejectionRate: float,
         sigma: float,
-        initLimit: float = 2 * np.pi,
+        initLimit: float = np.pi,
+        retainWeights: bool = False
     ) -> None:
         """
         Sets the predefined weights.
@@ -57,20 +58,28 @@ class GenesisUtils:
             rejectionRate (float): the rejection rate to use for decoding the individuals.
             sigma (float): the sigma to use for decoding the individuals.
             initLimit (float): the limit to use for generating the predefined weights.
+            retainWeights (bool): whether to retain the predefined weights or not.
 
         Returns:
             None
         """
 
         cls.noOfNeurons = noOfNeurons
-        cls.predefinedWeights = getPredefinedWeights(
-            generatePredefinedWeights(sfcrs, topology, cls.noOfNeurons, initLimit),
-            sfcrs,
-            topology,
-            cls.noOfNeurons,
-        )
+
+        if not retainWeights or (retainWeights and cls.predefinedWeights is None):
+            TUI.appendToSolverLog("Generating predefined weights.")
+            cls.predefinedWeights = getPredefinedWeights(
+                generatePredefinedWeights(sfcrs, topology, cls.noOfNeurons, initLimit),
+                sfcrs,
+                topology,
+                cls.noOfNeurons,
+            )
+        else:
+            TUI.appendToSolverLog("Using existing predefined weights.")
+
         cls.rejectionRate = rejectionRate
         cls.sigma = sigma
+        cls.initLimit = initLimit
 
     @staticmethod
     def extractDecodedIndividuals(
@@ -125,8 +134,6 @@ class GenesisUtils:
             DecodedIndividual: A tuple containing the embedding graphs, embedding data, link data, and acceptance ratio.
         """
 
-        global predefinedWeights
-
         try:
             weights: GenesisWeights = getWeights(individual, GenesisUtils.noOfNeurons)
 
@@ -137,9 +144,15 @@ class GenesisUtils:
             vnfWeights: list[float] = weights[1]
             linkWeights: list[float] = weights[2]
 
-            fgs: dict[str, list[str]] = generateFGs(
-                sfcrs, ccPDWeights, ccWeights, GenesisUtils.noOfNeurons, activation=activation
-            )
+            fgs: dict[str, list[str]] = {}
+            if staticChain:
+                for sfcr in sfcrs:
+                    fgs[sfcr["sfcrID"]] = sfcr["vnfs"]
+            else:
+                fgs: dict[str, list[str]] = generateFGs(
+                    sfcrs, ccPDWeights, ccWeights, GenesisUtils.noOfNeurons, activation=activation
+                )
+
             egs, nodes, embedData = generateEGs(
                 fgs,
                 topology,
@@ -168,7 +181,7 @@ class GenesisUtils:
 
     @staticmethod
     def decodePop(
-        pop: list[Individual], topology: Topology, sfcrs: "list[SFCRequest]", staticChain: bool = False, dijkstra: bool = False, disableGaussian: bool = False, activation: str = "sin"
+        pop: list[Individual], topology: Topology, sfcrs: "list[SFCRequest]", staticChain: bool = False, dijkstra: bool = False, disableGaussian: bool = False, activation: str = "sin", randomInputWeights: bool = False
     ) -> list[DecodedIndividual]:
         """
         Generates the Embedding Graphs.
@@ -181,6 +194,7 @@ class GenesisUtils:
             dijkstra (bool): whether to use Dijkstra's algorithm for pathfinding.
             disableGaussian (bool): whether to disable the Gaussian distribution for host selection.
             activation (str): the type of activation function to apply.
+            randomInputWeights (bool): whether to use random input weights or not.
 
         Returns:
             list[DecodedIndividual]: A list consisting of tuples containing the embedding graphs, embedding data, link data, and acceptance ratio.
@@ -188,6 +202,14 @@ class GenesisUtils:
 
         startTime: float = timeit.default_timer()
         decodedPop: "list[DecodedIndividual]" = []
+
+        if randomInputWeights:
+            GenesisUtils.predefinedWeights = getPredefinedWeights(
+                generatePredefinedWeights(sfcrs, topology, GenesisUtils.noOfNeurons, GenesisUtils.initLimit),
+                sfcrs,
+                topology,
+                GenesisUtils.noOfNeurons,
+            )
 
         with ProcessPoolExecutor() as executor:
             futures = [
@@ -217,7 +239,7 @@ class GenesisUtils:
 
     @staticmethod
     def generateRandomGenesisIndividual(
-        container: Type[Individual], topology: Topology, sfcrs: "list[SFCRequest]", initLimit: float = 2 * np.pi
+        container: Type[Individual], topology: Topology, sfcrs: "list[SFCRequest]"
     ) -> Individual:
         """
         Generates a random individual.
@@ -226,7 +248,6 @@ class GenesisUtils:
             container (Type[Individual]): the container for the individual.
             topology (Topology): the topology.
             sfcrs (list[SFCRequest]): the list of SFCRequests.
-            initLimit (float): the limit to use for generating the random weight.
 
         Returns:
             Individual: An individual randomly generated.
@@ -238,7 +259,7 @@ class GenesisUtils:
 
         weightLength: int = getWeightsLength(GenesisUtils.noOfNeurons)
         for _ in range(weightLength):
-            individual.append(generateRandomWeight(initLimit))
+            individual.append(generateRandomWeight(GenesisUtils.initLimit))
 
         return individual
 
@@ -264,7 +285,6 @@ class GenesisUtils:
     def genesisMutate(
         individual: Individual,
         indpb: float,
-        initLimit: float = 2 * np.pi
     ) -> Individual:
         """
         Mutates an individual.
@@ -272,7 +292,6 @@ class GenesisUtils:
         Parameters:
             individual (Individual): the individual to mutate.
             indpb (float): the independent probability for each attribute to be mutated.
-            initLimit (float): the limit to use for generating the random weight.
 
         Returns:
             Individual: the mutated individual.
@@ -282,6 +301,6 @@ class GenesisUtils:
 
         for gene in range(len(mutatedIndividual)):
             if np.random.random() < indpb:
-                mutatedIndividual[gene] = generateRandomWeight(initLimit)
+                mutatedIndividual[gene] = generateRandomWeight(GenesisUtils.initLimit)
 
         return mutatedIndividual
