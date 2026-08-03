@@ -6,6 +6,7 @@ from concurrent.futures import ProcessPoolExecutor
 import copy
 import random
 from typing import Tuple, Type, cast
+from uuid import uuid4
 import numpy as np
 from shared.constants.embedding_graph import TERMINAL
 from shared.models.sfc_request import SFCRequest
@@ -18,7 +19,7 @@ from algorithms.models.embedding import DecodedIndividual, LinkData
 from algorithms.hybrid.constants.surrogate import BRANCH
 from algorithms.hybrid.models.traffic import TimeSFCRequests
 from algorithms.hybrid.utils.scorer import Scorer
-from algorithms.utils.graphs import getVNFsFromFGRs, parseNodes
+from algorithms.utils.graphs import convertSFCRsToEGs, getVNFsFromFGRs, parseNodes
 from shared.models.embedding_graph import VNF, EmbeddingGraph, ForwardingLink
 from shared.models.topology import Link, Topology
 from dijkstar import Graph, find_path
@@ -47,68 +48,8 @@ class MakGAUtils:
         self._topology = topology
         self._trafficDesign = trafficDesign
         self._sfcrs = sfcrs
-        self._fgrs = self._convertSFCRsToEGs()
+        self._fgrs = convertSFCRsToEGs(sfcrs)
 
-
-    def _convertSFCRsToEGs(self) -> list[EmbeddingGraph]:
-        """
-        Converts a list of SFCRequests to a list of EmbeddingGraphs.
-
-        Returns:
-            list[EmbeddingGraph]: A list of EmbeddingGraphs.
-        """
-
-        egs: "list[EmbeddingGraph]" = []
-        embeddingData: "dict[str, dict[str, list[Tuple[str, int]]]]" = {}
-        splitters: "list[str]" = getConfig()["vnfs"]["splitters"]
-
-        for sfcr in self._sfcrs:
-            sfcrID: str = sfcr["sfcrID"]
-            sortedVNFs: "list[str]" = sfcr["vnfs"]
-            forwardingGraph: EmbeddingGraph = {"sfcID": sfcrID, "vnfs": {}}
-            oldDepth: int = 1
-            depth: int = 1
-            vnfDict: VNF = forwardingGraph["vnfs"]
-
-            def addVNF(vnfs: "list[str]", vnfDict: VNF, depth: int) -> None:
-                """
-                Adds VNF to the EmbeddingGraph.
-
-                Parameters:
-                    vnfs (list[str]): the VNFs.
-                    vnfDict (VNF): the VNF dictionary.
-                    depth (int): the depth of the VNF.
-
-                Returns:
-                    None
-                """
-
-                nonlocal oldDepth, embeddingData, splitters
-
-
-                if len(vnfs) == 0:
-                    vnfDict["host"] = {"id": SERVER}
-                    vnfDict["next"] = TERMINAL
-
-                    return
-
-                vnf: str = vnfs.pop(0)
-                splitter: bool = vnf in splitters
-                vnfDict["next"] = [{}, {}] if splitter else {}
-
-                vnfDict["vnf"] = {"id": vnf}
-
-                if splitter:
-                    depth += 1
-                    for i in range(2):
-                        addVNF(vnfs.copy(), vnfDict["next"][i], depth)
-                else:
-                    addVNF(vnfs, vnfDict["next"], depth)
-
-            addVNF(sortedVNFs, vnfDict, depth)
-            egs.append(forwardingGraph)
-
-        return egs
 
     def generateRandomIndividual(
         self,
@@ -135,15 +76,17 @@ class MakGAUtils:
                     host = 0
                 individual.append(host)
 
-            decodedIndividual = self.decodePop([individual])[0]
-            data: TimeSFCRequests = self._generateTrafficData(
-                decodedIndividual[1], isMax=True
-            )
-            MakGAUtils._demandPredictions.cacheResourceDemands(decodedIndividual[1], data)
+            # decodedIndividual = self.decodePop([individual])[0]
+            # data: TimeSFCRequests = self._generateTrafficData(
+            #     decodedIndividual[1], isMax=True
+            # )
+            # MakGAUtils._demandPredictions.cacheResourceDemands(decodedIndividual[1], data)
             # isValid = not isHostConstraintViolated(
             #     decodedIndividual
             # ) and not isLinkConstraintViolated(decodedIndividual)
             isValid = True
+
+        individual.id = uuid4()
 
         return individual
 
@@ -160,10 +103,13 @@ class MakGAUtils:
         """
 
         noOfHosts: int = len(self._topology["hosts"])
+
         for i in range(len(individual)):
             if random.random() < indpb:
                 host: int = random.randint(1, noOfHosts)
                 individual[i] = host
+            if random.random() < 0.05:
+                individual[i] = 0
 
         return individual
 

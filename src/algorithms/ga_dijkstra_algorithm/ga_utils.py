@@ -12,11 +12,12 @@ from typing import Callable, Tuple, Type, cast
 from uuid import uuid4
 from dijkstar import Graph, find_path
 import pandas as pd
+from shared.models.sfc_request import SFCRequest
 from algorithms.models.embedding import DecodedIndividual, EmbeddingData, LinkData
 from algorithms.hybrid.constants.surrogate import BRANCH
 from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
 from algorithms.hybrid.utils.hybrid_evolution import Individual
-from algorithms.utils.graphs import getVNFsFromFGRs, parseNodes
+from algorithms.utils.graphs import convertSFCRsToEGs, getVNFsFromFGRs, parseNodes
 from calibrate.demand_predictor import DemandPredictor
 from constants.topology import SERVER, SFCC
 from deap import base
@@ -32,24 +33,25 @@ from utils.tui import TUI
 demandPredictor: DemandPredictor = DemandPredictor()
 
 def generateRandomIndividual(
-    container: Type[Individual], topo: Topology, fgrs: "list[EmbeddingGraph]", alpha: float = 0.05
-) -> "list[list[int]]":
+    container: Type[Individual], topo: Topology, sfcrs: "list[SFCRequest]", alpha: float = 0.05
+) -> Individual:
     """
     Generate a random individual.
 
     Parameters:
         container (Type[Individual]): the container type for the individual.
         topo (Topology): the topology.
-        fgrs (EmbeddingGraph): the FG Request.
+        sfcrs (list[SFCRequest]): the SFC Requests.
         alpha (float): the probability of a VNF being deployed on a host.
 
     Returns:
-       list[list[int]]: the random individual.
+       Individual: the random individual.
     """
 
-    individual: "list[list[int]]" = container()
+    individual: Individual = container()
 
-    vnfs: "list[VNF]" = getVNFsFromFGRs(fgrs)
+    fgrs: list[EmbeddingGraph] = convertSFCRsToEGs(sfcrs)
+    vnfs: "list[str]" = getVNFsFromFGRs(fgrs)
     noOfVNFs: int = len(vnfs)
     noOfHosts: int = len(topo["hosts"])
 
@@ -64,14 +66,14 @@ def generateRandomIndividual(
 
 
 def convertIndividualToEmbeddingGraph(
-    individual: "list[list[int]]", fgrs: "list[EmbeddingGraph]", topology: Topology, popIndex: int
+    individual: "list[list[int]]", sfcrs: "list[SFCRequest]", topology: Topology, popIndex: int
 ) -> "Tuple[list[EmbeddingGraph], EmbeddingData, LinkData, int]":
     """
     Convert individual to an embedding graph.
 
     Parameters:
         individual (list[list[int]]): the individual to convert.
-        fgrs (list[EmbeddingGraph]): The SFC Requests.
+        sfcrs (list[SFCRequest]): The SFC Requests.
         topology (Topology): The Topology.
         popIndex (int): The index of the embedding graph in the population.
 
@@ -84,7 +86,7 @@ def convertIndividualToEmbeddingGraph(
     nodes: "dict[str, list[str]]" = {}
     embeddingData: EmbeddingData = {}
     linkData: LinkData = {}
-    copiedFGRs: "list[EmbeddingGraph]" = copy.deepcopy(fgrs)
+    copiedFGRs: "list[EmbeddingGraph]" = copy.deepcopy(convertSFCRsToEGs(sfcrs))
 
     for index, fgr in enumerate(copiedFGRs):
         vnfs: VNF = fgr["vnfs"]
@@ -364,6 +366,8 @@ def mutate(individual: Individual, indpb: float) -> Individual:
             except ValueError:
                 pass
             ind[random.choice(indices)] = 1
+        if random.random() < 0.05:
+            ind = [0] * len(ind)
 
     return mutatedIndividual
 
@@ -531,7 +535,7 @@ def crossover(
 
 
 def decodePop(
-    pop: "list[Individual]", topology: Topology, fgrs: "list[EmbeddingGraph]"
+    pop: "list[Individual]", topology: Topology, sfcrs: "list[SFCRequest]"
 ) -> "list[DecodedIndividual]":
     """
     Generate Embedding Graphs from the population.
@@ -539,7 +543,7 @@ def decodePop(
     Parameters:
         pop (list[creator.Individual]): the population.
         topology (Topology): the topology.
-        fgrs (list[EmbeddingGraph]): the Forwarding Graph Requests.
+        sfcrs (list[SFCRequest]): the SFC Requests.
 
     Returns:
         list[IndividualEG]: A list containing EGs, embedding data, link data and acceptance ratio.
@@ -553,7 +557,7 @@ def decodePop(
             executor.submit(
                 convertIndividualToEmbeddingGraph,
                 individual,
-                fgrs,
+                sfcrs,
                 topology,
                 index
             )
@@ -562,7 +566,7 @@ def decodePop(
 
         for future in futures:
             egs, embeddingData, linkData, index = future.result()
-            acceptanceRatio: float = len(egs) / len(fgrs)
+            acceptanceRatio: float = len(egs) / len(sfcrs)
             decodedPop.append(cast(DecodedIndividual, (index, egs, embeddingData, linkData, acceptanceRatio, pop[index].id)))
 
     endTime: float = timeit.default_timer()
