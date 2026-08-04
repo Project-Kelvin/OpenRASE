@@ -64,24 +64,19 @@ def isAllCombinationsInDatabase(combinations: Any, database: dict[int, int]) -> 
 
     return True
 
-def calculateDiscoveredPercentage(combinations: Any, database: dict[int, int]) -> float:
+def calculateDiscoveredPercentage(disCoveredDatabase: dict[int, int], database: dict[int, int]) -> float:
     """
     Calculates the percentage of discovered combinations in the database.
 
     Parameters:
-        combinations (Any): A list of combinations to check.
+        disCoveredDatabase (dict[int, int]): The database of discovered combinations.
         database (dict[int, int]): The database to check.
 
     Returns:
         float: The percentage of discovered combinations.
     """
 
-    discoveredCount: int = 0
-    for c in range(len(combinations)):
-        if isCombinationInDatabase(c, database):
-            discoveredCount += 1
-
-    return round((discoveredCount / len(combinations)) * 100, 2) if len(combinations) > 0 else 0.0
+    return round((len(disCoveredDatabase) / len(database)) * 100, 2) if len(database) > 0 else 0.0
 
 def getCombinationIndex(combination: Any, combinations: Any) -> int:
     """
@@ -119,6 +114,9 @@ def run() -> None:
             },
             {
                 "id": "h3"
+            },
+            {
+                "id": "h4"
             }
         ],
         "switches": [
@@ -180,6 +178,12 @@ def run() -> None:
                 "destination": "s3",
                 "bandwidth": 1000,
                 "delay": 10
+            },
+            {
+                "source": "h4",
+                "destination": "s2",
+                "bandwidth": 1000,
+                "delay": 10
             }
         ]
     })
@@ -187,67 +191,67 @@ def run() -> None:
     sfcrs: list[SFCRequest] = [
         cast(SFCRequest, {
             "sfcrID": "sfcr1",
-            "vnfs": ["waf", "tm", "ha"]
+            "vnfs": ["waf", "tm", "ha", "ips"]
         })
     ]
 
-    ccOrder: list[list[str]] = [["waf", "tm", "ha"], ["waf", "ha", "tm"], ["tm", "waf", "ha"], ["tm", "ha", "waf"], ["ha", "waf", "tm"], ["ha", "tm", "waf"]]
-    hostOrder: list[list[str]] = [
-        ["h1", "h1", "h1"],
-        ["h1", "h1", "h2"],
-        ["h1", "h1", "h3"],
-        ["h1", "h2", "h1"],
-        ["h1", "h2", "h2"],
-        ["h1", "h2", "h3"],
-        ["h1", "h3", "h1"],
-        ["h1", "h3", "h2"],
-        ["h1", "h3", "h3"],
-        ["h2", "h1", "h1"],
-        ["h2", "h1", "h2"],
-        ["h2", "h1", "h3"],
-        ["h2", "h2", "h1"],
-        ["h2", "h2", "h2"],
-        ["h2", "h2", "h3"],
-        ["h2", "h3", "h1"],
-        ["h2", "h3", "h2"],
-        ["h2", "h3", "h3"],
-        ["h3", "h1", "h1"],
-        ["h3", "h1", "h2"],
-        ["h3", "h1", "h3"],
-        ["h3", "h2", "h1"],
-        ["h3", "h2", "h2"],
-        ["h3", "h2", "h3"],
-        ["h3", "h3", "h1"],
-        ["h3", "h3", "h2"],
-        ["h3", "h3", "h3"]
-    ]
+    ccOrder: list[list[str]] = []
+    for vnf1 in sfcrs[0]["vnfs"]:
+        for vnf2 in sfcrs[0]["vnfs"]:
+            if vnf2 == vnf1:
+                continue
+            for vnf3 in sfcrs[0]["vnfs"]:
+                if vnf3 == vnf1 or vnf3 == vnf2:
+                    continue
+                for vnf4 in sfcrs[0]["vnfs"]:
+                    if vnf4 == vnf1 or vnf4 == vnf2 or vnf4 == vnf3:
+                        continue
+                    ccOrder.append([vnf1, vnf2, vnf3, vnf4])
+
+    hostOrder: list[list[str]] = []
+
+    for host1 in topology["hosts"]:
+        for host2 in topology["hosts"]:
+            for host3 in topology["hosts"]:
+                for host4 in topology["hosts"]:
+                    hostOrder.append([host1["id"], host2["id"], host3["id"], host4["id"]])
 
     linksOrder: dict[str, list[list[str]]] = {
         "sfcc-h1": [["s1"]],
         "sfcc-h2": [["s1", "s2"], ["s1", "s3", "s2"]],
         "sfcc-h3": [["s1","s3"], ["s1", "s2", "s3"]],
-        "h1-h2": [["s1", "s2"], ["s1", "s3", "s2"]],
-        "h2-h1": [["s2", "s1"], ["s2", "s3", "s1"]],
+        "sfcc-h4": [["s1", "s2"], ["s1", "s3", "s2"]],
         "h1-h1": [[]],
         "h2-h2": [[]],
         "h3-h3": [[]],
+        "h4-h4": [[]],
         "h1-server": [["s1", "s2", "s3"], ["s1", "s3"]],
         "h2-server": [["s2", "s3"], ["s2", "s1", "s3"]],
         "h3-server": [["s3"]],
+        "h4-server": [["s2", "s3"], ["s2", "s1", "s3"]],
         "h1-h3": [["s1", "s3"], ["s1", "s2", "s3"]],
         "h3-h1": [["s3", "s1"], ["s3", "s2", "s1"]],
         "h2-h3": [["s2", "s3"], ["s2", "s1", "s3"]],
-        "h3-h2": [["s3", "s2"], ["s3", "s1", "s2"]]
+        "h3-h2": [["s3", "s2"], ["s3", "s1", "s2"]],
+        "h1-h2": [["s1", "s2"], ["s1", "s3", "s2"]],
+        "h2-h1": [["s2", "s1"], ["s2", "s3", "s1"]],
+        "h1-h4": [["s1", "s2"], ["s1", "s3", "s2"]],
+        "h4-h1": [["s2", "s1"], ["s2", "s3", "s1"]],
+        "h2-h4": [["s2"]],
+        "h4-h2": [["s2"]],
+        "h3-h4": [["s3", "s2"], ["s3", "s1", "s2"]],
+        "h4-h3": [["s2", "s3"], ["s2", "s1", "s3"]]
     }
 
-    combinations: list[tuple[list[str], list[str], tuple[list[str], list[str], list[str], list[str]]]] = []
+    combinations: list[tuple[list[str], list[str], tuple[list[str], list[str], list[str], list[str], list[str]]]] = []
     for cc in ccOrder:
         for host in hostOrder:
             for sfccLink in linksOrder[f"sfcc-{host[0]}"]:
                 for hostLink in linksOrder[f"{host[0]}-{host[1]}"]:
                     for host1Link in linksOrder[f"{host[1]}-{host[2]}"]:
-                        for serverLink in linksOrder[f"{host[2]}-server"]:
-                            combinations.append((cc, host, (sfccLink, hostLink, host1Link, serverLink)))
+                        for host2Link in linksOrder[f"{host[2]}-{host[3]}"]:
+                            for serverLink in linksOrder[f"{host[3]}-server"]:
+                                combinations.append((cc, host, (sfccLink, hostLink, host1Link, host2Link, serverLink)))
 
     hostCCCombinations: list[tuple[list[str], list[str]]] = []
     for cc in ccOrder:
@@ -255,6 +259,9 @@ def run() -> None:
             hostCCCombinations.append((cc, host))
 
     print("Total combinations:", len(combinations))
+    print("Total CC combinations:", len(ccOrder))
+    print("Total Host combinations:", len(hostOrder))
+    print("Total CC-Host combinations:", len(hostCCCombinations))
     # for combination in combinations:
     #     print(combination)
 
@@ -277,7 +284,12 @@ def run() -> None:
     allCCHostFound: bool = isAllCombinationsInDatabase(hostCCCombinations, hostCCDatabase)
     searched: int = 0
     population: list[Individual] = []
-    while not allFound and searched < 100000:
+    discoveredCombinations: dict[int, int] = {}
+    discoveredCCCombinations: dict[int, int] = {}
+    discoveredHostCombinations: dict[int, int] = {}
+    discoveredCCHostCombinations: dict[int, int] = {}
+
+    while not allFound and searched < 10000:
         GenesisUtils.init(sfcrs, topology, 8, 0.00, 1.0, np.pi)
         individual: Individual = GenesisUtils.generateRandomGenesisIndividual(Individual, topology, sfcrs)
         population.append(individual)
@@ -321,22 +333,30 @@ def run() -> None:
         for link in eg["links"]:
             egLinksOrder[f"{link['source']['id']}-{link['destination']['id']}"] = link["links"]
 
-        egLinks: tuple[list[str], list[str],list[str], list[str]] = (
+        egLinks: tuple[list[str], list[str],list[str], list[str], list[str]] = (
             egLinksOrder[f"sfcc-{egHostOrder[0]}"],
             egLinksOrder[f"{egHostOrder[0]}-{egHostOrder[1]}"] if f"{egHostOrder[0]}-{egHostOrder[1]}" in egLinksOrder else egLinksOrder[f"{egHostOrder[1]}-{egHostOrder[0]}"][::-1] if f"{egHostOrder[1]}-{egHostOrder[0]}" in egLinksOrder else [],
             egLinksOrder[f"{egHostOrder[1]}-{egHostOrder[2]}"] if f"{egHostOrder[1]}-{egHostOrder[2]}" in egLinksOrder else egLinksOrder[f"{egHostOrder[2]}-{egHostOrder[1]}"][::-1] if f"{egHostOrder[2]}-{egHostOrder[1]}" in egLinksOrder else [],
-            egLinksOrder[f"{egHostOrder[2]}-server"]
+            egLinksOrder[f"{egHostOrder[2]}-{egHostOrder[3]}"] if f"{egHostOrder[2]}-{egHostOrder[3]}" in egLinksOrder else egLinksOrder[f"{egHostOrder[3]}-{egHostOrder[2]}"][::-1] if f"{egHostOrder[3]}-{egHostOrder[2]}" in egLinksOrder else [],
+            egLinksOrder[f"{egHostOrder[3]}-server"]
         )
 
-        generatedCombination: tuple[list[str], list[str], tuple[list[str], list[str], list[str], list[str]]] = (egCcOrder, egHostOrder, egLinks)
+        generatedCombination: tuple[list[str], list[str], tuple[list[str], list[str], list[str], list[str], list[str]]] = (egCcOrder, egHostOrder, egLinks)
 
         print("Combination extracted.")
-        # print(generatedCombination)
 
-        database[getCombinationIndex(generatedCombination, combinations)] += 1
-        ccDatabase[getCombinationIndex(egCcOrder, ccOrder)] += 1
-        hostDatabase[getCombinationIndex(egHostOrder, hostOrder)] += 1
-        hostCCDatabase[getCombinationIndex((egCcOrder, egHostOrder), hostCCCombinations)] += 1
+        dbCombinationIndex: int = getCombinationIndex(generatedCombination, combinations)
+        ccDBCombinationIndex: int = getCombinationIndex(egCcOrder, ccOrder)
+        hostDBCombinationIndex: int = getCombinationIndex(egHostOrder, hostOrder)
+        hostCCCombinationsIndex: int = getCombinationIndex((egCcOrder, egHostOrder), hostCCCombinations)
+        database[dbCombinationIndex] += 1
+        discoveredCombinations[dbCombinationIndex] = database[dbCombinationIndex]
+        ccDatabase[ccDBCombinationIndex] += 1
+        discoveredCCCombinations[ccDBCombinationIndex] = ccDatabase[ccDBCombinationIndex]
+        hostDatabase[hostDBCombinationIndex] += 1
+        discoveredHostCombinations[hostDBCombinationIndex] = hostDatabase[hostDBCombinationIndex]
+        hostCCDatabase[hostCCCombinationsIndex] += 1
+        discoveredCCHostCombinations[hostCCCombinationsIndex] = hostCCDatabase[hostCCCombinationsIndex]
         allCCFound: bool = isAllCombinationsInDatabase(ccOrder, ccDatabase)
         allHostFound: bool = isAllCombinationsInDatabase(hostOrder, hostDatabase)
         allFound = isAllCombinationsInDatabase(combinations, database)
@@ -344,6 +364,8 @@ def run() -> None:
         searched += 1
         print("Searched:", searched, "\nFailed:", failed, "\nAll Found:", allFound, "\nAll CC Found:", allCCFound, "\nAll Host Found:", allHostFound, "\nAll CC-Host Found:", allCCHostFound)
 
+    print("Finished.")
+    print("Writing overall results.")
     with open(os.path.join(phenotypeDir, "phenotype_eval.csv"), "w") as f:
         for combination, count in zip(combinations, database.values()):
             for vnf in combination[0]:
@@ -354,18 +376,30 @@ def run() -> None:
                 f.write(f"{'->'.join(link)},")
             f.write(f"{count}\n")
 
+    print("Writing CC results.")
     with open(os.path.join(phenotypeDir, "phenotype_cc_eval.csv"), "w") as f:
         for combination, count in zip(ccOrder, ccDatabase.values()):
-            for vnf in combination[0]:
+            for vnf in combination:
                 f.write(f"{vnf},")
             f.write(f"{count}\n")
 
+    print("Writing Host results.")
     with open(os.path.join(phenotypeDir, "phenotype_host_eval.csv"), "w") as f:
         for combination, count in zip(hostOrder, hostDatabase.values()):
             for host in combination:
                 f.write(f"{host},")
             f.write(f"{count}\n")
 
+    print("Writing CC-Host results.")
+    with open(os.path.join(phenotypeDir, "phenotype_cc_host_eval.csv"), "w") as f:
+        for combination, count in zip(hostCCCombinations, hostCCDatabase.values()):
+            for vnf in combination[0]:
+                f.write(f"{vnf},")
+            for host in combination[1]:
+                f.write(f"{host},")
+            f.write(f"{count}\n")
+
+    print("Writing summary results.")
     with open(os.path.join(phenotypeDir, "phenotype_summary.txt"), "w") as f:
         f.write(f"Total combinations: {len(combinations)}\n")
         f.write(f"Total CC combinations: {len(ccOrder)}\n")
@@ -377,7 +411,7 @@ def run() -> None:
         f.write(f"All CC Found: {allCCFound}\n")
         f.write(f"All Host Found: {allHostFound}\n")
         f.write(f"All CC-Host Found: {allCCHostFound}\n")
-        f.write(f"Discovered Percentage: {calculateDiscoveredPercentage(combinations, database)}%\n")
-        f.write(f"Discovered CC Percentage: {calculateDiscoveredPercentage(ccOrder, ccDatabase)}%\n")
-        f.write(f"Discovered Host Percentage: {calculateDiscoveredPercentage(hostOrder, hostDatabase)}%\n")
-        f.write(f"Discovered CC-Host Percentage: {calculateDiscoveredPercentage(hostCCCombinations, hostCCDatabase)}%\n")
+        f.write(f"Discovered Percentage: {calculateDiscoveredPercentage(discoveredCombinations, database)}%\n")
+        f.write(f"Discovered CC Percentage: {calculateDiscoveredPercentage(discoveredCCCombinations, ccDatabase)}%\n")
+        f.write(f"Discovered Host Percentage: {calculateDiscoveredPercentage(discoveredHostCombinations, hostDatabase)}%\n")
+        f.write(f"Discovered CC-Host Percentage: {calculateDiscoveredPercentage(discoveredCCHostCombinations, hostCCDatabase)}%\n")
