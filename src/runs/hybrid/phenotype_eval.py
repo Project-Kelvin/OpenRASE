@@ -274,10 +274,20 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
         for host in hostOrder:
             hostCCCombinations.append((cc, host))
 
+    hostLinksCombinations: list[tuple[list[str], tuple[list[str], list[str], list[str], list[str], list[str]]]] = []
+    for host in hostOrder:
+        for sfccLink in linksOrder[f"sfcc-{host[0]}"]:
+            for hostLink in linksOrder[f"{host[0]}-{host[1]}"]:
+                for host1Link in linksOrder[f"{host[1]}-{host[2]}"]:
+                    for host2Link in linksOrder[f"{host[2]}-{host[3]}"]:
+                        for serverLink in linksOrder[f"{host[3]}-server"]:
+                            hostLinksCombinations.append((host, (sfccLink, hostLink, host1Link, host2Link, serverLink)))
+
     print("Total combinations:", len(combinations))
     print("Total CC combinations:", len(ccOrder))
     print("Total Host combinations:", len(hostOrder))
     print("Total CC-Host combinations:", len(hostCCCombinations))
+    print("Total Host-Links combinations:", len(hostLinksCombinations))
     # for combination in combinations:
     #     print(combination)
 
@@ -293,11 +303,15 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
     hostCCDatabase: dict[int, int] = {
         c: 0 for c in range(len(hostCCCombinations))
     }
+    hostLinksDatabase: dict[int, int] = {
+        c: 0 for c in range(len(hostLinksCombinations))
+    }
     failed: int = 0
     allFound: bool = isAllCombinationsInDatabase(combinations, database)
     allCCFound: bool = isAllCombinationsInDatabase(ccOrder, ccDatabase)
     allHostFound: bool = isAllCombinationsInDatabase(hostOrder, hostDatabase)
     allCCHostFound: bool = isAllCombinationsInDatabase(hostCCCombinations, hostCCDatabase)
+    allHostLinksFound: bool = isAllCombinationsInDatabase(hostLinksCombinations, hostLinksDatabase)
     searched: int = 0
     population: list[Individual] = []
     discoveredCombinations: dict[int, int] = {}
@@ -305,7 +319,7 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
     discoveredHostCombinations: dict[int, int] = {}
     discoveredCCHostCombinations: dict[int, int] = {}
 
-    while not allFound and searched < 100000:
+    while not allFound and searched < 100:
         eg: EmbeddingGraph = {}
         egs: list[EmbeddingGraph] = []
         if algo == "genesis":
@@ -380,6 +394,7 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
         ccDBCombinationIndex: int = getCombinationIndex(egCcOrder, ccOrder)
         hostDBCombinationIndex: int = getCombinationIndex(egHostOrder, hostOrder)
         hostCCCombinationsIndex: int = getCombinationIndex((egCcOrder, egHostOrder), hostCCCombinations)
+        hostLinksCombinationsIndex: int = getCombinationIndex((egHostOrder, egLinks), hostLinksCombinations)
         database[dbCombinationIndex] += 1
         discoveredCombinations[dbCombinationIndex] = database[dbCombinationIndex]
         ccDatabase[ccDBCombinationIndex] += 1
@@ -392,8 +407,9 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
         allHostFound: bool = isAllCombinationsInDatabase(hostOrder, hostDatabase)
         allFound = isAllCombinationsInDatabase(combinations, database)
         allCCHostFound: bool = isAllCombinationsInDatabase(hostCCCombinations, hostCCDatabase)
+        allHostLinksFound: bool = isAllCombinationsInDatabase(hostLinksCombinations, hostLinksDatabase)
         searched += 1
-        print("Searched:", searched, "\nFailed:", failed, "\nAll Found:", allFound, "\nAll CC Found:", allCCFound, "\nAll Host Found:", allHostFound, "\nAll CC-Host Found:", allCCHostFound)
+        print("Searched:", searched, "\nFailed:", failed, "\nAll Found:", allFound, "\nAll CC Found:", allCCFound, "\nAll Host Found:", allHostFound, "\nAll CC-Host Found:", allCCHostFound, "\nAll Host-Links Found:", allHostLinksFound)
 
     print("Finished.")
     print("Writing overall results.")
@@ -430,6 +446,15 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
                 f.write(f"{host},")
             f.write(f"{count}\n")
 
+    print("Writing Host-Links results.")
+    with open(os.path.join(phenotypeDir, "phenotype_host_links_eval.csv"), "w") as f:
+        for combination, count in zip(hostLinksCombinations, hostLinksDatabase.values()):
+            for host in combination[0]:
+                f.write(f"{host},")
+            for link in combination[1]:
+                f.write(f"{'->'.join(link)},")
+            f.write(f"{count}\n")
+
     print("Writing summary results.")
     with open(os.path.join(phenotypeDir, "phenotype_summary.txt"), "w") as f:
         f.write(f"Algorithm: {algo}\n")
@@ -445,7 +470,9 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
         f.write(f"All CC Found: {allCCFound}\n")
         f.write(f"All Host Found: {allHostFound}\n")
         f.write(f"All CC-Host Found: {allCCHostFound}\n")
+        f.write(f"All Host-Links Found: {allHostLinksFound}\n")
         f.write(f"Discovered Percentage: {calculateDiscoveredPercentage(discoveredCombinations, database)}%\n")
         f.write(f"Discovered CC Percentage: {calculateDiscoveredPercentage(discoveredCCCombinations, ccDatabase)}%\n")
         f.write(f"Discovered Host Percentage: {calculateDiscoveredPercentage(discoveredHostCombinations, hostDatabase)}%\n")
         f.write(f"Discovered CC-Host Percentage: {calculateDiscoveredPercentage(discoveredCCHostCombinations, hostCCDatabase)}%\n")
+        f.write(f"Discovered Host-Links Percentage: {calculateDiscoveredPercentage(discoveredCCHostCombinations, hostLinksDatabase)}%\n")
