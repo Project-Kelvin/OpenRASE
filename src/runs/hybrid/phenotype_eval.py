@@ -319,7 +319,7 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
     discoveredHostCombinations: dict[int, int] = {}
     discoveredCCHostCombinations: dict[int, int] = {}
 
-    while not allFound and searched < 100:
+    while not allFound and searched < 100000:
         eg: EmbeddingGraph = {}
         egs: list[EmbeddingGraph] = []
         if algo == "genesis":
