@@ -6,6 +6,7 @@ GA is used for VNf Embedding and Dijkstra is used for link embedding.
 from copy import deepcopy
 import random
 from typing import Callable, Type
+from algorithms.utils.graphs import convertSFCRsToEGs
 from deap import tools
 from shared.models.sfc_request import SFCRequest
 from shared.models.traffic_design import TrafficDesign
@@ -16,6 +17,7 @@ from algorithms.models.embedding import DecodedIndividual
 from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 from algorithms.mak_ga.mak_ga_utils import MakGAUtils
+from algorithms.mak_ga.gaha_individual import generateRandomIndividual as generateRandomGAHAIndividual
 
 POP_SIZE: int = 20
 INDPB: float = 0.7 # Experimentally determined gene mutation probability for the GA
@@ -75,7 +77,7 @@ def solve(
         return gahaUtils.decodePop(pop, ignoreVNFInstances=True)
 
     def generateRandomIndividual(container: Type[Individual], topology: Topology, sfcr: list[SFCRequest]) -> Individual:
-        return gahaUtils.generateRandomIndividual(container)
+        return generateRandomGAHAIndividual(container, convertSFCRsToEGs(sfcr), topology)
 
     hybridEvolution: HybridEvolution = HybridEvolution(
         "gaha",

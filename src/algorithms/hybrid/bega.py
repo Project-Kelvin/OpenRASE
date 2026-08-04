@@ -6,6 +6,7 @@ GA is used for VNf Embedding and Dijkstra is used for link embedding.
 from copy import deepcopy
 import random
 from typing import Callable
+from algorithms.ga_dijkstra_algorithm.bega_individual import generateRandomIndividual
 from deap import tools
 from shared.models.sfc_request import SFCRequest
 from shared.models.traffic_design import TrafficDesign
@@ -13,7 +14,6 @@ from shared.models.topology import Topology
 from shared.models.embedding_graph import EmbeddingGraph
 from algorithms.ga_dijkstra_algorithm.ga_utils import (
     decodePop,
-    generateRandomIndividual,
     mutate,
 )
 from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution, Individual

@@ -3,6 +3,10 @@ This defines the function to evaluate GENESIS'S ability to explore the phenotype
 """
 
 import os
+from algorithms.ga_dijkstra_algorithm.bega_individual import convertIndividualToEmbeddingGraph as convertBEGAIndividualToEG, generateRandomIndividual as generateRandomBEGAIndividual
+from algorithms.mak_ga.gaha_individual import convertIndividualToEmbeddingGraphs as convertGAHAIndividualToEG, generateRandomIndividual as generateRandomGAHAIndividual
+from algorithms.utils.graphs import convertSFCRsToEGs
+import click
 from typing import Any, cast
 import numpy as np
 from packages.python.shared.constants.embedding_graph import TERMINAL
@@ -97,9 +101,21 @@ def getCombinationIndex(combination: Any, combinations: Any) -> int:
 
     return -1
 
-def run() -> None:
+@click.command()
+@click.option("--algo", type=click.Choice(["genesis", "gaha", "bega"]), default="genesis", help="Run the specified algorithm.")
+@click.option("--dijkstra", is_flag=True, default=False, help="Run GENESIS with Dijkstra's algorithm.")
+@click.option("--chain", is_flag=True, default=False, help="Run GENESIS with static chain-based evaluation.")
+def run(algo: str, dijkstra: bool, chain: bool) -> None:
     """
-    This function runs the GENESIS algorithm on the phenotype space and evaluates its performance.
+    This function runs the specified algorithm on the phenotype space and evaluates its performance.
+
+    Parameters:
+        algo (str): The algorithm to run.
+        dijkstra (bool): Flag to run GENESIS with Dijkstra's algorithm.
+        chain (bool): Flag to run GENESIS with static chain-based evaluation.
+        dijkstra (bool): Flag to run GENESIS with Dijkstra's algorithm.
+        chain (bool): Flag to run GENESIS with static chain-based evaluation.
+
     """
 
     TUI.disable()
@@ -290,20 +306,35 @@ def run() -> None:
     discoveredCCHostCombinations: dict[int, int] = {}
 
     while not allFound and searched < 100000:
-        GenesisUtils.init(sfcrs, topology, 8, 0.00, 1.0, np.pi)
-        individual: Individual = GenesisUtils.generateRandomGenesisIndividual(Individual, topology, sfcrs)
-        population.append(individual)
-        print("Random individual generated.")
-        decodedIndividual: DecodedIndividual = GenesisUtils.decodeIndividual(cast(GenesisIndividual, individual), 0, topology, sfcrs)
-        print("Individual decoded.")
+        eg: EmbeddingGraph = {}
+        egs: list[EmbeddingGraph] = []
+        if algo == "genesis":
+            GenesisUtils.init(sfcrs, topology, 8, 0.00, 1.0, np.pi)
+            individual: Individual = GenesisUtils.generateRandomGenesisIndividual(Individual, topology, sfcrs)
+            population.append(individual)
+            print("Random individual generated.")
+            decodedIndividual: DecodedIndividual = GenesisUtils.decodeIndividual(cast(GenesisIndividual, individual), 0, topology, sfcrs, dijkstra=dijkstra, staticChain=chain)
+            print("Individual decoded.")
+            egs = decodedIndividual[1]
+        elif algo == "gaha":
+            individual: Individual = generateRandomGAHAIndividual(Individual, convertSFCRsToEGs(sfcrs), topology, 0.0)
+            population.append(individual)
+            print("Random individual generated.")
+            egs, _, _, _, _= convertGAHAIndividualToEG(individual, topology, convertSFCRsToEGs(sfcrs), 0)
+        elif algo == "bega":
+            individual: Individual = generateRandomBEGAIndividual(Individual, topology, sfcrs, 0.0)
+            population.append(individual)
+            print("Random individual generated.")
+            egs, _, _, _ = convertBEGAIndividualToEG(individual, sfcrs, topology, 0)
 
-        if decodedIndividual[4] == 0:
+        if len(egs) == 0:
             print("Acceptance Rate is 0, cannot evaluate phenotype space.")
             failed += 1
+            searched += 1
 
             continue
 
-        eg: EmbeddingGraph = decodedIndividual[1][0]
+        eg = egs[0]
 
         egCcOrder: list[str] = []
         egHostOrder: list[str] = []
@@ -401,6 +432,9 @@ def run() -> None:
 
     print("Writing summary results.")
     with open(os.path.join(phenotypeDir, "phenotype_summary.txt"), "w") as f:
+        f.write(f"Algorithm: {algo}\n")
+        f.write(f"Is Dijkstra: {dijkstra}\n")
+        f.write(f"Is Static Chain: {chain}\n")
         f.write(f"Total combinations: {len(combinations)}\n")
         f.write(f"Total CC combinations: {len(ccOrder)}\n")
         f.write(f"Total Host combinations: {len(hostOrder)}\n")
