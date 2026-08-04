@@ -289,7 +289,7 @@ def run() -> None:
     discoveredHostCombinations: dict[int, int] = {}
     discoveredCCHostCombinations: dict[int, int] = {}
 
-    while not allFound and searched < 10000:
+    while not allFound and searched < 100000:
         GenesisUtils.init(sfcrs, topology, 8, 0.00, 1.0, np.pi)
         individual: Individual = GenesisUtils.generateRandomGenesisIndividual(Individual, topology, sfcrs)
         population.append(individual)
