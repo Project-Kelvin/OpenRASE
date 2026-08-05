@@ -14,6 +14,7 @@ from algorithms.ga_dijkstra_algorithm.bega_individual import convertIndividualTo
 from shared.models.sfc_request import SFCRequest
 from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
 from algorithms.hybrid.utils.hybrid_evolution import Individual
+from algorithms.models.embedding import DecodedIndividual
 from calibrate.demand_predictor import DemandPredictor
 from deap import base
 from shared.models.embedding_graph import EmbeddingGraph
