@@ -28,9 +28,6 @@ if not os.path.exists(artifactsDir):
 experimentsDir: str = os.path.join(artifactsDir, "experiments")
 if not os.path.exists(experimentsDir):
     os.makedirs(experimentsDir)
-phenotypeDir: str = os.path.join(experimentsDir, "phenotype")
-if not os.path.exists(phenotypeDir):
-    os.makedirs(phenotypeDir)
 
 def isCombinationInDatabase(c: int, database: dict[int, int]) -> bool:
     """
@@ -117,6 +114,10 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
         chain (bool): Flag to run GENESIS with static chain-based evaluation.
 
     """
+
+    phenotypeDir: str = os.path.join(experimentsDir, f"phenotype_{algo}{'_dijkstra' if dijkstra else ''}{'_chain' if chain else ''}")
+    if not os.path.exists(phenotypeDir):
+        os.makedirs(phenotypeDir)
 
     TUI.disable()
 
@@ -318,6 +319,7 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
     discoveredCCCombinations: dict[int, int] = {}
     discoveredHostCombinations: dict[int, int] = {}
     discoveredCCHostCombinations: dict[int, int] = {}
+    discoveredHostLinksCombinations: dict[int, int] = {}
 
     while not allFound and searched < 100000:
         eg: EmbeddingGraph = {}
@@ -403,6 +405,8 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
         discoveredHostCombinations[hostDBCombinationIndex] = hostDatabase[hostDBCombinationIndex]
         hostCCDatabase[hostCCCombinationsIndex] += 1
         discoveredCCHostCombinations[hostCCCombinationsIndex] = hostCCDatabase[hostCCCombinationsIndex]
+        hostLinksDatabase[hostLinksCombinationsIndex] += 1
+        discoveredHostLinksCombinations[hostLinksCombinationsIndex] = hostLinksDatabase[hostLinksCombinationsIndex]
         allCCFound: bool = isAllCombinationsInDatabase(ccOrder, ccDatabase)
         allHostFound: bool = isAllCombinationsInDatabase(hostOrder, hostDatabase)
         allFound = isAllCombinationsInDatabase(combinations, database)
@@ -464,6 +468,7 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
         f.write(f"Total CC combinations: {len(ccOrder)}\n")
         f.write(f"Total Host combinations: {len(hostOrder)}\n")
         f.write(f"Total CC-Host combinations: {len(hostCCCombinations)}\n")
+        f.write(f"Total Host-Links combinations: {len(hostLinksCombinations)}\n")
         f.write(f"Total searched: {searched}\n")
         f.write(f"Total failed: {failed}\n")
         f.write(f"All Found: {allFound}\n")
@@ -475,4 +480,4 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
         f.write(f"Discovered CC Percentage: {calculateDiscoveredPercentage(discoveredCCCombinations, ccDatabase)}%\n")
         f.write(f"Discovered Host Percentage: {calculateDiscoveredPercentage(discoveredHostCombinations, hostDatabase)}%\n")
         f.write(f"Discovered CC-Host Percentage: {calculateDiscoveredPercentage(discoveredCCHostCombinations, hostCCDatabase)}%\n")
-        f.write(f"Discovered Host-Links Percentage: {calculateDiscoveredPercentage(discoveredCCHostCombinations, hostLinksDatabase)}%\n")
+        f.write(f"Discovered Host-Links Percentage: {calculateDiscoveredPercentage(discoveredHostLinksCombinations, hostLinksDatabase)}%\n")
