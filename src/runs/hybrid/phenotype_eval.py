@@ -321,13 +321,28 @@ def run(algo: str, dijkstra: bool, chain: bool, gaussian: bool) -> None:
     discoveredCCHostCombinations: dict[int, int] = {}
     discoveredHostLinksCombinations: dict[int, int] = {}
 
+    class InputOutputRecord:
+        """
+        A dataclass to record the input and output of the algorithm.
+
+        Attributes:
+            input (Any): The input to the algorithm.
+            output (Any): The output from the algorithm.
+        """
+        input: list[float]
+        output: list[tuple[list[str], list[str], tuple[list[str], list[str], list[str], list[str], list[str]]]]
+        id: int
+
+    rows: list[InputOutputRecord] = []
     while not allFound and searched < 100000:
         eg: EmbeddingGraph = {}
         egs: list[EmbeddingGraph] = []
+        record: InputOutputRecord = InputOutputRecord()
         if algo == "genesis":
-            GenesisUtils.init(sfcrs, topology, 8, 0.00, 1.0, np.pi)
+            GenesisUtils.init(sfcrs, topology, 2, 0.00, 1.0, np.pi)
             individual: Individual = GenesisUtils.generateRandomGenesisIndividual(Individual, topology, sfcrs)
             population.append(individual)
+            record.input = list(individual)
             print("Random individual generated.")
             decodedIndividual: DecodedIndividual = GenesisUtils.decodeIndividual(cast(GenesisIndividual, individual), 0, topology, sfcrs, dijkstra=dijkstra, staticChain=chain, disableGaussian=gaussian)
             print("Individual decoded.")
@@ -397,6 +412,9 @@ def run(algo: str, dijkstra: bool, chain: bool, gaussian: bool) -> None:
         hostDBCombinationIndex: int = getCombinationIndex(egHostOrder, hostOrder)
         hostCCCombinationsIndex: int = getCombinationIndex((egCcOrder, egHostOrder), hostCCCombinations)
         hostLinksCombinationsIndex: int = getCombinationIndex((egHostOrder, egLinks), hostLinksCombinations)
+
+        record.output = [generatedCombination]
+        record.id = dbCombinationIndex
         database[dbCombinationIndex] += 1
         discoveredCombinations[dbCombinationIndex] = database[dbCombinationIndex]
         ccDatabase[ccDBCombinationIndex] += 1
@@ -413,6 +431,7 @@ def run(algo: str, dijkstra: bool, chain: bool, gaussian: bool) -> None:
         allCCHostFound: bool = isAllCombinationsInDatabase(hostCCCombinations, hostCCDatabase)
         allHostLinksFound: bool = isAllCombinationsInDatabase(hostLinksCombinations, hostLinksDatabase)
         searched += 1
+        rows.append(record)
         print("Searched:", searched, "\nFailed:", failed, "\nAll Found:", allFound, "\nAll CC Found:", allCCFound, "\nAll Host Found:", allHostFound, "\nAll CC-Host Found:", allCCHostFound, "\nAll Host-Links Found:", allHostLinksFound)
 
     print("Finished.")
@@ -458,6 +477,20 @@ def run(algo: str, dijkstra: bool, chain: bool, gaussian: bool) -> None:
             for link in combination[1]:
                 f.write(f"{'->'.join(link)},")
             f.write(f"{count}\n")
+
+    print("Writing input-output records.")
+    with open(os.path.join(phenotypeDir, "phenotype_input_output_records.csv"), "w") as f:
+        for record in rows:
+            for input_value in record.input:
+                f.write(f"{input_value},")
+            for output_combination in record.output:
+                for vnf in output_combination[0]:
+                    f.write(f"{vnf}|")
+                for host in output_combination[1]:
+                    f.write(f"{host}|")
+                for link in output_combination[2]:
+                    f.write(f"{'->'.join(link)},")
+            f.write(f"{record.id}\n")
 
     print("Writing summary results.")
     with open(os.path.join(phenotypeDir, "phenotype_summary.txt"), "w") as f:
