@@ -102,7 +102,8 @@ def getCombinationIndex(combination: Any, combinations: Any) -> int:
 @click.option("--algo", type=click.Choice(["genesis", "gaha", "bega"]), default="genesis", help="Run the specified algorithm.")
 @click.option("--dijkstra", is_flag=True, default=False, help="Run GENESIS with Dijkstra's algorithm.")
 @click.option("--chain", is_flag=True, default=False, help="Run GENESIS with static chain-based evaluation.")
-def run(algo: str, dijkstra: bool, chain: bool) -> None:
+@click.option("--gaussian", is_flag=True, default=False, help="Run GENESIS with Gaussian disabled.")
+def run(algo: str, dijkstra: bool, chain: bool, gaussian: bool) -> None:
     """
     This function runs the specified algorithm on the phenotype space and evaluates its performance.
 
@@ -110,12 +111,11 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
         algo (str): The algorithm to run.
         dijkstra (bool): Flag to run GENESIS with Dijkstra's algorithm.
         chain (bool): Flag to run GENESIS with static chain-based evaluation.
-        dijkstra (bool): Flag to run GENESIS with Dijkstra's algorithm.
-        chain (bool): Flag to run GENESIS with static chain-based evaluation.
+        gaussian (bool): Flag to run GENESIS with Gaussian disabled.
 
     """
 
-    phenotypeDir: str = os.path.join(experimentsDir, f"phenotype_{algo}{'_dijkstra' if dijkstra else ''}{'_chain' if chain else ''}")
+    phenotypeDir: str = os.path.join(experimentsDir, f"phenotype_{algo}{'_dijkstra' if dijkstra else ''}{'_chain' if chain else ''}{'_gaussian' if gaussian else ''}")
     if not os.path.exists(phenotypeDir):
         os.makedirs(phenotypeDir)
 
@@ -329,7 +329,7 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
             individual: Individual = GenesisUtils.generateRandomGenesisIndividual(Individual, topology, sfcrs)
             population.append(individual)
             print("Random individual generated.")
-            decodedIndividual: DecodedIndividual = GenesisUtils.decodeIndividual(cast(GenesisIndividual, individual), 0, topology, sfcrs, dijkstra=dijkstra, staticChain=chain)
+            decodedIndividual: DecodedIndividual = GenesisUtils.decodeIndividual(cast(GenesisIndividual, individual), 0, topology, sfcrs, dijkstra=dijkstra, staticChain=chain, disableGaussian=gaussian)
             print("Individual decoded.")
             egs = decodedIndividual[1]
         elif algo == "gaha":
@@ -464,6 +464,7 @@ def run(algo: str, dijkstra: bool, chain: bool) -> None:
         f.write(f"Algorithm: {algo}\n")
         f.write(f"Is Dijkstra: {dijkstra}\n")
         f.write(f"Is Static Chain: {chain}\n")
+        f.write(f"Is Gaussian Disabled: {gaussian}\n")
         f.write(f"Total combinations: {len(combinations)}\n")
         f.write(f"Total CC combinations: {len(ccOrder)}\n")
         f.write(f"Total Host combinations: {len(hostOrder)}\n")
