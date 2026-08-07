@@ -91,7 +91,8 @@ def generateSFCRs(noOfCopies: int) -> "list[SFCRequest]":
 @click.option("--test", is_flag=True, default=False, help="Run in test mode.")
 @click.option("--random-input-weights", is_flag=True, default=False, help="Use random input weights instead of predefined weights.")
 @click.option("--neurons", is_flag=True, default=False, help="Test the number of neurons in the neural network.")
-def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool, env: str, retrain: bool, offline: bool, test: bool, random_input_weights: bool, neurons: bool) -> None:
+@click.option("--random-host", is_flag=True, default=False, help="Use random host ids instead of the ones in the topology.")
+def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool, env: str, retrain: bool, offline: bool, test: bool, random_input_weights: bool, neurons: bool, random_host: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -112,6 +113,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
         test (bool): Whether to run in test mode.
         random_input_weights (bool): Whether to use random input weights instead of predefined weights.
         neurons (bool): Whether to test the number of neurons in the neural network.
+        random_host (bool): Whether to use random host ids instead of the ones in the topology.
 
     Returns:
         None
@@ -137,7 +139,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
     if mutation or cx or rr or sigma or activation:
         experiments = [experiments[1]]
 
-    if init or chain or dijkstra or gaussian or neurons or random_input_weights or env == "dc":
+    if init or chain or dijkstra or gaussian or neurons or random_input_weights or random_host or env == "dc":
         experiments = [experiments[0]]
 
     if env == "milan":
@@ -202,7 +204,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
 
 
             topology: Topology = generateFatTreeTopology(
-                4, exp["linkBandwidth"], exp["noOfCPUs"], exp["memory"], delay
+                4, exp["linkBandwidth"], exp["noOfCPUs"], exp["memory"], delay, randomHost=random_host
             )
         else:
             trafficDesign: list[TrafficDesign] = [generateTrafficDesignFromIoTTrace(

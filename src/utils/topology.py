@@ -2,12 +2,14 @@
 This generates topoigies.
 """
 
+import random
+
 from shared.models.topology import Host, Link, Switch, Topology
 
 from constants.topology import SERVER, SFCC
 
 
-def generateFatTreeTopology(k: int, bandwidth: int, cpu: float, memory: int, delay: int = None) -> Topology:
+def generateFatTreeTopology(k: int, bandwidth: int, cpu: float, memory: int, delay: int = None, randomHost: bool = False) -> Topology:
     """
     Generate a Fat Tree Topology.
 
@@ -40,6 +42,9 @@ def generateFatTreeTopology(k: int, bandwidth: int, cpu: float, memory: int, del
 
     links: "list[Link]" = []
     pods: "list[dict[str, list[str]]]" = []
+
+    if randomHost:
+        random.shuffle(hosts)
 
     for i, sw in enumerate(edgeSwitches):
         if i == 0:
