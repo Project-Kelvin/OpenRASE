@@ -1,9 +1,2 @@
 *
 !.gitignore
-!experiments/
-!experiments/hybrid/
-!experiments/hybrid/surrogate/
-!experiments/hybrid/surrogate/data/
-!experiments/hybrid/surrogate/data/*
-!experiments/hybrid/surrogate/data/latest
-!experiments/hybrid/surrogate/data/latest/*
