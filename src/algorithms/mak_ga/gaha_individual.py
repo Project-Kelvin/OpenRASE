@@ -120,6 +120,9 @@ def convertIndividualToEmbeddingGraphs(individual: Individual, topology: Topolog
             if nodes[fgr["sfcID"]][-1] != SERVER:
                 nodes[fgr["sfcID"]].append(BRANCH)
 
+        if embeddingNotFound[0]:
+            return
+
         if "host" in vnf and vnf["host"]["id"] == SERVER:
             nodes[fgr["sfcID"]].append(SERVER)
 

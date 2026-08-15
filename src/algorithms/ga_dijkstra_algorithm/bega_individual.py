@@ -56,7 +56,7 @@ def generateRandomIndividual(
 
 
 def convertIndividualToEmbeddingGraph(
-    individual: "list[list[int]]", sfcrs: "list[SFCRequest]", topology: Topology, popIndex: int
+    individual: "list[list[int]]", sfcrs: "list[SFCRequest]", topology: Topology, popIndex: int, rejectionRate: float = 0.05
 ) -> "Tuple[list[EmbeddingGraph], EmbeddingData, LinkData, int]":
     """
     Convert individual to an embedding graph.
@@ -66,6 +66,7 @@ def convertIndividualToEmbeddingGraph(
         sfcrs (list[SFCRequest]): The SFC Requests.
         topology (Topology): The Topology.
         popIndex (int): The index of the embedding graph in the population.
+        rejectionRate (float): The probability of a VNF being deployed on a host.
 
     Returns:
         tuple[list[EmbeddingGraph], EmbeddingData, LinkData, popIndex]: the embedding graph, the embedding data, the link data, and the index.

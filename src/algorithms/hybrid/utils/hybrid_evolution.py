@@ -9,7 +9,7 @@ from datetime import datetime
 import os
 import random
 import timeit
-from typing import Callable, Tuple, Type
+from typing import Callable, Tuple, Type, Union
 from uuid import uuid4
 from deap import base, tools
 import numpy as np
@@ -43,6 +43,7 @@ Crossover = Callable[
     Tuple[Individual, Individual],
 ]
 Mutate = Callable[[Individual, float], Individual]
+RejectVNF = Callable[[Individual, float], Individual]
 
 
 class HybridEvolution:
@@ -65,7 +66,9 @@ class HybridEvolution:
         cxpPb: float,
         indPb: float,
         evaluateOnline: bool = True,
-        retrain: bool = False
+        retrain: bool = False,
+        rejectVNF: Union[RejectVNF, None] = None,
+        rejectionRate: float = 0.05,
     ):
         """
         Initializes the HybridEvolution class.
@@ -82,6 +85,8 @@ class HybridEvolution:
             indPb (float): the individual mutation probability.
             evaluateOnline (bool): whether to evaluate the solution online or offline.
             retrain (bool): Specifies if BENNS should be retrained.
+            rejectVNF (Union[RejectVNF, None]): the function to reject a VNF.
+            rejectionRate (float): the probability of a VNF being deployed on a host.
 
         Returns:
             None
@@ -93,6 +98,7 @@ class HybridEvolution:
         )
         self._crossover: Crossover = crossover
         self._mutate: Mutate = mutate
+        self._rejectVNF: Union[RejectVNF, None] = rejectVNF
         self._toolbox: base.Toolbox = base.Toolbox()
         self._artifactsDir: str = os.path.join(
             getConfig()["repoAbsolutePath"], "artifacts", "experiments", experimentName
@@ -103,6 +109,7 @@ class HybridEvolution:
         self._cxpPb: float = cxpPb
         self._evaluateOnline: bool = evaluateOnline
         self._retrain: bool = retrain
+        self._rejectionRate: float = rejectionRate
 
     def _select(
         self,
@@ -220,6 +227,8 @@ class HybridEvolution:
                 self._toolbox.mutate(mutant)
 
                 del mutant.fitness.values
+
+            mutant = self._rejectVNF(mutant, self._rejectionRate) if self._rejectVNF else mutant
 
         return offspring
 

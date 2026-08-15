@@ -44,14 +44,13 @@ class MakGAUtils:
         self._fgrs = convertSFCRsToEGs(sfcrs)
 
 
-    def mutate(self, individual: Individual, indpb: float, rejectionRate: float = 0.05) -> Individual:
+    def mutate(self, individual: Individual, indpb: float) -> Individual:
         """
         Mutates an individual by randomly changing its genes based on a given probability.
 
         Parameters:
             individual (Individual): The individual to mutate.
             indpb (float): The probability of mutating each gene.
-            rejectionRate (float): The probability of a VNF being deployed on a host.
 
         Returns:
             Individual: The mutated individual.
@@ -63,8 +62,6 @@ class MakGAUtils:
             if random.random() < indpb:
                 host: int = random.randint(1, noOfHosts)
                 individual[i] = host
-            if random.random() < rejectionRate:
-                individual[i] = 0
 
         return individual
 
@@ -514,3 +511,23 @@ class MakGAUtils:
         data.extend(maxData)
 
         MakGAUtils._demandPredictions.cacheResourceDemands(egs, data)
+
+    def rejectVNF(self, individual: Individual, rejectionRate: float) -> Individual:
+        """
+        Determines whether to reject a VNF based on the rejection rate.
+
+        Parameters:
+            individual (Individual): The individual to evaluate.
+            rejectionRate (float): The probability of rejection.
+
+        Returns:
+            Individual: The individual after potential rejection.
+        """
+
+        rejectedIndividual: Individual = copy.deepcopy(individual)
+
+        for i in range(len(rejectedIndividual)):
+            if random.random() < rejectionRate:
+                rejectedIndividual[i] = 0
+
+        return rejectedIndividual

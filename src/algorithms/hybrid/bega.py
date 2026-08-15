@@ -15,6 +15,7 @@ from shared.models.embedding_graph import EmbeddingGraph
 from algorithms.ga_dijkstra_algorithm.ga_utils import (
     decodePop,
     mutate,
+    rejectVNF,
 )
 from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution, Individual
 from mano.telemetry import Telemetry
@@ -76,7 +77,8 @@ def solve(
         mutPb,
         cxpPb,
         indPb,
-        evaluateOnline=evaluateOnline
+        evaluateOnline=evaluateOnline,
+        rejectVNF=rejectVNF
     )
 
     hybridEvolution.hybridSolve(

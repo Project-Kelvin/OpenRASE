@@ -90,7 +90,8 @@ def solve(
         cxPb,
         indPb,
         evaluateOnline=evaluateOnline,
-        retrain=retrain
+        retrain=retrain,
+        rejectVNF=gahaUtils.rejectVNF,
     )
 
     hybridEvolution.hybridSolve(

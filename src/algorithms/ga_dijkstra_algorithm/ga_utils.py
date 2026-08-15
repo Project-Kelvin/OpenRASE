@@ -115,14 +115,13 @@ def evaluation(
     return (acceptanceRatio, round(latency))
 
 
-def mutate(individual: Individual, indpb: float, rejectionRate: float = 0.05) -> Individual:
+def mutate(individual: Individual, indpb: float) -> Individual:
     """
     Mutate the individual.
 
     Parameters:
         individual (Individual): the individual to mutate.
         indpb (float): the probability of mutation.
-        rejectionRate (float): the probability of rejection.
 
     Returns:
         Individual: the mutated individual.
@@ -140,8 +139,6 @@ def mutate(individual: Individual, indpb: float, rejectionRate: float = 0.05) ->
             except ValueError:
                 pass
             ind[random.choice(indices)] = 1
-        if random.random() < rejectionRate:
-            ind = [0] * len(ind)
 
     return mutatedIndividual
 
@@ -349,3 +346,23 @@ def decodePop(
     )
 
     return decodedPop
+
+def rejectVNF(individual: Individual, rejectionRate: float = 0.05) -> Individual:
+    """
+    Reject a VNF from the individual.
+
+    Parameters:
+        individual (Individual): the individual to reject VNF  from.
+        rejectionRate (float): the probability of a VNF being deployed on a host.
+
+    Returns:
+        Individual: the individual with rejected VNF instances.
+    """
+
+    rejectedIndividual: "list[list[int]]" = deepcopy(individual)
+
+    for ind in rejectedIndividual:
+        if random.random() < rejectionRate:
+            ind[ind.index(1)] = 0
+
+    return rejectedIndividual
