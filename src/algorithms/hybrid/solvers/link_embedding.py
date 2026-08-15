@@ -396,6 +396,8 @@ class EmbedLinks:
             index += 1
             closedSet.append(currentNode)
 
+        return []
+
     def getLinkData(self) -> LinkData:
         """
         Gets the link data.
@@ -421,6 +423,7 @@ class EmbedLinks:
             list[EmbeddingGraph]: the EGs.
         """
 
+        egsToRemove: "list[EmbeddingGraph]" = []
         for eg in self._egs:
             graph: Union[Graph, None] = None
             if dijkstra:
@@ -450,9 +453,16 @@ class EmbedLinks:
                                 path = self._findPath(
                                     eg["sfcID"], nodeList[i], nodeList[i + 1]
                                 )
+
+                                if len(path) == 0:
+                                    TUI.appendToSolverLog(f"Error: No path found between {nodeList[i]} and {nodeList[i + 1]}", True)
+                                    egsToRemove.append(eg)
+                                    continue
+
                             paths[srcDst] = path
                         except Exception as e:
                             TUI.appendToSolverLog(f"Error: {e}", True)
+                            egsToRemove.append(eg)
                             continue
 
                         eg["links"].append(
@@ -531,5 +541,7 @@ class EmbedLinks:
                                 self._linkData[f"{path[p]}-{path[p + 1]}"] = {
                                     eg["sfcID"]: (1 / divisor, linkDelay)
                                 }
+
+        self._egs = [eg for eg in self._egs if eg["sfcID"] not in [eg["sfcID"] for eg in egsToRemove]]
 
         return self._egs
