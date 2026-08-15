@@ -225,10 +225,9 @@ class HybridEvolution:
         for mutant in offspring:
             if random.random() < self._mutPb:
                 self._toolbox.mutate(mutant)
+                mutant = self._rejectVNF(mutant, self._rejectionRate) if self._rejectVNF else mutant
 
                 del mutant.fitness.values
-
-            mutant = self._rejectVNF(mutant, self._rejectionRate) if self._rejectVNF else mutant
 
         return offspring
 

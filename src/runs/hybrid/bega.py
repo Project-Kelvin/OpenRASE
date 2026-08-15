@@ -64,13 +64,14 @@ def run(headless: bool, mutation: bool, cx: bool, env: str) -> None:
     #(15, 0.1, False, 10, 0.1) works
     experiments: list[tuple[int, float, bool, float, float]] = [
         (15, 0.23, False, 5, 0.5), # Used for ablation (DC)
-        (20, 0.1, False, 10, 1), # Used for hyperparameter tuning (DC),
+        (20, 0.1, False, 10, 1), # Used for hyperparameter tuning in GENESIS and DC,
         (20, 0.1, False, 10, 1), # Used VNF embedding only experiment (Milan)
-        (10, 0.1, False, 10, 1), # Used VNF embedding only experiment (25N50E)
+        (10, 0.1, False, 10, 1), # Used VNF embedding only experiment (25N50E),
+        (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA,
     ]
 
     if mutation or cx:
-        experiments = [experiments[1]]
+        experiments = [experiments[4]]
 
     if env == "dc":
         experiments = [experiments[0]]
