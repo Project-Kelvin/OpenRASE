@@ -103,7 +103,10 @@ def getCombinationIndex(combination: Any, combinations: Any) -> int:
 @click.option("--dijkstra", is_flag=True, default=False, help="Run GENESIS with Dijkstra's algorithm.")
 @click.option("--chain", is_flag=True, default=False, help="Run GENESIS with static chain-based evaluation.")
 @click.option("--gaussian", is_flag=True, default=False, help="Run GENESIS with Gaussian disabled.")
-def run(algo: str, dijkstra: bool, chain: bool, gaussian: bool) -> None:
+@click.option("--relu", is_flag=True, default=False, help="Run GENESIS with ReLU.")
+@click.option("--tanh", is_flag=True, default=False, help="Run GENESIS with Tanh.")
+@click.option("--linear", is_flag=True, default=False, help="Run GENESIS with Sigmoid.")
+def run(algo: str, dijkstra: bool, chain: bool, gaussian: bool, relu: bool, tanh: bool, linear: bool) -> None:
     """
     This function runs the specified algorithm on the phenotype space and evaluates its performance.
 
@@ -112,10 +115,13 @@ def run(algo: str, dijkstra: bool, chain: bool, gaussian: bool) -> None:
         dijkstra (bool): Flag to run GENESIS with Dijkstra's algorithm.
         chain (bool): Flag to run GENESIS with static chain-based evaluation.
         gaussian (bool): Flag to run GENESIS with Gaussian disabled.
+        relu (bool): Flag to run GENESIS with ReLU.
+        tanh (bool): Flag to run GENESIS with Tanh.
+        linear (bool): Flag to run GENESIS with Sigmoid.
 
     """
 
-    phenotypeDir: str = os.path.join(experimentsDir, f"phenotype_{algo}{'_dijkstra' if dijkstra else ''}{'_chain' if chain else ''}{'_gaussian' if gaussian else ''}")
+    phenotypeDir: str = os.path.join(experimentsDir, f"phenotype_{algo}{'_dijkstra' if dijkstra else ''}{'_chain' if chain else ''}{'_gaussian' if gaussian else ''}{'_relu' if relu else ''}{'_tanh' if tanh else ''}{'_linear' if linear else ''}")
     if not os.path.exists(phenotypeDir):
         os.makedirs(phenotypeDir)
 
@@ -344,7 +350,7 @@ def run(algo: str, dijkstra: bool, chain: bool, gaussian: bool) -> None:
             population.append(individual)
             record.input = list(individual)
             print("Random individual generated.")
-            decodedIndividual: DecodedIndividual = GenesisUtils.decodeIndividual(cast(GenesisIndividual, individual), 0, topology, sfcrs, dijkstra=dijkstra, staticChain=chain, disableGaussian=gaussian)
+            decodedIndividual: DecodedIndividual = GenesisUtils.decodeIndividual(cast(GenesisIndividual, individual), 0, topology, sfcrs, dijkstra=dijkstra, staticChain=chain, disableGaussian=gaussian, activation="relu" if relu else "tanh" if tanh else "linear" if linear else "sin")
             print("Individual decoded.")
             egs = decodedIndividual[1]
         elif algo == "gaha":
