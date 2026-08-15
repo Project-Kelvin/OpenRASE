@@ -359,10 +359,8 @@ def rejectVNF(individual: Individual, rejectionRate: float = 0.05) -> Individual
         Individual: the individual with rejected VNF instances.
     """
 
-    rejectedIndividual: "list[list[int]]" = deepcopy(individual)
-
-    for ind in rejectedIndividual:
+    for ind in individual:
         if random.random() < rejectionRate:
             ind[ind.index(1)] = 0
 
-    return rejectedIndividual
+    return individual

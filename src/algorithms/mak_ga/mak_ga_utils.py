@@ -524,10 +524,8 @@ class MakGAUtils:
             Individual: The individual after potential rejection.
         """
 
-        rejectedIndividual: Individual = copy.deepcopy(individual)
-
-        for i in range(len(rejectedIndividual)):
+        for i in range(len(individual)):
             if random.random() < rejectionRate:
-                rejectedIndividual[i] = 0
+                individual[i] = 0
 
-        return rejectedIndividual
+        return individual
