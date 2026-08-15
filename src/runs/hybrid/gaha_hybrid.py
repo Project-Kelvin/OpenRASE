@@ -220,84 +220,35 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retra
                         requests.append(self._requests.get())
                         sleep(0.1)
 
-                    if mutation:
-                        for mutPb in mutationProbabilities:
-                            for indPb in individualProbabilities:
-                                for i in range(noOfRuns):
-                                    seed: int = setRandomSeed()
-                                    linesToWrite: list[str] = [
-                                        f"Seed: {seed}",
-                                    ]
-                                    TUI.appendToSolverLog(
-                                        f"Running experiment {exp['name']} with mutPb={mutPb} and indPb={indPb}."
-                                    )
-                                    solve(
-                                        topology,
-                                        requests,
-                                        self._orchestrator.sendEmbeddingGraphs,
-                                        self._orchestrator.deleteEmbeddingGraphs,
-                                        trafficDesign,
-                                        self._trafficGenerator,
-                                        self._orchestrator.getTelemetry(),
-                                        f"{exp['name']}_mutPb{mutPb}_indPb{indPb}_{i}",
-                                        mutPb = mutPb,
-                                        indPb = indPb,
-                                        evaluateOnline = False,
-                                        linesToWrite=linesToWrite
-                                    )
-                    elif cx:
-                        for cxPb in crossoverProbabilities:
-                            for i in range(noOfRuns):
-                                TUI.appendToSolverLog(
-                                    f"Running experiment {exp['name']} with cxPb={cxPb}."
-                                )
-                                seed: int = setRandomSeed()
-                                linesToWrite: list[str] = [
-                                    f"Seed: {seed}",
-                                ]
-                                solve(
-                                    topology,
-                                    requests,
-                                    self._orchestrator.sendEmbeddingGraphs,
-                                    self._orchestrator.deleteEmbeddingGraphs,
-                                    trafficDesign,
-                                    self._trafficGenerator,
-                                    self._orchestrator.getTelemetry(),
-                                    f"{exp['name']}_cxPb{cxPb}_{i}",
-                                    cxPb = cxPb,
-                                    evaluateOnline = False,
-                                    linesToWrite=linesToWrite
-                                )
-                    else:
-                        TUI.appendToSolverLog(
-                            f"Running experiment {exp['name']} with default parameters."
-                        )
+                    TUI.appendToSolverLog(
+                        f"Running experiment {exp['name']} with default parameters."
+                    )
 
-                        for i in range(noOfRuns):
-                            seed: int = setRandomSeed()
-                            linesToWrite: list[str] = [
-                                f"Seed: {seed}",
-                            ]
-                            solve(
-                                topology,
-                                requests,
-                                self._orchestrator.sendEmbeddingGraphs,
-                                self._orchestrator.deleteEmbeddingGraphs,
-                                trafficDesign,
-                                self._trafficGenerator,
-                                self._orchestrator.getTelemetry(),
-                                f"{exp['name']}_{i}",
-                                evaluateOnline = not offline,
-                                retrain = retrain,
-                                linesToWrite=linesToWrite
-                            )
+                    for i in range(noOfRuns):
+                        seed: int = setRandomSeed()
+                        linesToWrite: list[str] = [
+                            f"Seed: {seed}",
+                        ]
+                        solve(
+                            topology,
+                            requests,
+                            self._orchestrator.sendEmbeddingGraphs,
+                            self._orchestrator.deleteEmbeddingGraphs,
+                            trafficDesign,
+                            self._trafficGenerator,
+                            self._orchestrator.getTelemetry(),
+                            f"{exp['name']}_{i}",
+                            evaluateOnline = not offline,
+                            retrain = retrain,
+                            linesToWrite=linesToWrite
+                        )
 
                 except Exception as e:
                     TUI.appendToSolverLog(str(e), True)
 
                 TUI.appendToSolverLog("Finished experiment.")
 
-        if test:
+        if test or mutation or cx:
             TUI.disable()
             fgsToSend: "list[SFCRequest]" = []
             with open(
@@ -321,24 +272,74 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retra
                         fgsToSend.append(fgToSend)
 
             TUI.appendToSolverLog(f"Running experiment {exp['name']} in test mode.")
-            for i in range(noOfRuns):
-                seed: int = setRandomSeed()
-                linesToWrite: list[str] = [
-                    f"Seed: {seed}",
-                ]
-                solve(
-                    topology,
-                    fgsToSend,
-                    None,
-                    None,
-                    trafficDesign,
-                    None,
-                    None,
-                    f"{exp['name']}_{i}",
-                    evaluateOnline = False,
-                    retrain = False,
-                    linesToWrite=linesToWrite
-                )
+
+            if mutation:
+                for mutPb in mutationProbabilities:
+                    for indPb in individualProbabilities:
+                        for i in range(noOfRuns):
+                            seed: int = setRandomSeed()
+                            linesToWrite: list[str] = [
+                                f"Seed: {seed}",
+                            ]
+                            TUI.appendToSolverLog(
+                                f"Running experiment {exp['name']} with mutPb={mutPb} and indPb={indPb}."
+                            )
+                            solve(
+                                topology,
+                                fgsToSend,
+                                None,
+                                None,
+                                trafficDesign,
+                                None,
+                                None,
+                                f"{exp['name']}_mutPb{mutPb}_indPb{indPb}_{i}",
+                                mutPb = mutPb,
+                                indPb = indPb,
+                                evaluateOnline = False,
+                                linesToWrite=linesToWrite
+                            )
+            elif cx:
+                for cxPb in crossoverProbabilities:
+                    for i in range(noOfRuns):
+                        TUI.appendToSolverLog(
+                            f"Running experiment {exp['name']} with cxPb={cxPb}."
+                        )
+                        seed: int = setRandomSeed()
+                        linesToWrite: list[str] = [
+                            f"Seed: {seed}",
+                        ]
+                        solve(
+                            topology,
+                            fgsToSend,
+                            None,
+                            None,
+                            trafficDesign,
+                            None,
+                            None,
+                            f"{exp['name']}_cxPb{cxPb}_{i}",
+                            cxPb = cxPb,
+                            evaluateOnline = False,
+                            linesToWrite=linesToWrite
+                        )
+            if test:
+                for i in range(noOfRuns):
+                    seed: int = setRandomSeed()
+                    linesToWrite: list[str] = [
+                        f"Seed: {seed}",
+                    ]
+                    solve(
+                        topology,
+                        fgsToSend,
+                        None,
+                        None,
+                        trafficDesign,
+                        None,
+                        None,
+                        f"{exp['name']}_{i}",
+                        evaluateOnline = False,
+                        retrain = False,
+                        linesToWrite=linesToWrite
+                    )
         else:
             sfcEm: SFCEmulator = SFCEmulator(FGGen, HybridSolver, headless)
             sfcEm.startTest(
