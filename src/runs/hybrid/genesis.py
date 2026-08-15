@@ -92,7 +92,8 @@ def generateSFCRs(noOfCopies: int) -> "list[SFCRequest]":
 @click.option("--random-input-weights", is_flag=True, default=False, help="Use random input weights instead of predefined weights.")
 @click.option("--neurons", is_flag=True, default=False, help="Test the number of neurons in the neural network.")
 @click.option("--random-host", is_flag=True, default=False, help="Use random host ids instead of the ones in the topology.")
-def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool, env: str, retrain: bool, offline: bool, test: bool, random_input_weights: bool, neurons: bool, random_host: bool) -> None:
+@click.option("--himode", type=click.Choice(["hard", "easy"], case_sensitive=False), default="hard", help="Run in hi or genesis mode.")
+def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool, env: str, retrain: bool, offline: bool, test: bool, random_input_weights: bool, neurons: bool, random_host: bool, himode: str) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -114,6 +115,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
         random_input_weights (bool): Whether to use random input weights instead of predefined weights.
         neurons (bool): Whether to test the number of neurons in the neural network.
         random_host (bool): Whether to use random host ids instead of the ones in the topology.
+        himode (str): Whether to run in hi or genesis mode.
 
     Returns:
         None
@@ -122,7 +124,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
     mutationProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
-    rejectionRates: list[float] = [0.05, 0.07, 0.1]
+    rejectionRates: list[float] = [0.0, 0.05, 0.07, 0.1]
     sigmas: list[float] = [0.0, 1.0, 2.0, 4.0]
     activations: list[str] = ["tanh", "sin", "relu", "linear"]
     initLimit: list[float] = [1, 2, np.pi, 2 * np.pi]
@@ -132,26 +134,32 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
     experiments: list[tuple[int, float, bool, float, float]] = [
         (15, 0.23, False, 5, 0.5), # Used for ablation (DC)
         (20, 0.1, False, 10, 1), # Used for hyperparameter tuning (DC),
-        (20, 0.1, False, 10, 1), # Used VNF embedding only experiment (Milan)
+        (20, 0.1, False, 10, 1), # Used VNF embedding only experiment (Milan). Used as hard in HiGenesis tuning.
         (10, 0.1, False, 10, 1), # Used VNF embedding only experiment (25N50E)
-        (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA
+        (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA,
+        (15, 0.1, False, 10, 1), # Used for hyperparameter tuning in HiGENESIS Easy,
     ]
 
     if mutation or cx or rr or sigma or activation:
-        experiments = [experiments[1]]
+        selectedExperiments = [experiments[1]]
 
     if init or chain or dijkstra or gaussian or neurons or random_input_weights or random_host or env == "dc":
-        experiments = [experiments[0]]
+        selectedExperiments = [experiments[0]]
 
     if env == "milan":
-        experiments = [experiments[2]]
+        if (rr or sigma) and himode == "easy":
+            selectedExperiments = [experiments[5]] # HiGENESIS sigma and rr tuning
+        elif (rr or sigma) and himode == "hard":
+            selectedExperiments = [experiments[2]] # HiGENESIS sigma and rr tuning
+        else:
+            selectedExperiments = [experiments[2]]
 
     if env == "25n50e":
-        experiments = [experiments[3]]
+        selectedExperiments = [experiments[3]]
 
     noOfRuns: int = 20
 
-    for experiment in experiments:
+    for experiment in selectedExperiments:
         noOfCopy, trafficScale, trafficPattern, linkBandwidth, noOfCPUs = experiment
         exp: dict[str, Any] = dict(
             {
