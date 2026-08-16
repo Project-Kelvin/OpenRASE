@@ -134,10 +134,11 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
     experiments: list[tuple[int, float, bool, float, float]] = [
         (15, 0.23, False, 5, 0.5), # Used for ablation (DC)
         (20, 0.1, False, 10, 1), # Used for hyperparameter tuning (DC),
-        (20, 0.1, False, 10, 1), # Used VNF embedding only experiment (Milan). Used as hard in HiGenesis tuning.
+        (20, 0.1, False, 10, 1), # Used VNF embedding only experiment (Milan).
         (10, 0.1, False, 10, 1), # Used VNF embedding only experiment (25N50E)
         (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA,
-        (15, 0.1, False, 10, 1), # Used for hyperparameter tuning in HiGENESIS Easy,
+        (8, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Easy,
+        (15, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Hard,
     ]
 
     if mutation or cx or rr or sigma or activation:
@@ -150,7 +151,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
         if (rr or sigma) and himode == "easy":
             selectedExperiments = [experiments[5]] # HiGENESIS sigma and rr tuning
         elif (rr or sigma) and himode == "hard":
-            selectedExperiments = [experiments[2]] # HiGENESIS sigma and rr tuning
+            selectedExperiments = [experiments[6]] # HiGENESIS sigma and rr tuning
         else:
             selectedExperiments = [experiments[2]]
 
