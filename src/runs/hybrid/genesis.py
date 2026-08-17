@@ -138,7 +138,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
         (10, 0.1, False, 10, 1), # Used VNF embedding only experiment (25N50E)
         (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA,
         (8, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Easy,
-        (15, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Hard,
+        (12, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Hard,
     ]
 
     if mutation or cx or rr or sigma or activation:
