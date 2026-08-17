@@ -187,9 +187,16 @@ class EmbedLinks:
         self._pdWeights: list[float] = predefinedWeights
         self._weights: list[float] = weights
         self._hotCode: HotCode = HotCode()
+        # cached once since these are re-derived from the (immutable) topology
+        self._allLinks: list[str] = EmbedLinks.getLinks(self._topology)
+        self._hostSet: set[str] = {host["id"] for host in self._topology["hosts"]} | {SFCC, SERVER}
+        self._linkMap: dict[tuple[str, str], Link] = {}
+        for link in self._topology["links"]:
+            self._linkMap[(link["source"], link["destination"])] = link
+            self._linkMap[(link["destination"], link["source"])] = link
         self._convertToHotCodes()
         self._hCost: dict[str, dict[str, dict[str, float]]] = {}
-        self._links: list[str] = []
+        self._linkIndex: dict[str, int] = {}
         self._activation: str = activation
         self._data: np.ndarray = self._predictCost()
         self._linkData: Optional[LinkData] = None
@@ -206,11 +213,7 @@ class EmbedLinks:
             bool: True if the node is a host, False otherwise.
         """
 
-        return (
-            node in [host["id"] for host in self._topology["hosts"]]
-            or node == SFCC
-            or node == SERVER
-        )
+        return node in self._hostSet
 
     def _constructNP(self) -> np.ndarray:
         """
@@ -221,14 +224,13 @@ class EmbedLinks:
         """
 
         rows: "list[list[int]]" = []
-        links = EmbedLinks.getLinks(self._topology)
         for sfcr in self._sfcrs:
-            for link in links:
+            for link in self._allLinks:
                 row: "list[int]" = []
                 row.extend(self._hotCode.getSFCCode(sfcr["sfcrID"]))
                 row.extend(self._hotCode.getNodeCode(link))
                 rows.append(row)
-                self._links.append(f"{sfcr['sfcrID']}_{link}")
+                self._linkIndex[f"{sfcr['sfcrID']}_{link}"] = len(rows) - 1
 
         return np.array(rows, dtype=np.float64)
 
@@ -288,9 +290,8 @@ class EmbedLinks:
             None
         """
 
-        links = EmbedLinks.getLinks(self._topology)
-        for link in links:
-            self._hotCode.addNode(link, len(links))
+        for link in self._allLinks:
+            self._hotCode.addNode(link, len(self._allLinks))
 
         sfcLength: int = len(self._sfcrs)
 
@@ -330,10 +331,9 @@ class EmbedLinks:
             float: the heuristic cost.
         """
 
-        if f"{sfc}_{src}_{dst}" in self._links:
-            index = self._links.index(f"{sfc}_{src}_{dst}")
-        else:
-            index = self._links.index(f"{sfc}_{dst}_{src}")
+        index = self._linkIndex.get(f"{sfc}_{src}_{dst}")
+        if index is None:
+            index = self._linkIndex[f"{sfc}_{dst}_{src}"]
 
         return self._data[index]
 
@@ -350,11 +350,16 @@ class EmbedLinks:
             list[str]: the path.
         """
 
-        openSet: "list[Node]" = [Node(source)]
-        closedSet: "list[Node]" = []
+        startNode: Node = Node(source)
+        counter: int = 0
+        openHeap: "list[tuple[float, int, Node]]" = [
+            (startNode.totalCost + startNode.hCost, counter, startNode)
+        ]
+        # best known total cost per node name, replaces the closedSet scan with an O(1) lookup
+        bestCost: dict[str, float] = {source: 0.0}
         index: int = 0
-        while len(openSet) > 0:
-            currentNode: Node = heapq.heappop(openSet)
+        while len(openHeap) > 0:
+            _, _, currentNode = heapq.heappop(openHeap)
             if currentNode.name == destination:
                 path = []
                 while currentNode is not None:
@@ -365,36 +370,28 @@ class EmbedLinks:
 
                 return path
 
+            if currentNode.totalCost > bestCost.get(currentNode.name, float("inf")):
+                index += 1
+                continue
+
             if index == 0 or not self._isHost(currentNode.name):
                 for neighbour in self._graph.adj[currentNode.name]:
-                    node: Node = Node(neighbour)
-
-                    if self._isHost(neighbour):
-                        node.hCost = 0
-                    else:
-                        node.hCost = self._getHeuristicCost(
-                            sfcID, neighbour, destination
-                        )
-                    node.parent = currentNode
-                    node.totalCost = currentNode.totalCost + self._getHeuristicCost(
+                    totalCost = currentNode.totalCost + self._getHeuristicCost(
                         sfcID, currentNode.name, neighbour
                     )
 
-                    if (
-                        len(
-                            [
-                                closedSetNode
-                                for closedSetNode in closedSet
-                                if closedSetNode.name == neighbour
-                                and node.totalCost >= closedSetNode.totalCost
-                            ]
+                    if totalCost < bestCost.get(neighbour, float("inf")):
+                        bestCost[neighbour] = totalCost
+                        node: Node = Node(neighbour)
+                        node.hCost = 0 if self._isHost(neighbour) else self._getHeuristicCost(
+                            sfcID, neighbour, destination
                         )
-                        == 0
-                    ):
-                        heapq.heappush(openSet, node)
+                        node.parent = currentNode
+                        node.totalCost = totalCost
+                        counter += 1
+                        heapq.heappush(openHeap, (node.totalCost + node.hCost, counter, node))
 
             index += 1
-            closedSet.append(currentNode)
 
         return []
 
@@ -476,22 +473,11 @@ class EmbedLinks:
                     path = paths[srcDst] if srcDst in paths else paths[dstSrc]
 
                     for p in range(len(path) - 1):
-                        links: list[Link] = [
-                            topoLink
-                            for topoLink in self._topology["links"]
-                            if (
-                                topoLink["source"] == path[p]
-                                and topoLink["destination"] == path[p + 1]
-                            )
-                            or (
-                                topoLink["source"] == path[p + 1]
-                                and topoLink["destination"] == path[p]
-                            )
-                        ]
-                        if len(links) == 0:
+                        matchedLink: Optional[Link] = self._linkMap.get((path[p], path[p + 1]))
+                        if matchedLink is None:
                             raise Exception(f"No link found between {path[p]} and {path[p + 1]}")
 
-                        link: Link = links[0]
+                        link: Link = matchedLink
                         linkDelay: float = cast(float,(
                             (link["delay"] / divisor)
                             if "delay" in link and link["delay"] is not None
