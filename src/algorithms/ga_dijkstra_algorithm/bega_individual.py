@@ -52,6 +52,7 @@ def generateRandomIndividual(
         individual.append(item)
 
     individual.id = uuid4()
+
     return individual
 
 

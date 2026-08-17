@@ -131,13 +131,13 @@ def mutate(individual: Individual, indpb: float) -> Individual:
 
     for ind in mutatedIndividual:
         if random.random() < indpb:
-            ind = [0] * len(ind)
             indices: "list[int]" = list(range(len(ind)))
             try:
                 trueIndex: int = ind.index(1)
                 indices.remove(trueIndex)
             except ValueError:
                 pass
+            ind = [0] * len(ind)
             ind[random.choice(indices)] = 1
 
     return mutatedIndividual

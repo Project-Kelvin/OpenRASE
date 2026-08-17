@@ -145,6 +145,7 @@ class GenesisUtils:
             linkWeights: list[float] = weights[2]
 
             fgs: dict[str, list[str]] = {}
+            startTime: float = timeit.default_timer()
             if staticChain:
                 for sfcr in sfcrs:
                     fgs[sfcr["sfcrID"]] = sfcr["vnfs"]
@@ -152,7 +153,12 @@ class GenesisUtils:
                 fgs: dict[str, list[str]] = generateFGs(
                     sfcrs, ccPDWeights, ccWeights, GenesisUtils.noOfNeurons, activation=activation
                 )
+            endTime: float = timeit.default_timer()
+            TUI.appendToSolverLog(
+                f"Solved VNF-CC in {endTime - startTime:.2f} seconds."
+            )
 
+            startTime: float = timeit.default_timer()
             egs, nodes, embedData = generateEGs(
                 fgs,
                 topology,
@@ -164,6 +170,12 @@ class GenesisUtils:
                 disableGaussian,
                 activation=activation
             )
+            endTime: float = timeit.default_timer()
+            TUI.appendToSolverLog(
+                f"Solved VNF-EM in {endTime - startTime:.2f} seconds."
+            )
+
+            starTime: float = timeit.default_timer()
             embedLinks: Optional[EmbedLinks] = None
             linkData: Optional[LinkData] = None
             if len(egs) > 0:
@@ -172,6 +184,10 @@ class GenesisUtils:
                 )
                 egs = embedLinks.embedLinks(nodes, dijkstra=dijkstra)
                 linkData = embedLinks.getLinkData()
+            endTime: float = timeit.default_timer()
+            TUI.appendToSolverLog(
+                f"Solved VL-EM in {endTime - starTime:.2f} seconds."
+            )
             ar: float = len(egs) / len(sfcrs)
         except Exception as e:
             TUI.appendToSolverLog(f"Error decoding individual {index}: {e}")
