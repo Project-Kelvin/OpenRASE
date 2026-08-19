@@ -130,12 +130,13 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
     initLimit: list[float] = [1, 2, np.pi, 2 * np.pi]
     noOfNeurons: list[int] = [1, 4, 6]
     delay: int = 1
+    selectedExperiments: list[tuple[int, float, bool, float, float]] = []
 
     experiments: list[tuple[int, float, bool, float, float]] = [
-        (15, 0.23, False, 5, 0.5), # Used for ablation (DC)
+        (15, 0.23, False, 5, 0.5), # Used for ablation and DC.
         (20, 0.1, False, 10, 1), # Used for hyperparameter tuning (DC),
-        (20, 0.1, False, 10, 1), # Used VNF embedding only experiment (Milan).
-        (10, 0.1, False, 10, 1), # Used VNF embedding only experiment (25N50E)
+        (20, 0.1, False, 10, 1), # Used for Milan.
+        (10, 0.1, False, 10, 1), # Used for 25N50E
         (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA,
         (8, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Easy,
         (12, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Hard,
@@ -144,10 +145,10 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
     if mutation or cx or rr or sigma or activation:
         selectedExperiments = [experiments[1]]
 
-    if init or chain or dijkstra or gaussian or neurons or random_input_weights or random_host or env == "dc":
+    elif init or chain or dijkstra or gaussian or neurons or random_input_weights or random_host or env == "dc":
         selectedExperiments = [experiments[0]]
 
-    if env == "milan":
+    elif env == "milan":
         if (rr or sigma) and himode == "easy":
             selectedExperiments = [experiments[5]] # HiGENESIS sigma and rr tuning
         elif (rr or sigma) and himode == "hard":
@@ -155,7 +156,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
         else:
             selectedExperiments = [experiments[2]]
 
-    if env == "25n50e":
+    elif env == "25n50e":
         selectedExperiments = [experiments[3]]
 
     noOfRuns: int = 20

@@ -451,7 +451,7 @@ class MakGAUtils:
 
         return False
 
-    def getTotalDelay(self, decodedIndividual: DecodedIndividual) -> float:
+    def getTotalDelay(self, decodedIndividual: DecodedIndividual) -> tuple[int, float, float]:
         """
         Calculates the total delay for a decoded individual based on the topology.
 
@@ -459,7 +459,7 @@ class MakGAUtils:
             decodedIndividual (DecodedIndividual): The decoded individual containing embedding data.
 
         Returns:
-            float: The total delay for the individual.
+            tuple[int, float, float]: The index, acceptance ratio and the latency.
         """
 
         propagationDelay: float = self._getPropagationDelay(
@@ -473,14 +473,14 @@ class MakGAUtils:
             self._trafficDesign, [1] * duration
         )
         avgData: TimeSFCRequests = {
-            eg["sfcID"]: np.mean(trafficRate) for eg in decodedIndividual[1]
+            eg["sfcID"]: np.median(trafficRate) for eg in decodedIndividual[1]
         }
         processingDelay: float = self._getProcessingDelay(avgData, decodedIndividual)
         queueDelay: float = self._getQueueDelay(
             avgData, decodedIndividual
         )
 
-        return processingDelay + queueDelay + propagationDelay + virtualisationDelay
+        return decodedIndividual[0], decodedIndividual[4], processingDelay + queueDelay + propagationDelay + virtualisationDelay
 
     def cacheDemand(self, pop: list[DecodedIndividual]) -> None:
         """

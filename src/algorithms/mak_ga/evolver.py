@@ -109,7 +109,7 @@ def gahaEvolve(
                 for ind in decodedPop
             ]
             for i, future in enumerate(futures):
-                delay = future.result()
+                delay = future.result()[2]
                 ind = decodedPop[i]
                 ar: float = (1 / ind[4]) if ind[4] != 0 else 10000
                 delays.append(delay)

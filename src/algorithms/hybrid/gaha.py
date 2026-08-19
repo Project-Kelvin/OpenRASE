@@ -38,7 +38,8 @@ def solve(
     indPb: float = INDPB,
     evaluateOnline: bool = True,
     retrain: bool = False,
-    linesToWrite: list[str] = []
+    linesToWrite: list[str] = [],
+    dirName: str = "rega"
 ) -> None:
     """
     Solves the problem using a GA for VNF embedding and Dijkstra for link embedding.
@@ -58,6 +59,7 @@ def solve(
         evaluateOnline (bool): whether to evaluate the solution online or offline.
         retrain (bool): whether to retrain the surrogate model.
         linesToWrite (list[str]): list of lines to write to the log file.
+        dirName (str): directory name.
 
     Returns:
         None
@@ -80,7 +82,7 @@ def solve(
         return generateRandomGAHAIndividual(container, convertSFCRsToEGs(sfcr), topology)
 
     hybridEvolution: HybridEvolution = HybridEvolution(
-        "gaha",
+        dirName,
         decodePopWrapper,
         generateRandomIndividual,
         tools.cxTwoPoint,

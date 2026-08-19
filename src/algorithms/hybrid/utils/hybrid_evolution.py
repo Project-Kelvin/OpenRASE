@@ -11,6 +11,7 @@ import random
 import timeit
 from typing import Callable, Tuple, Type, Union
 from uuid import uuid4
+from algorithms.mak_ga.mak_ga_utils import MakGAUtils
 from deap import base, tools
 import numpy as np
 from shared.models.sfc_request import SFCRequest
@@ -33,6 +34,7 @@ MAX_POWER: int = 300
 MIN_AR: float = 0.95
 MIN_QUAL_IND: int = 1
 NGEN: int = 100
+TIME_LIMIT: int = 1 # in hours
 
 DecodePop = Callable[
     [list[Individual], Topology, list[SFCRequest]], list[DecodedIndividual]
@@ -66,9 +68,12 @@ class HybridEvolution:
         cxpPb: float,
         indPb: float,
         evaluateOnline: bool = True,
+        evaluateOffline: bool = True,
         retrain: bool = False,
         rejectVNF: Union[RejectVNF, None] = None,
         rejectionRate: float = 0.05,
+        useGAHAOffline: bool = False,
+        finalValidation: bool = False,
     ):
         """
         Initializes the HybridEvolution class.
@@ -83,10 +88,13 @@ class HybridEvolution:
             mutPb (float): the mutation probability.
             cxpPb (float): the crossover probability.
             indPb (float): the individual mutation probability.
-            evaluateOnline (bool): whether to evaluate the solution online or offline.
+            evaluateOnline (bool): whether to evaluate the solution online.
+            evaluateOffline (bool): whether to evaluate the solution offline.
             retrain (bool): Specifies if BENNS should be retrained.
             rejectVNF (Union[RejectVNF, None]): the function to reject a VNF.
             rejectionRate (float): the probability of a VNF being deployed on a host.
+            useGAHAOffline (bool): use GAHA's offline evaluator.
+            finalValidation (bool): whether to validate the best final solution irrespective of convergence.
 
         Returns:
             None
@@ -108,8 +116,11 @@ class HybridEvolution:
         self._indPb: float = indPb
         self._cxpPb: float = cxpPb
         self._evaluateOnline: bool = evaluateOnline
+        self._evaluateOffline: bool = evaluateOffline
         self._retrain: bool = retrain
         self._rejectionRate: float = rejectionRate
+        self._useGAHAOffline: bool = useGAHAOffline
+        self._finalValidation: bool = finalValidation
 
     def _select(
         self,
@@ -213,6 +224,11 @@ class HybridEvolution:
         random.shuffle(offspring)
 
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
+            if self._rejectVNF:
+                if random.random() <= 0.5:
+                    child1 = self._rejectVNF(child1, self._rejectionRate)
+                if random.random() <= 0.5:
+                    child2 = self._rejectVNF(child2, self._rejectionRate)
             if random.random() < self._cxpPb:
 
                 self._toolbox.mate(child1, child2)
@@ -222,10 +238,16 @@ class HybridEvolution:
                 child1.id = uuid4()
                 child2.id = uuid4()
 
+            # if self._rejectVNF:
+            #     childToReject: int = random.sample([0, 1], k=1)[0]
+            #     if childToReject == 0:
+            #         child1 = self._rejectVNF(child1, self._rejectionRate)
+            #     else:
+            #         child2 = self._rejectVNF(child2, self._rejectionRate)
+
         for mutant in offspring:
             if random.random() < self._mutPb:
                 self._toolbox.mutate(mutant)
-                mutant = self._rejectVNF(mutant, self._rejectionRate) if self._rejectVNF else mutant
 
                 del mutant.fitness.values
 
@@ -291,58 +313,105 @@ class HybridEvolution:
             f"Population decoded for generation {gen}. Starting evaluation."
         )
 
-        TUI.appendToSolverLog(f"Caching surrogate evaluations for generation {gen}.")
-        if type == POWER:
-            HybridEvaluation.cacheForOfflinePowerUsage(
-                populationEG, trafficDesign, topology, gen, isAvgOnly=True
-            )
-        else:
-            HybridEvaluation.cacheForOffline(
-                populationEG, trafficDesign, topology, gen, isAvgOnly=True
-            )
-            # HybridEvaluation.saveCachedLatency(
-            #     os.path.join(dirName, scoresDir, f"gen_{gen}.csv")
-            # )
+        makGAUtils: Union[MakGAUtils, None] = None
+
+        if self._evaluateOffline:
+            TUI.appendToSolverLog(f"Caching surrogate evaluations for generation {gen}.")
+            if type == POWER:
+                HybridEvaluation.cacheForOfflinePowerUsage(
+                    populationEG, trafficDesign, topology, gen, isAvgOnly=True
+                )
+            elif self._useGAHAOffline:
+                makGAUtils = MakGAUtils(topology, trafficDesign[0], fgrs)
+                makGAUtils.cacheDemand(populationEG)
+            else:
+                HybridEvaluation.cacheForOffline(
+                    populationEG, trafficDesign, topology, gen, isAvgOnly=True
+                )
+                # HybridEvaluation.saveCachedLatency(
+                #     os.path.join(dirName, scoresDir, f"gen_{gen}.csv")
+                # )
 
         startTime: float = timeit.default_timer()
 
         TUI.appendToSolverLog(
             f"Evaluating population using surrogate for generation {gen}."
         )
-        with ProcessPoolExecutor() as executor:
-            futures = []
 
-            if type == POWER:
-                futures = [
-                    executor.submit(
-                        HybridEvaluation.evaluationOnSurrogatePowerUsage,
-                        ind,
+        if self._evaluateOffline:
+            with ProcessPoolExecutor() as executor:
+                futures = []
+
+                if type == POWER:
+                    futures = [
+                        executor.submit(
+                            HybridEvaluation.evaluationOnSurrogatePowerUsage,
+                            ind,
+                            gen,
+                            ngen,
+                            topology,
+                            trafficDesign,
+                            maxMemoryDemand,
+                        )
+                        for ind in populationEG
+                    ]
+                elif self._useGAHAOffline and makGAUtils is not None:
+                    futures = [
+                        executor.submit(
+                            makGAUtils.getTotalDelay,
+                            ind,
+                        )
+                        for ind in populationEG
+                    ]
+                else:
+                    futures = [
+                        executor.submit(
+                            HybridEvaluation.evaluationOnSurrogate,
+                            ind,
+                            gen,
+                            ngen,
+                            topology,
+                            trafficDesign,
+                            maxMemoryDemand,
+                        )
+                        for ind in populationEG
+                    ]
+
+                for future in as_completed(futures):
+                    result: "tuple[int, float, float]" = future.result()
+                    ind: "Individual" = pop[result[0]]
+                    ind.fitness.values = (result[1], result[2])
+        else:
+            for i, decodedInd in enumerate(populationEG):
+                if type == POWER:
+                    ar, latency = HybridEvaluation.evaluationOnEmulatorPowerUsage(
+                        decodedInd,
+                        fgrs,
                         gen,
                         ngen,
-                        topology,
+                        sendEGs,
+                        deleteEGs,
                         trafficDesign,
+                        telemetry,
+                        topology,
                         maxMemoryDemand,
                     )
-                    for ind in populationEG
-                ]
-            else:
-                futures = [
-                    executor.submit(
-                        HybridEvaluation.evaluationOnSurrogate,
-                        ind,
+                else:
+                    ar, latency = HybridEvaluation.evaluationOnEmulator(
+                        decodedInd,
+                        fgrs,
                         gen,
                         ngen,
-                        topology,
+                        sendEGs,
+                        deleteEGs,
                         trafficDesign,
+                        trafficGenerator,
+                        topology,
                         maxMemoryDemand,
+                        self._retrain,
                     )
-                    for ind in populationEG
-                ]
+                pop[i].fitness.values = (ar, latency)
 
-            for future in as_completed(futures):
-                result: "tuple[int, float, float]" = future.result()
-                ind: "Individual" = pop[result[0]]
-                ind.fitness.values = (result[1], result[2])
         endTime: float = timeit.default_timer()
         TUI.appendToSolverLog(
             f"Finished generation {gen} in {endTime - startTime} seconds."
@@ -374,7 +443,10 @@ class HybridEvolution:
             f"Qualified Individuals: {len(qualifiedIndividuals)}/{minQualifiedInds}"
         )
 
-        if len(qualifiedIndividuals) >= minQualifiedInds:
+        if self._finalValidation and len(qualifiedIndividuals) == 0:
+            qualifiedIndividuals = hof
+
+        if len(qualifiedIndividuals) >= minQualifiedInds and self._evaluateOffline:
             TUI.appendToSolverLog(
                 f"Finished the evolution of weights using surrogate at generation {gen}."
             )
@@ -541,6 +613,8 @@ class HybridEvolution:
         self._toolbox.register("mutate", self._mutate, indpb=self._indPb)
         self._toolbox.register("select", tools.selNSGA2)
 
+        timeTaken: float = 0.0
+        startTimeLimit: float = timeit.default_timer()
         pop: "list[Individual]" = (
             self._toolbox.population(n=popSize)
             if not retainPopulation or len(HybridEvolution._population) == 0
@@ -577,8 +651,9 @@ class HybridEvolution:
         HybridEvolution._population = deepcopy(pop)
 
         gen = gen + 1
-
-        while len(qualifiedIndividuals) < MIN_QUAL_IND and gen <= NGEN:
+        timeTaken = timeTaken + ((timeit.default_timer() - startTimeLimit)/(60 * 60))
+        while len(qualifiedIndividuals) < MIN_QUAL_IND and gen <= NGEN and timeTaken < TIME_LIMIT:
+            startTimeLimit: float = timeit.default_timer()
             TUI.appendToSolverLog(
                 f"Qualified individuals less than {MIN_QUAL_IND}. Continuing evolution."
             )
@@ -614,6 +689,7 @@ class HybridEvolution:
             )
             gen = gen + 1
             HybridEvolution._population = deepcopy(pop)
+            timeTaken = timeTaken + ((timeit.default_timer() - startTimeLimit)/(60 * 60))
 
         expEndTime: float = timeit.default_timer()
         TUI.appendToSolverLog(f"Time taken: {expEndTime - expStartTime:.2f}s")

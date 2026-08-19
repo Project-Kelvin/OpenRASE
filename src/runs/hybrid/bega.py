@@ -9,6 +9,7 @@ from time import sleep
 from typing import Any
 import click
 import numpy as np
+from packages.python.shared.models.sfc_request import SFCRequest
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
 from shared.models.traffic_design import TrafficDesign
@@ -37,12 +38,50 @@ def setRandomSeed() -> int:
 
     return seed
 
+def generateSFCRs(noOfCopies: int) -> "list[SFCRequest]":
+    """
+    Generate the SFC Requests.
+
+    Parameters:
+        noOfCopies (int): The number of copies of each SFC Request to generate.
+
+    Returns:
+        list[SFCRequest]: A list of SFC Requests.
+    """
+
+    sfcrsToSend: "list[SFCRequest]" = []
+    with open(
+        os.path.join(
+            getConfig()["repoAbsolutePath"],
+            "src",
+            "runs",
+            "hybrid",
+            "configs",
+            "sfcrs.json",
+        ),
+        "r",
+        encoding="utf8",
+    ) as f:
+        sfcrs = json.load(f)
+
+        for i, sfcr in enumerate(sfcrs):
+            for c in range(noOfCopies):
+                sfcrToSend: SFCRequest = sfcr.copy()
+                sfcrToSend["sfcrID"] = f"sfcr{i}-{c}"
+                sfcrsToSend.append(sfcrToSend)
+
+    return sfcrsToSend
+
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
 @click.option("--mutation", is_flag=True, default=False, help="Run in mutation probability hyperparameter tuning mode.")
 @click.option("--cx", is_flag=True, default=False, help="Run in crossover probability hyperparameter tuning mode.")
 @click.option("--env", type=click.Choice(["dc", "milan", "25n50e"], case_sensitive=False), default="dc", help="Environment to run the experiments in.")
-def run(headless: bool, mutation: bool, cx: bool, env: str) -> None:
+@click.option("--test", is_flag=True, default=False, help="Run in test mode.")
+@click.option("--gaha", is_flag=False, default=False, help="Use GAHA's offline evaluator.")
+@click.option("--online", is_flag=False, default=False, help="Use online evaluation only.")
+@click.option("--paper", type=click.Choice(["benns", "genesis"], case_sensitive=False), default="genesis", help="Paper to run the experiments for.")
+def run(headless: bool, mutation: bool, cx: bool, env: str, test: bool, online: bool, gaha: bool, paper: str) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -51,6 +90,10 @@ def run(headless: bool, mutation: bool, cx: bool, env: str) -> None:
         mutation (bool): Whether to run in mutation probability hyperparameter tuning mode.
         cx (bool): Whether to run in crossover probability hyperparameter tuning mode.
         env (str): The environment to run the experiments in.
+        test (bool): Whether to run in the test mode.
+        gaha (bool): Use GAHA's offline evaluator.
+        online (bool): Use online evaluation only.
+        paper (float): Paper to run the experiment for
 
     Returns:
         None
@@ -60,31 +103,44 @@ def run(headless: bool, mutation: bool, cx: bool, env: str) -> None:
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     delay: int = 1
+    selectedExperiments: list[tuple[int, float, bool, float, float]] = []
 
     #(15, 0.1, False, 10, 0.1) works
     experiments: list[tuple[int, float, bool, float, float]] = [
-        (15, 0.23, False, 5, 0.5), # Used for ablation (DC)
-        (20, 0.1, False, 10, 1), # Used for hyperparameter tuning in GENESIS and DC,
+        (15, 0.23, False, 5, 0.5), # Used for ablation and DC
+        (20, 0.1, False, 10, 1), # Used for hyperparameter tuning in GENESIS (DC)
         (20, 0.1, False, 10, 1), # Used VNF embedding only experiment (Milan)
-        (10, 0.1, False, 10, 1), # Used VNF embedding only experiment (25N50E),
-        (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA,
+        (10, 0.1, False, 10, 1), # Used VNF embedding only experiment (25N50E)
+        (4, 0.1, False, 10, 2), # Used for BEGA BENNS DC,
+        (6, 0.1, False, 10, 1), # Used for BEGA BENNS Milan,
+        (5, 0.1, False, 10, 1), # Used for BEGA BENNS 25n50e,
+        (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA/REGA
     ]
 
     if mutation or cx:
-        experiments = [experiments[4]]
+        selectedExperiments = [experiments[1]]
+    elif paper == "genesis":
+        if env == "dc":
+            selectedExperiments = [experiments[0]]
 
-    if env == "dc":
-        experiments = [experiments[0]]
+        elif env == "milan":
+            selectedExperiments = [experiments[2]]
 
-    if env == "milan":
-        experiments = [experiments[2]]
+        elif env == "25n50e":
+            selectedExperiments = [experiments[3]]
+    elif paper == "benns":
+        if env == "dc":
+            selectedExperiments = [experiments[4]]
 
-    if env == "25n50e":
-        experiments = [experiments[3]]
+        elif env == "milan":
+            selectedExperiments = [experiments[5]]
+
+        elif env == "25n50e":
+            selectedExperiments = [experiments[6]]
 
     noOfRuns: int = 20
 
-    for experiment in experiments:
+    for experiment in selectedExperiments:
         noOfCopy, trafficScale, trafficPattern, linkBandwidth, noOfCPUs = experiment
         exp: dict[str, Any] = dict(
             {
@@ -212,87 +268,122 @@ def run(headless: bool, mutation: bool, cx: bool, env: str) -> None:
                         requests.append(self._requests.get())
                         sleep(0.1)
 
-                    if mutation:
-                        for mutPb in mutationProbabilities:
-                            for indPb in individualProbabilities:
-                                for i in range(noOfRuns):
-                                    TUI.appendToSolverLog(
-                                        f"Running experiment {exp['name']} with mutPb={mutPb} and indPb={indPb}."
-                                    )
-                                    seed: int = setRandomSeed()
-                                    linesToWrite: list[str] = [
-                                        f"Seed: {seed}",
-                                    ]
-                                    solve(
-                                        topology,
-                                        requests,
-                                        self._orchestrator.sendEmbeddingGraphs,
-                                        self._orchestrator.deleteEmbeddingGraphs,
-                                        trafficDesign,
-                                        self._trafficGenerator,
-                                        self._orchestrator.getTelemetry(),
-                                        f"{exp['name']}_mutPb{mutPb}_indPb{indPb}_{i}",
-                                        mutPb = mutPb,
-                                        indPb = indPb,
-                                        evaluateOnline = False,
-                                        linesToWrite=linesToWrite
-                                    )
-                    elif cx:
-                        for cxPb in crossoverProbabilities:
-                            for i in range(noOfRuns):
-                                TUI.appendToSolverLog(
-                                    f"Running experiment {exp['name']} with cxPb={cxPb}."
-                                )
-                                seed: int = setRandomSeed()
-                                linesToWrite: list[str] = [
-                                    f"Seed: {seed}",
-                                ]
-                                solve(
-                                    topology,
-                                    requests,
-                                    self._orchestrator.sendEmbeddingGraphs,
-                                    self._orchestrator.deleteEmbeddingGraphs,
-                                    trafficDesign,
-                                    self._trafficGenerator,
-                                    self._orchestrator.getTelemetry(),
-                                    f"{exp['name']}_cxPb{cxPb}_{i}",
-                                    cxpPb = cxPb,
-                                    evaluateOnline = False,
-                                    linesToWrite=linesToWrite
-                                )
-                    else:
-                        TUI.appendToSolverLog(
-                            f"Running experiment {exp['name']} with default parameters."
-                        )
+                    TUI.appendToSolverLog(
+                        f"Running experiment {exp['name']} with default parameters."
+                    )
 
-                        for i in range(noOfRuns):
-                            TUI.appendToSolverLog(
-                                f"Running experiment round {i}."
-                            )
-                            seed: int = setRandomSeed()
-                            linesToWrite: list[str] = [
-                                f"Seed: {seed}",
-                            ]
-                            solve(
-                                topology,
-                                requests,
-                                self._orchestrator.sendEmbeddingGraphs,
-                                self._orchestrator.deleteEmbeddingGraphs,
-                                trafficDesign,
-                                self._trafficGenerator,
-                                self._orchestrator.getTelemetry(),
-                                f"{exp['name']}_{i}",
-                                linesToWrite=linesToWrite
-                            )
+                    for i in range(noOfRuns):
+                        TUI.appendToSolverLog(
+                            f"Running experiment round {i}."
+                        )
+                        seed: int = setRandomSeed()
+                        linesToWrite: list[str] = [
+                            f"Seed: {seed}",
+                        ]
+                        solve(
+                            topology,
+                            requests,
+                            self._orchestrator.sendEmbeddingGraphs,
+                            self._orchestrator.deleteEmbeddingGraphs,
+                            trafficDesign,
+                            self._trafficGenerator,
+                            self._orchestrator.getTelemetry(),
+                            f"{exp['name']}_{i}",
+                            linesToWrite=linesToWrite,
+                            useGAHAOffline = gaha,
+                            evaluateOffline = not online,
+                            finalValidation = online,
+                        )
 
                 except Exception as e:
                     TUI.appendToSolverLog(f"Error: {str(e)}", True)
 
                 TUI.appendToSolverLog("Finished experiment.")
 
-        sfcEm: SFCEmulator = SFCEmulator(FGGen, HybridSolver, headless)
-        sfcEm.startTest(
-            topology,
-            trafficDesign,
-        )
-        sfcEm.end()
+        if mutation:
+            TUI.disable()
+            sfcrsToSend: "list[SFCRequest]" = generateSFCRs(exp["noOfCopies"])
+            for mutPb in mutationProbabilities:
+                for indPb in individualProbabilities:
+                    for i in range(noOfRuns):
+                        TUI.appendToSolverLog(
+                            f"Running experiment {exp['name']} with mutPb={mutPb} and indPb={indPb}."
+                        )
+                        seed: int = setRandomSeed()
+                        linesToWrite: list[str] = [
+                            f"Seed: {seed}",
+                        ]
+                        solve(
+                            topology,
+                            sfcrsToSend,
+                            None,
+                            None,
+                            trafficDesign,
+                            None,
+                            None,
+                            f"{exp['name']}_mutPb{mutPb}_indPb{indPb}_{i}",
+                            mutPb = mutPb,
+                            indPb = indPb,
+                            evaluateOnline = False,
+                            linesToWrite=linesToWrite,
+                            useGAHAOffline = gaha,
+                            dirName = "bega_mutation"
+                        )
+        elif cx:
+            TUI.disable()
+            sfcrsToSend: "list[SFCRequest]" = generateSFCRs(exp["noOfCopies"])
+            for cxPb in crossoverProbabilities:
+                for i in range(noOfRuns):
+                    TUI.appendToSolverLog(
+                        f"Running experiment {exp['name']} with cxPb={cxPb}."
+                    )
+                    seed: int = setRandomSeed()
+                    linesToWrite: list[str] = [
+                        f"Seed: {seed}",
+                    ]
+                    solve(
+                        topology,
+                        sfcrsToSend,
+                        None,
+                        None,
+                        trafficDesign,
+                        None,
+                        None,
+                        f"{exp['name']}_cxPb{cxPb}_{i}",
+                        cxpPb = cxPb,
+                        evaluateOnline = False,
+                        linesToWrite=linesToWrite,
+                        useGAHAOffline = gaha,
+                        dirName = "bega_cx"
+                    )
+        elif test:
+            TUI.disable()
+            sfcrsToSend: "list[SFCRequest]" = generateSFCRs(exp["noOfCopies"])
+            for i in range(noOfRuns):
+                TUI.appendToSolverLog(
+                    f"Running experiment {exp['name']}."
+                )
+                seed: int = setRandomSeed()
+                linesToWrite: list[str] = [
+                    f"Seed: {seed}",
+                ]
+                solve(
+                    topology,
+                    sfcrsToSend,
+                    None,
+                    None,
+                    trafficDesign,
+                    None,
+                    None,
+                    f"{exp['name']}_{i}",
+                    evaluateOnline = False,
+                    linesToWrite=linesToWrite,
+                    useGAHAOffline = gaha
+                )
+        else:
+            sfcEm: SFCEmulator = SFCEmulator(FGGen, HybridSolver, headless)
+            sfcEm.startTest(
+                topology,
+                trafficDesign,
+            )
+            sfcEm.end()

@@ -39,7 +39,11 @@ def solve(
     cxpPb: float = CXPB,
     indPb: float = INDPB,
     evaluateOnline: bool = True,
-    linesToWrite: list[str] = []
+    linesToWrite: list[str] = [],
+    useGAHAOffline: bool = False,
+    evaluateOffline: bool = True,
+    finalValidation = False,
+    dirName: str = "bega"
 ) -> None:
     """
     Solves the problem using a GA for VNF embedding and Dijkstra for link embedding.
@@ -56,8 +60,12 @@ def solve(
         mutPb (float): the mutation probability.
         cxpPb (float): the crossover probability.
         indPb (float): the individual mutation probability.
-        evaluateOnline (bool): whether to evaluate the solution online or offline.
+        evaluateOnline (bool): whether to evaluate online.
         linesToWrite (list[str]): list of lines to write to the log file.
+        useGAHAOffline (bool): use GAHA's offline evaluator.
+        evaluateOffline (bool): whether to evaluate offline.
+        finalValidation (bool): whether to validate the best final solution irrespective of convergence.
+        dirName (str): directory name.
 
     Returns:
         None
@@ -68,7 +76,7 @@ def solve(
         random.shuffle(sfcr["vnfs"])
 
     hybridEvolution: HybridEvolution = HybridEvolution(
-        "bega",
+        dirName,
         decodePop,
         generateRandomIndividual,
         tools.cxTwoPoint,
@@ -78,7 +86,10 @@ def solve(
         cxpPb,
         indPb,
         evaluateOnline=evaluateOnline,
-        rejectVNF=rejectVNF
+        rejectVNF=rejectVNF,
+        useGAHAOffline = useGAHAOffline,
+        evaluateOffline = evaluateOffline,
+        finalValidation = finalValidation
     )
 
     hybridEvolution.hybridSolve(

@@ -68,6 +68,7 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retra
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     delay: int = 1
+    selectedExperiments: list[tuple[int, float, bool, float, float]] = []
 
     #(15, 0.1, False, 10, 0.1) works
     experiments: list[tuple[int, float, bool, float, float]] = [
@@ -79,20 +80,20 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retra
     ]
 
     if mutation or cx:
-        experiments = [experiments[4]]
+        selectedExperiments = [experiments[1]]
 
-    if env == "dc":
-        experiments = [experiments[0]]
+    elif env == "dc":
+        selectedExperiments = [experiments[4]]
 
-    if env == "milan":
-        experiments = [experiments[2]]
+    elif env == "milan":
+        selectedExperiments = [experiments[2]]
 
-    if env == "25n50e":
-        experiments = [experiments[3]]
+    elif env == "25n50e":
+        selectedExperiments = [experiments[3]]
 
     noOfRuns: int = 20
 
-    for experiment in experiments:
+    for experiment in selectedExperiments:
         noOfCopy, trafficScale, trafficPattern, linkBandwidth, noOfCPUs = experiment
         exp: dict[str, Any] = dict(
             {
@@ -297,7 +298,8 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retra
                                 mutPb = mutPb,
                                 indPb = indPb,
                                 evaluateOnline = False,
-                                linesToWrite=linesToWrite
+                                linesToWrite=linesToWrite,
+                                dirName="rega_mutation"
                             )
             elif cx:
                 for cxPb in crossoverProbabilities:
@@ -320,7 +322,8 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retra
                             f"{exp['name']}_cxPb{cxPb}_{i}",
                             cxPb = cxPb,
                             evaluateOnline = False,
-                            linesToWrite=linesToWrite
+                            linesToWrite=linesToWrite,
+                            dirName="rega_cx"
                         )
             if test:
                 for i in range(noOfRuns):

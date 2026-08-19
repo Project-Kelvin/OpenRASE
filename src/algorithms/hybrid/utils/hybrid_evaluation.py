@@ -98,7 +98,7 @@ class HybridEvaluation:
 
             if isAvgOnly:
                 simulationData = [
-                    {eg["sfcID"]: np.mean(simTrafficDesign) for eg in egs}
+                    {eg["sfcID"]: np.median(simTrafficDesign) for eg in egs}
                 ]
             else:
                 simulationData = [
