@@ -7,7 +7,7 @@ from algorithms.ga_dijkstra_algorithm.bega_individual import convertIndividualTo
 from algorithms.mak_ga.gaha_individual import convertIndividualToEmbeddingGraphs as convertGAHAIndividualToEG, generateRandomIndividual as generateRandomGAHAIndividual
 from algorithms.utils.graphs import convertSFCRsToEGs
 import click
-from typing import Any, cast
+from typing import Any, Union, cast
 import numpy as np
 from packages.python.shared.constants.embedding_graph import TERMINAL
 from packages.python.shared.utils.config import getConfig
@@ -344,22 +344,22 @@ def run(algo: str, dijkstra: bool, chain: bool, gaussian: bool, relu: bool, tanh
         eg: EmbeddingGraph = {}
         egs: list[EmbeddingGraph] = []
         record: InputOutputRecord = InputOutputRecord()
+        individual: Union[Individual, None] = None
         if algo == "genesis":
             GenesisUtils.init(sfcrs, topology, 2, 0.00, 1.0, np.pi)
-            individual: Individual = GenesisUtils.generateRandomGenesisIndividual(Individual, topology, sfcrs)
+            individual = GenesisUtils.generateRandomGenesisIndividual(Individual, topology, sfcrs)
             population.append(individual)
-            record.input = list(individual)
             print("Random individual generated.")
             decodedIndividual: DecodedIndividual = GenesisUtils.decodeIndividual(cast(GenesisIndividual, individual), 0, topology, sfcrs, dijkstra=dijkstra, staticChain=chain, disableGaussian=gaussian, activation="relu" if relu else "tanh" if tanh else "linear" if linear else "sin")
             print("Individual decoded.")
             egs = decodedIndividual[1]
         elif algo == "gaha":
-            individual: Individual = generateRandomGAHAIndividual(Individual, convertSFCRsToEGs(sfcrs), topology, 0.0)
+            individual = generateRandomGAHAIndividual(Individual, convertSFCRsToEGs(sfcrs), topology, 0.0)
             population.append(individual)
             print("Random individual generated.")
             egs, _, _, _, _= convertGAHAIndividualToEG(individual, topology, convertSFCRsToEGs(sfcrs), 0)
         elif algo == "bega":
-            individual: Individual = generateRandomBEGAIndividual(Individual, topology, sfcrs, 0.0)
+            individual = generateRandomBEGAIndividual(Individual, topology, sfcrs, 0.0)
             population.append(individual)
             print("Random individual generated.")
             egs, _, _, _ = convertBEGAIndividualToEG(individual, sfcrs, topology, 0)
@@ -419,6 +419,7 @@ def run(algo: str, dijkstra: bool, chain: bool, gaussian: bool, relu: bool, tanh
         hostCCCombinationsIndex: int = getCombinationIndex((egCcOrder, egHostOrder), hostCCCombinations)
         hostLinksCombinationsIndex: int = getCombinationIndex((egHostOrder, egLinks), hostLinksCombinations)
 
+        record.input = list(individual) if individual is not None else []
         record.output = [generatedCombination]
         record.id = dbCombinationIndex
         database[dbCombinationIndex] += 1
