@@ -223,12 +223,8 @@ class HybridEvolution:
         offspring: "list[Individual]" = list(map(self._toolbox.clone, pop))
         random.shuffle(offspring)
 
+
         for child1, child2 in zip(offspring[::2], offspring[1::2]):
-            if self._rejectVNF:
-                if random.random() <= 0.5:
-                    child1 = self._rejectVNF(child1, self._rejectionRate)
-                if random.random() <= 0.5:
-                    child2 = self._rejectVNF(child2, self._rejectionRate)
             if random.random() < self._cxpPb:
 
                 self._toolbox.mate(child1, child2)
@@ -238,18 +234,14 @@ class HybridEvolution:
                 child1.id = uuid4()
                 child2.id = uuid4()
 
-            # if self._rejectVNF:
-            #     childToReject: int = random.sample([0, 1], k=1)[0]
-            #     if childToReject == 0:
-            #         child1 = self._rejectVNF(child1, self._rejectionRate)
-            #     else:
-            #         child2 = self._rejectVNF(child2, self._rejectionRate)
-
         for mutant in offspring:
             if random.random() < self._mutPb:
                 self._toolbox.mutate(mutant)
 
                 del mutant.fitness.values
+
+            if self._rejectVNF:
+                self._rejectVNF(mutant, self._rejectionRate)
 
         return offspring
 
