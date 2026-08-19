@@ -127,15 +127,16 @@ def mutate(individual: Individual, indpb: float) -> Individual:
         Individual: the mutated individual.
     """
 
-    for ind in individual:
+    for i, ind in enumerate(individual):
         if random.random() < indpb:
             indices: "list[int]" = list(range(len(ind)))
             if 1 in ind:
                 trueIndex: int = ind.index(1)
                 indices.remove(trueIndex)
 
-            ind = [0] * len(ind)
-            ind[random.choice(indices)] = 1
+            newInd: "list[int]" = [0] * len(ind)
+            newInd[random.choice(indices)] = 1
+            individual[i] = newInd
 
     return individual
 
