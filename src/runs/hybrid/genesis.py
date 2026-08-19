@@ -93,7 +93,9 @@ def generateSFCRs(noOfCopies: int) -> "list[SFCRequest]":
 @click.option("--neurons", is_flag=True, default=False, help="Test the number of neurons in the neural network.")
 @click.option("--random-host", is_flag=True, default=False, help="Use random host ids instead of the ones in the topology.")
 @click.option("--himode", type=click.Choice(["hard", "easy"], case_sensitive=False), default="hard", help="Run in hi or genesis mode.")
-def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool, env: str, retrain: bool, offline: bool, test: bool, random_input_weights: bool, neurons: bool, random_host: bool, himode: str) -> None:
+@click.option("--sigma-value", type=float, default=-1.0, help="The sigma value for hyperparameter tuning.")
+@click.option("--runs", type=int, default=20, help="Number of test runs.")
+def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool, env: str, retrain: bool, offline: bool, test: bool, random_input_weights: bool, neurons: bool, random_host: bool, himode: str, sigma_value: float, runs: int) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -116,6 +118,8 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
         neurons (bool): Whether to test the number of neurons in the neural network.
         random_host (bool): Whether to use random host ids instead of the ones in the topology.
         himode (str): Whether to run in hi or genesis mode.
+        sigma_value (float): The sigma value for hyperparameter tuning.
+        runs (int): Number of test runs.
 
     Returns:
         None
@@ -125,7 +129,9 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     rejectionRates: list[float] = [0.0, 0.05, 0.07, 0.1]
-    sigmas: list[float] = [0.0, 1.0, 2.0, 4.0]
+    sigmas: list[float] = [1.0, 2.0, 4.0]
+    if sigma_value != -1.0:
+        sigmas = [sigma_value]
     activations: list[str] = ["tanh", "sin", "relu", "linear"]
     initLimit: list[float] = [1, 2, np.pi, 2 * np.pi]
     noOfNeurons: list[int] = [1, 4, 6]
@@ -139,7 +145,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
         (10, 0.1, False, 10, 1), # Used for 25N50E
         (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA,
         (8, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Easy,
-        (12, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Hard,
+        (10, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Hard,
     ]
 
     if mutation or cx or rr or sigma or activation:
@@ -159,7 +165,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
     elif env == "25n50e":
         selectedExperiments = [experiments[3]]
 
-    noOfRuns: int = 20
+    noOfRuns: int = runs
 
     for experiment in selectedExperiments:
         noOfCopy, trafficScale, trafficPattern, linkBandwidth, noOfCPUs = experiment
