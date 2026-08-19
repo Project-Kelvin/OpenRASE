@@ -118,7 +118,7 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, test: bool, online: 
     ]
 
     if mutation or cx:
-        selectedExperiments = [experiments[1]]
+        selectedExperiments = [experiments[7]]
     elif paper == "genesis":
         if env == "dc":
             selectedExperiments = [experiments[0]]
