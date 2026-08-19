@@ -27,11 +27,11 @@ MAX_LATENCY: int = 100
 MAX_POWER: int = 300
 MIN_QUAL_IND: int = 1
 META_CXPB: float = 1.0
-META_MUTPB: float = 0.5
+META_MUTPB: float = 0.7
 GENESIS_CXPB: float = 1.0
-GENESIS_MUTPB: float = 0.5
-META_INDPB: float = 0.5
-GENESIS_INDPB: float = 0.5
+GENESIS_MUTPB: float = 0.7
+META_INDPB: float = 0.7
+GENESIS_INDPB: float = 0.7
 DOMINANCE_THRESHOLD: float = 0.0
 
 
