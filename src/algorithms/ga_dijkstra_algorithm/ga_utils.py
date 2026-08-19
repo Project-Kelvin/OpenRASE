@@ -127,20 +127,17 @@ def mutate(individual: Individual, indpb: float) -> Individual:
         Individual: the mutated individual.
     """
 
-    mutatedIndividual: "list[list[int]]" = deepcopy(individual)
-
-    for ind in mutatedIndividual:
+    for ind in individual:
         if random.random() < indpb:
             indices: "list[int]" = list(range(len(ind)))
-            try:
+            if 1 in ind:
                 trueIndex: int = ind.index(1)
                 indices.remove(trueIndex)
-            except ValueError:
-                pass
+
             ind = [0] * len(ind)
             ind[random.choice(indices)] = 1
 
-    return mutatedIndividual
+    return individual
 
 
 def algorithm(
@@ -361,6 +358,7 @@ def rejectVNF(individual: Individual, rejectionRate: float = 0.05) -> Individual
 
     for ind in individual:
         if random.random() < rejectionRate:
-            ind[ind.index(1)] = 0
+            if 1 in ind:
+                ind[ind.index(1)] = 0
 
     return individual

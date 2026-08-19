@@ -112,6 +112,11 @@ def convertIndividualToEmbeddingGraph(
                     nodes[fgr["sfcID"]].append(BRANCH)
 
             if embeddingNotFound[0]:
+                if "host" in vnf and vnf["host"]["id"] == SERVER:
+                    return
+
+                offset[0] = offset[0] + 1
+
                 return
 
             if "host" in vnf and vnf["host"]["id"] == SERVER:
@@ -121,7 +126,7 @@ def convertIndividualToEmbeddingGraph(
                 return
 
             else:
-                try:
+                if 1 in individual[offset[0]]:
                     vnf["host"] = {"id": f"h{individual[offset[0]].index(1) + 1}"}
                     # pylint: disable=cell-var-from-loop
                     if nodes[fgr["sfcID"]][-1] != vnf["host"]["id"]:
@@ -142,8 +147,9 @@ def convertIndividualToEmbeddingGraph(
                         embeddingData[vnf["host"]["id"]] = {
                             fgr["sfcID"]: [[vnf["vnf"]["id"], depth]]
                         }
-                except ValueError:
+                else:
                     embeddingNotFound[0] = True
+                    offset[0] = offset[0] + 1
 
         traverseVNF(vnfs, parseVNF, embeddingNotFound, offset)
         if not embeddingNotFound[0]:
