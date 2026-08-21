@@ -78,10 +78,11 @@ def generateSFCRs(noOfCopies: int) -> "list[SFCRequest]":
 @click.option("--cx", is_flag=True, default=False, help="Run in crossover probability hyperparameter tuning mode.")
 @click.option("--env", type=click.Choice(["dc", "milan", "25n50e"], case_sensitive=False), default="dc", help="Environment to run the experiments in.")
 @click.option("--test", is_flag=True, default=False, help="Run in test mode.")
-@click.option("--gaha", is_flag=False, default=False, help="Use GAHA's offline evaluator.")
-@click.option("--online", is_flag=False, default=False, help="Use online evaluation only.")
+@click.option("--gaha", is_flag=True, default=False, help="Use GAHA's offline evaluator.")
+@click.option("--online", is_flag=True, default=False, help="Use online evaluation only.")
 @click.option("--paper", type=click.Choice(["benns", "genesis"], case_sensitive=False), default="genesis", help="Paper to run the experiments for.")
-def run(headless: bool, mutation: bool, cx: bool, env: str, test: bool, online: bool, gaha: bool, paper: str) -> None:
+@click.option("--pop-size", type=int, default=20, help="The population size.")
+def run(headless: bool, mutation: bool, cx: bool, env: str, test: bool, online: bool, gaha: bool, paper: str, pop_size: int) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -93,7 +94,8 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, test: bool, online: 
         test (bool): Whether to run in the test mode.
         gaha (bool): Use GAHA's offline evaluator.
         online (bool): Use online evaluation only.
-        paper (float): Paper to run the experiment for
+        paper (float): Paper to run the experiment for.
+        pop_size (int): The population size.
 
     Returns:
         None
@@ -105,6 +107,15 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, test: bool, online: 
     delay: int = 1
     selectedExperiments: list[tuple[int, float, bool, float, float]] = []
 
+    tunedIndPb: float = 0.7
+    tunedGenePb: float = 1.0
+    tunedCxPb: float = 0.7
+
+    if pop_size == 2:
+        tunedIndPb = 0.7
+        tunedGenePb = 1.0
+        tunedCxPb = 0.5
+
     #(15, 0.1, False, 10, 0.1) works
     experiments: list[tuple[int, float, bool, float, float]] = [
         (15, 0.23, False, 5, 0.5), # Used for ablation and DC
@@ -114,11 +125,12 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, test: bool, online: 
         (4, 0.1, False, 10, 2), # Used for BEGA BENNS DC,
         (6, 0.1, False, 10, 1), # Used for BEGA BENNS Milan,
         (5, 0.1, False, 10, 1), # Used for BEGA BENNS 25n50e,
-        (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA/REGA
+        (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA/REGA,
+        (3, 0.1, False, 10, 1), # Used for BEGA tuning in pop 2,
     ]
 
     if mutation or cx:
-        selectedExperiments = [experiments[7]]
+        selectedExperiments = [experiments[8]]
     elif paper == "genesis":
         if env == "dc":
             selectedExperiments = [experiments[0]]
@@ -292,7 +304,11 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, test: bool, online: 
                             linesToWrite=linesToWrite,
                             useGAHAOffline = gaha,
                             evaluateOffline = not online,
-                            finalValidation = online,
+                            finalValidation = gaha,
+                            mutPb=tunedIndPb,
+                            indPb=tunedGenePb,
+                            cxpPb=tunedCxPb,
+                            popSize=pop_size
                         )
 
                 except Exception as e:
@@ -327,7 +343,8 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, test: bool, online: 
                             evaluateOnline = False,
                             linesToWrite=linesToWrite,
                             useGAHAOffline = gaha,
-                            dirName = "bega_mutation"
+                            dirName = "bega_mutation",
+                            popSize=pop_size
                         )
         elif cx:
             TUI.disable()
@@ -354,7 +371,8 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, test: bool, online: 
                         evaluateOnline = False,
                         linesToWrite=linesToWrite,
                         useGAHAOffline = gaha,
-                        dirName = "bega_cx"
+                        dirName = "bega_cx",
+                        popSize=pop_size
                     )
         elif test:
             TUI.disable()
@@ -378,7 +396,11 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, test: bool, online: 
                     f"{exp['name']}_{i}",
                     evaluateOnline = False,
                     linesToWrite=linesToWrite,
-                    useGAHAOffline = gaha
+                    useGAHAOffline = gaha,
+                    mutPb=tunedIndPb,
+                    indPb=tunedGenePb,
+                    cxpPb=tunedCxPb,
+                    popSize=pop_size
                 )
         else:
             sfcEm: SFCEmulator = SFCEmulator(FGGen, HybridSolver, headless)

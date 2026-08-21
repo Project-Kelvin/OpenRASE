@@ -9,8 +9,8 @@ from datetime import datetime
 import os
 import random
 import timeit
-from typing import Callable, Tuple, Type, Union
-from uuid import uuid4
+from typing import Callable, Tuple, Type, Union, cast
+from uuid import UUID, uuid4
 from algorithms.mak_ga.mak_ga_utils import MakGAUtils
 from deap import base, tools
 import numpy as np
@@ -121,6 +121,7 @@ class HybridEvolution:
         self._rejectionRate: float = rejectionRate
         self._useGAHAOffline: bool = useGAHAOffline
         self._finalValidation: bool = finalValidation
+        self._decodedPop: dict[UUID, DecodedIndividual] = {}
 
     def _select(
         self,
@@ -245,10 +246,33 @@ class HybridEvolution:
 
         return offspring
 
+    def _decodePopulation(self, pop: list[Individual], topology: Topology, sfcrs: list[SFCRequest]) -> list[DecodedIndividual]:
+        """
+        Decodes population by looking up the decoded pop dictionary and using the decodePop function.
+
+        Parameters:
+            pop (list[Individual]): the encoded population.
+            topology (Topology): the network topology.
+            sfcrs (list[SFCRequest]): the SFCR requests to embed.
+
+        Returns:
+            decodedPop (list[DecodedIndividual]): the decoded population.
+        """
+
+        newDecodedPop: list[DecodedIndividual] = self._decodePop(pop, topology, sfcrs)
+        for i, ind in enumerate(newDecodedPop):
+            if ind[5] in self._decodedPop:
+                reIndexedDecodedPop: DecodedIndividual = cast(DecodedIndividual, (i, self._decodedPop[ind[5]][1], self._decodedPop[ind[5]][2], self._decodedPop[ind[5]][3], self._decodedPop[ind[5]][4], self._decodedPop[ind[5]][5]))
+                newDecodedPop[i] = reIndexedDecodedPop
+            else:
+                self._decodedPop[ind[5]] = ind
+
+        return newDecodedPop
+
+
     def _performGeneticOperation(
         self,
         parent: list[Individual],
-        parentPopEG: list[DecodedIndividual],
         pop: list[Individual],
         topology: Topology,
         fgrs: list[SFCRequest],
@@ -268,13 +292,12 @@ class HybridEvolution:
         deleteEGs: "Callable[[list[EmbeddingGraph]], None]",
         hof: tools.ParetoFront,
         type: str = LATENCY,
-    ) -> "tuple[list[Individual], list[Individual], list[DecodedIndividual]]":
+    ) -> "tuple[list[Individual], list[Individual]]":
         """
         Perform the genetic operation.
 
         Parameters:
             parent (list[Individual]): the parent population.
-            parentPopEG (list[DecodedIndividual]): the decoded parent population.
             pop (list[Individual]): the current population.
             topology (Topology): the topology.
             fgrs (list[SFCRequest]): the SFC Requests.
@@ -296,11 +319,11 @@ class HybridEvolution:
             type (str): the optimisation objective type.
 
         Returns:
-            tuple[list[Individual], list[Individual], list[DecodedIndividual]]: the updated population, qualified individuals, and decoded population.
+            tuple[list[Individual], list[Individual]]: the updated population, and qualified individuals.
         """
 
         TUI.appendToSolverLog(f"Decoding population for generation {gen}.")
-        populationEG: "list[DecodedIndividual]" = self._decodePop(pop, topology, fgrs)
+        populationEG: "list[DecodedIndividual]" = self._decodePopulation(pop, topology, fgrs)
         TUI.appendToSolverLog(
             f"Population decoded for generation {gen}. Starting evaluation."
         )
@@ -413,10 +436,6 @@ class HybridEvolution:
         else:
             hof.update(pop)
 
-        popEG: "list[DecodedIndividual]" = GenesisUtils.extractDecodedIndividuals(
-            pop, populationEG + parentPopEG
-        )
-
         ars = [ind.fitness.values[0] for ind in pop]
         latencies = [ind.fitness.values[1] for ind in pop]
 
@@ -435,8 +454,8 @@ class HybridEvolution:
             f"Qualified Individuals: {len(qualifiedIndividuals)}/{minQualifiedInds}"
         )
 
-        if self._finalValidation and len(qualifiedIndividuals) == 0:
-            qualifiedIndividuals = hof
+        if self._finalValidation and len(qualifiedIndividuals) == 0 and gen == ngen:
+            qualifiedIndividuals = list(hof)
 
         if len(qualifiedIndividuals) >= minQualifiedInds and self._evaluateOffline:
             TUI.appendToSolverLog(
@@ -465,9 +484,7 @@ class HybridEvolution:
 
                 emHof = tools.ParetoFront()
 
-                populationEG: "list[DecodedIndividual]" = GenesisUtils.extractDecodedIndividuals(
-                    qualifiedIndividuals, popEG
-                )
+                populationEG = self._decodePopulation(qualifiedIndividuals, topology, fgrs)
                 HybridEvaluation.cacheForOnline(populationEG, trafficDesign)
                 for i, decodedInd in enumerate(populationEG):
                     if type == POWER:
@@ -526,7 +543,7 @@ class HybridEvolution:
                     f"Generation {gen}: Min AR: {emMinAR}, Max Latency: {emMaxLatency}"
                 )
 
-        return pop, qualifiedIndividuals, popEG
+        return pop, qualifiedIndividuals
 
     def hybridSolve(
         self,
@@ -617,8 +634,7 @@ class HybridEvolution:
         )
         gen: int = 1
         hof: tools.ParetoFront = tools.ParetoFront()
-        pop, qualifiedIndividuals, popEG = self._performGeneticOperation(
-            [],
+        pop, qualifiedIndividuals = self._performGeneticOperation(
             [],
             pop,
             topology,
@@ -656,9 +672,8 @@ class HybridEvolution:
             TUI.appendToSolverLog(
                 f"Offspring generated for generation {gen}. Evaluating offspring."
             )
-            pop, qualifiedIndividuals, popEG = self._performGeneticOperation(
+            pop, qualifiedIndividuals = self._performGeneticOperation(
                 pop,
-                popEG,
                 offspring,
                 topology,
                 fgrs,

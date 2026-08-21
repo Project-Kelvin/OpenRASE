@@ -47,6 +47,7 @@ def setRandomSeed() -> int:
 @click.option("--offline", is_flag=True, default=False, help="Run in offline mode.")
 @click.option("--retrain", is_flag=True, default=False, help="Retrain the surrogate model.")
 @click.option("--test", is_flag=True, default=False, help="Run in test mode.")
+
 def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retrain: bool, test: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
@@ -70,17 +71,22 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retra
     delay: int = 1
     selectedExperiments: list[tuple[int, float, bool, float, float]] = []
 
+    tunedIndPb: float = 0.7
+    tunedGenePb: float = 1.0
+    tunedCxPb: float = 0.7
+
     #(15, 0.1, False, 10, 0.1) works
     experiments: list[tuple[int, float, bool, float, float]] = [
         (15, 0.23, False, 5, 0.5), # Used for ablation (DC)
         (20, 0.1, False, 10, 1), # Used for hyperparameter tuning (DC),
         (20, 0.1, False, 10, 1), # Used VNF embedding only experiment (Milan)
         (10, 0.1, False, 10, 1), # Used VNF embedding only experiment (25N50E)
-        (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA
+        (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA,
+        (3, 0.1, False, 10, 1), # Used for BEGA tuning in pop 2,
     ]
 
     if mutation or cx:
-        selectedExperiments = [experiments[4]]
+        selectedExperiments = [experiments[5]]
 
     elif env == "dc":
         selectedExperiments = [experiments[4]]
@@ -242,7 +248,10 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retra
                             f"{exp['name']}_{i}",
                             evaluateOnline = not offline,
                             retrain = retrain,
-                            linesToWrite=linesToWrite
+                            linesToWrite=linesToWrite,
+                            mutPb=tunedIndPb,
+                            indPb=tunedGenePb,
+                            cxPb=tunedCxPb
                         )
 
                 except Exception as e:
@@ -342,7 +351,10 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retra
                         f"{exp['name']}_{i}",
                         evaluateOnline = False,
                         retrain = False,
-                        linesToWrite=linesToWrite
+                        linesToWrite=linesToWrite,
+                        mutPb=tunedIndPb,
+                        indPb=tunedGenePb,
+                        cxPb=tunedCxPb
                     )
         else:
             sfcEm: SFCEmulator = SFCEmulator(FGGen, HybridSolver, headless)

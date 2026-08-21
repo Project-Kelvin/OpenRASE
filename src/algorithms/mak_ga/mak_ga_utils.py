@@ -5,14 +5,14 @@ This defines the util class used by the GA algorithm developed by Mohammad Ali K
 from concurrent.futures import ProcessPoolExecutor
 import copy
 import random
-from typing import cast
+from typing import Tuple, Union, cast
 from algorithms.mak_ga.gaha_individual import convertIndividualToEmbeddingGraphs
 import numpy as np
 from shared.models.sfc_request import SFCRequest
 from algorithms.hybrid.models.individuals import Individual
-from algorithms.mak_ga.models.embedding import EmbeddingData
+from algorithms.mak_ga.models.embedding import EmbeddingData as EmbeddingDataGAHA
 from algorithms.hybrid.utils.demand_predictions import DemandPredictions
-from algorithms.models.embedding import DecodedIndividual, LinkData
+from algorithms.models.embedding import DecodedIndividual, EmbeddingData, LinkData
 from algorithms.hybrid.models.traffic import TimeSFCRequests
 from algorithms.hybrid.utils.scorer import Scorer
 from algorithms.utils.graphs import convertSFCRsToEGs
@@ -37,11 +37,13 @@ class MakGAUtils:
         topology: Topology,
         trafficDesign: TrafficDesign,
         sfcrs: list[SFCRequest],
+        ignoreVNFInstances: bool = True
     ) -> None:
         self._topology = topology
         self._trafficDesign = trafficDesign
         self._sfcrs = sfcrs
         self._fgrs = convertSFCRsToEGs(sfcrs)
+        self._ignoreVNFInstances: bool = ignoreVNFInstances
 
 
     def mutate(self, individual: Individual, indpb: float) -> Individual:
@@ -66,7 +68,7 @@ class MakGAUtils:
         return individual
 
 
-    def decodePop(self, pop: list[Individual], ignoreVNFInstances: bool = False) -> list[DecodedIndividual]:
+    def decodePop(self, pop: list[Individual], ignoreVNFInstances: bool = True) -> list[DecodedIndividual]:
         """
         Decodes a population of individuals into EmbeddingGraph objects and calculates the total cost.
 
@@ -125,9 +127,9 @@ class MakGAUtils:
         )
         maxRate: float = max(designRate)
         if isMax:
-            data = [{eg["sfcID"]: maxRate for eg in egs}]
+            data = cast(TimeSFCRequests,[{eg["sfcID"]: maxRate for eg in egs}])
         else:
-            data = [{eg["sfcID"]: rate for eg in egs} for rate in designRate]
+            data = cast(TimeSFCRequests, [{eg["sfcID"]: rate for eg in egs} for rate in designRate])
         return data
 
     def _isVNFInHost(
@@ -162,13 +164,13 @@ class MakGAUtils:
         )
 
     def _getProcessingDelay(
-        self, data: dict[str, float], decodedIndividual: DecodedIndividual
+        self, data: TimeSFCRequests, decodedIndividual: DecodedIndividual
     ) -> float:
         """
         Calculates the processing delay for a decoded individual based on the topology.
 
         Parameters:
-            data (dict[str, float]): The traffic data containing requests for each SFC.
+            data (TimeSFCRequests): The traffic data containing requests for each SFC.
             decodedIndividual (DecodedIndividual): The decoded individual containing embedding data.
 
         Returns:
@@ -179,27 +181,36 @@ class MakGAUtils:
         cpuCost: float = 0.0
         for eg in egs:
             for host in self._topology["hosts"]:
-                for _ in range(len(decodedIndividual[5][eg["sfcID"]])):
+                if host["id"] not in decodedIndividual[2] or eg["sfcID"] not in decodedIndividual[2][host["id"]]:
+                    continue
+                for _ in range(len(decodedIndividual[2][host["id"]][eg["sfcID"]])):
                     serverCPU, _ = getAvailableCPUAndMemory()
                     cpuAvailable: float = (
                         host["cpu"] if host["cpu"] is not None else serverCPU
                     )
                     totalVNFDemand: float = 0.0
 
-                    for vnf, instance, depth in decodedIndividual[5][eg["sfcID"]]:
+                    embeddingData: Union[EmbeddingData, EmbeddingDataGAHA] = cast(EmbeddingData, decodedIndividual[2]) if self._ignoreVNFInstances else cast(EmbeddingDataGAHA, decodedIndividual[2])
+                    for vnfData in embeddingData[host["id"]][eg["sfcID"]]:
+                        vnf: str = vnfData[0]
+                        instance: int = 0
+                        if self._ignoreVNFInstances:
+                            depth: int = vnfData[1]
+                        else:
+                            instance = vnfData[1]
+                            depth: int = cast(Tuple[str, int, int], vnfData)[2]
+
                         vnfDemand: float = 0.0
                         divisor: int = 2 ** (depth - 1)
-                        if self._isVNFInHost(
-                            eg["sfcID"], vnf, instance, host["id"], decodedIndividual[2]
-                        ):
-                            vnfDemand = MakGAUtils._demandPredictions.getDemand(
-                                vnf,
-                                (
-                                    (data[eg["sfcID"]] / divisor)
-                                    if eg["sfcID"] in data
-                                    else 0
-                                ),
-                            )["cpu"]
+
+                        vnfDemand = MakGAUtils._demandPredictions.getDemand(
+                            vnf,
+                            (
+                                (data[eg["sfcID"]] / divisor)
+                                if eg["sfcID"] in data
+                                else 0
+                            ),
+                        )["cpu"]
 
                         totalVNFDemand += vnfDemand
 
@@ -258,14 +269,14 @@ class MakGAUtils:
 
     def _getQueueDelay(
         self,
-        data: dict[str, float],
+        data: TimeSFCRequests,
         decodedIndividual: DecodedIndividual,
     ) -> float:
         """
         Calculates the queue delay for a decoded individual based on the topology.
 
         Parameters:
-            data (dict[str, float]): The traffic data containing requests for each SFC.
+            data (TimeSFCRequests): The traffic data containing requests for each SFC.
             decodedIndividual (DecodedIndividual): The decoded individual containing embedding data.
 
         Returns:
@@ -331,10 +342,8 @@ class MakGAUtils:
         virtualisationDelay: float = 0.0
         for eg in egs:
             for host in self._topology["hosts"]:
-                for vnf, instance, _depth in decodedIndividual[5][eg["sfcID"]]:
-                    if self._isVNFInHost(
-                        eg["sfcID"], vnf, instance, host["id"], decodedIndividual[2]
-                    ):
+                if host["id"] in decodedIndividual[2] and eg["sfcID"] in decodedIndividual[2][host["id"]]:
+                    for _ in decodedIndividual[2][host["id"]][eg["sfcID"]]:
                         virtualisationDelay += hostVirtualisationDelay
 
         return virtualisationDelay
@@ -360,7 +369,7 @@ class MakGAUtils:
                     embeddingData[host][sfcID].append(
                         (
                             vnf[0],
-                            vnf[2],
+                            vnf[1] if self._ignoreVNFInstances else cast(tuple[str, int, int], vnf)[2],
                         )
                     )
         scores: dict[str, ResourceDemand] = Scorer.getHostScores(
@@ -389,7 +398,7 @@ class MakGAUtils:
         """
         egs: list[EmbeddingGraph] = decodedIndividual[1]
         linkData: LinkData = decodedIndividual[3]
-        data: TimeSFCRequests = self._generateTrafficData(egs, isMax=True)[0]
+        data: dict[str, float] = self._generateTrafficData(egs, isMax=True)[0]
 
         linkRequestData: dict[str, float] = {}
         for eg in egs:
@@ -462,6 +471,9 @@ class MakGAUtils:
             tuple[int, float, float]: The index, acceptance ratio and the latency.
         """
 
+        if decodedIndividual[4] == 0.0:
+            return decodedIndividual[0], decodedIndividual[4], 50000
+
         propagationDelay: float = self._getPropagationDelay(
             decodedIndividual
         )
@@ -472,9 +484,9 @@ class MakGAUtils:
         trafficRate: "list[float]" = getTrafficDesignRate(
             self._trafficDesign, [1] * duration
         )
-        avgData: TimeSFCRequests = {
+        avgData: TimeSFCRequests = cast(TimeSFCRequests, {
             eg["sfcID"]: np.median(trafficRate) for eg in decodedIndividual[1]
-        }
+        })
         processingDelay: float = self._getProcessingDelay(avgData, decodedIndividual)
         queueDelay: float = self._getQueueDelay(
             avgData, decodedIndividual
