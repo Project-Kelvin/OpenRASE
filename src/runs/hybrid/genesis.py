@@ -129,7 +129,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     rejectionRates: list[float] = [0.0, 0.05, 0.07, 0.1]
-    sigmas: list[float] = [1.0, 2.0, 4.0]
+    sigmas: list[float] = [1.0, 2.0, 4.0] # should be 0.0, 1.0, 2.0, 4.0
     if sigma_value != -1.0:
         sigmas = [sigma_value]
     activations: list[str] = ["tanh", "sin", "relu", "linear"]
@@ -144,26 +144,24 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
         (20, 0.1, False, 10, 1), # Used for Milan.
         (10, 0.1, False, 10, 1), # Used for 25N50E
         (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA,
-        (8, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Easy,
-        (10, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Hard,
+        (15, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Easy,
+        (17, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Medium,
+        (19, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Hard,
     ]
 
-    if mutation or cx or rr or sigma or activation:
-        selectedExperiments = [experiments[1]]
-
-    elif init or chain or dijkstra or gaussian or neurons or random_input_weights or random_host or env == "dc":
-        selectedExperiments = [experiments[0]]
-
-    elif env == "milan":
+    if env == "milan":
         if (rr or sigma) and himode == "easy":
             selectedExperiments = [experiments[5]] # HiGENESIS sigma and rr tuning
         elif (rr or sigma) and himode == "hard":
             selectedExperiments = [experiments[6]] # HiGENESIS sigma and rr tuning
         else:
             selectedExperiments = [experiments[2]]
-
     elif env == "25n50e":
         selectedExperiments = [experiments[3]]
+    elif mutation or cx or rr or sigma or activation:
+        selectedExperiments = [experiments[1]]
+    elif init or chain or dijkstra or gaussian or neurons or random_input_weights or random_host or env == "dc":
+        selectedExperiments = [experiments[0]]
 
     noOfRuns: int = runs
 
