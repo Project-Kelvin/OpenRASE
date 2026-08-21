@@ -43,6 +43,7 @@ def solve(
     useGAHAOffline: bool = False,
     evaluateOffline: bool = True,
     finalValidation = False,
+    popSize: int = POP_SIZE,
     dirName: str = "bega"
 ) -> None:
     """
@@ -65,6 +66,7 @@ def solve(
         useGAHAOffline (bool): use GAHA's offline evaluator.
         evaluateOffline (bool): whether to evaluate offline.
         finalValidation (bool): whether to validate the best final solution irrespective of convergence.
+        popSize (int): The population size.
         dirName (str): directory name.
 
     Returns:
@@ -100,7 +102,7 @@ def solve(
         trafficDesign,
         trafficGenerator,
         telemetry,
-        POP_SIZE,
+        popSize,
         experiment,
         linesToWrite=linesToWrite
     )
