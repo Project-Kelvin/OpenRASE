@@ -62,7 +62,7 @@ def generateRandomIndividual(
 
     return individual
 
-def convertIndividualToEmbeddingGraphs(individual: Individual, topology: Topology, fgrs: list[EmbeddingGraph], popIndex: int, ignoreVNFInstances: bool = False) -> tuple[
+def convertIndividualToEmbeddingGraphs(individual: Individual, topology: Topology, fgrs: list[EmbeddingGraph], popIndex: int, ignoreVNFInstances: bool = True) -> tuple[
     list[EmbeddingGraph],
     EmbeddingData,
     LinkData,
