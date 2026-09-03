@@ -21,8 +21,6 @@ rootDir: str = os.path.join(experiments, "root")
 if not os.path.exists(rootDir):
     os.makedirs(rootDir)
 
-currentRootExperimentFile: str = os.path.join(rootDir, f"experiment_{str(datetime.datetime.now())}.csv")
-
 class RootSearchSpace(RootInterface):
     lock = Lock()
 
@@ -34,11 +32,13 @@ class RootSearchSpace(RootInterface):
             popSize (int): The size of the population for the HiGENESIS algorithm.
         """
 
+        self._currentRootExperimentFile: str = os.path.join(rootDir, f"experiment_{str(datetime.datetime.now())}.csv")
         self._popSize: int = popSize
         self._rootSearchSpace: list[int] = self._generateRootSearchSpace()
         self._rootFitness: dict[int, list[float]] = {}
         self._initializeRootFitness()
         self._generateLogHeader()
+
 
     def _generateLogHeader(self) -> None:
         """
@@ -53,7 +53,7 @@ class RootSearchSpace(RootInterface):
         for root in self._rootSearchSpace:
             roots.append(str(root))
 
-        with open(currentRootExperimentFile, "w") as f:
+        with open(self._currentRootExperimentFile, "w") as f:
             f.write(f"Timestamp,{','.join(roots)}\n")
 
     def _generateRootSearchSpace(self) -> list[int]:
@@ -75,7 +75,11 @@ class RootSearchSpace(RootInterface):
         """
 
         for root in self._rootSearchSpace:
-            self._rootFitness[root] = [1.0 / len(self._rootSearchSpace)]  # Initialize with a list of 10 fitness values
+            self._rootFitness[root] = [1.0]  # Initialize with a list of 10 fitness values
+
+        with open(self._currentRootExperimentFile, "a") as f:
+            fitnessValues: list[str] = [str(np.mean(self._rootFitness[root])) for root in self._rootSearchSpace]
+            f.write(f"{str(datetime.datetime.now())},{','.join(fitnessValues)}\n")
 
     def generateRandomRoot(self) -> int:
         """
@@ -89,8 +93,8 @@ class RootSearchSpace(RootInterface):
         """
 
         weights: list[float] = [float(np.mean(self._rootFitness[root])) for root in self._rootSearchSpace]
-        # root: int = random.choices(self._rootSearchSpace, weights=weights, k=1)[0]
-        root: int = 1
+        root: int = random.choices(self._rootSearchSpace, weights=weights, k=1)[0]
+        # root: int = 1
 
         return root
 
@@ -111,7 +115,7 @@ class RootSearchSpace(RootInterface):
                 self._rootFitness[root] = []
             self._rootFitness[root].append(fitness)
 
-        with open(currentRootExperimentFile, "a") as f:
+        with open(self._currentRootExperimentFile, "a") as f:
             fitnessValues: list[str] = [str(np.mean(self._rootFitness[root])) for root in self._rootSearchSpace]
             f.write(f"{str(datetime.datetime.now())},{','.join(fitnessValues)}\n")
 

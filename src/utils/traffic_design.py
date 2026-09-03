@@ -124,14 +124,14 @@ def getTrafficDesignRate(trafficDesign: TrafficDesign, durations: "list[int]") -
 
     return reqps
 
-def generateTrafficDesignFromIoTTrace(dataFile: str, hourDuration: int = 5*60, scale: int = 1000) -> TrafficDesign:
+def generateTrafficDesignFromIoTTrace(dataFile: str, hourDuration: int = 5*60, scale: float = 1000) -> TrafficDesign:
     """
     Generate the Traffic Design from an IoT trace.
 
     Parameters:
         dataFile (str): the CSV data file.
         hourDuration (int): the simulated duration of the hour in seconds.
-        scale (int): the scale factor.
+        scale (float): the scale factor.
 
     Returns:
         TrafficDesign: the Traffic Design.
