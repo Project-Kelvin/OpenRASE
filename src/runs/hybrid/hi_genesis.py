@@ -173,7 +173,7 @@ def run(headless: bool, client: bool, env: str, static_root: bool, genesis: bool
                 "runs",
                 "hybrid",
                 "data",
-                "iot-trace.csv",
+                "iot-trace.csv" if env == "milan" else "iot-trace-2.csv",
             ),
             segmentDuration,
             1000 / trafficScale,
