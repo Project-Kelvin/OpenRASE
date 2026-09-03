@@ -21,20 +21,19 @@ from shared.models.embedding_graph import EmbeddingGraph
 from shared.utils.config import getConfig
 from algorithms.hybrid.constants.genesis_objective import LATENCY, POWER
 from algorithms.hybrid.models.individuals import Individual
-from algorithms.hybrid.utils.genesis import GenesisUtils
 from algorithms.models.embedding import DecodedIndividual
 from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
 from mano.telemetry import Telemetry
 from sfc.traffic_generator import TrafficGenerator
 from utils.tui import TUI
 
-MAX_MEMORY_DEMAND: int = 10
+MAX_MEMORY_DEMAND: int = 100
 MAX_LATENCY: int = 100
 MAX_POWER: int = 300
 MIN_AR: float = 0.95
 MIN_QUAL_IND: int = 1
 NGEN: int = 100
-TIME_LIMIT: int = 1 # in hours
+TIME_LIMIT: int = 24 # in hours
 
 DecodePop = Callable[
     [list[Individual], Topology, list[SFCRequest]], list[DecodedIndividual]
@@ -74,6 +73,7 @@ class HybridEvolution:
         rejectionRate: float = 0.05,
         useGAHAOffline: bool = False,
         finalValidation: bool = False,
+        minimumAR: float = MIN_AR
     ):
         """
         Initializes the HybridEvolution class.
@@ -95,6 +95,7 @@ class HybridEvolution:
             rejectionRate (float): the probability of a VNF being deployed on a host.
             useGAHAOffline (bool): use GAHA's offline evaluator.
             finalValidation (bool): whether to validate the best final solution irrespective of convergence.
+            minimumAR (float): the minimum acceptance ratio required for a solution to be considered valid.
 
         Returns:
             None
@@ -122,6 +123,7 @@ class HybridEvolution:
         self._useGAHAOffline: bool = useGAHAOffline
         self._finalValidation: bool = finalValidation
         self._decodedPop: dict[UUID, DecodedIndividual] = {}
+        self._minimumAR: float = minimumAR
 
     def _select(
         self,
@@ -240,6 +242,7 @@ class HybridEvolution:
                 self._toolbox.mutate(mutant)
 
                 del mutant.fitness.values
+                mutant.id = uuid4()
 
             if self._rejectVNF:
                 self._rejectVNF(mutant, self._rejectionRate)
@@ -645,7 +648,7 @@ class HybridEvolution:
             gen,
             NGEN,
             MAX_MEMORY_DEMAND,
-            MIN_AR,
+            self._minimumAR,
             MAX_LATENCY if type == LATENCY else MAX_POWER,
             MIN_QUAL_IND,
             popSize,
@@ -683,7 +686,7 @@ class HybridEvolution:
                 gen,
                 NGEN,
                 MAX_MEMORY_DEMAND,
-                MIN_AR,
+                self._minimumAR,
                 MAX_LATENCY if type == LATENCY else MAX_POWER,
                 MIN_QUAL_IND,
                 popSize,
@@ -718,7 +721,7 @@ class HybridEvolution:
             expFile.write(f"No. of CPUs: {names[4]}\n")
             expFile.write(f"Time taken: {expEndTime - expStartTime:.2f}\n")
             expFile.write(f"Qualified Individuals: {len(qualifiedIndividuals)}\n")
-            expFile.write(f"Minimum Acceptance Rate: {MIN_AR}\n")
+            expFile.write(f"Minimum Acceptance Rate: {self._minimumAR}\n")
             expFile.write(f"Maximum Latency: {MAX_LATENCY}\n")
             expFile.write(f"Minimum Qualified Individuals: {MIN_QUAL_IND}\n")
             expFile.write(f"Population Size: {popSize}\n")

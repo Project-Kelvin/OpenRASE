@@ -92,10 +92,11 @@ def generateSFCRs(noOfCopies: int) -> "list[SFCRequest]":
 @click.option("--random-input-weights", is_flag=True, default=False, help="Use random input weights instead of predefined weights.")
 @click.option("--neurons", is_flag=True, default=False, help="Test the number of neurons in the neural network.")
 @click.option("--random-host", is_flag=True, default=False, help="Use random host ids instead of the ones in the topology.")
-@click.option("--himode", type=click.Choice(["hard", "easy"], case_sensitive=False), default="hard", help="Run in hi or genesis mode.")
+@click.option("--himode", type=click.Choice(["hard", "easy", "medium", "harder", "hardest", "beast"], case_sensitive=False), default="hard", help="Run in hi or genesis mode.")
 @click.option("--sigma-value", type=float, default=-1.0, help="The sigma value for hyperparameter tuning.")
+@click.option("--rr-value", type=float, default=-1.0, help="The rejection rate value for hyperparameter tuning.")
 @click.option("--runs", type=int, default=20, help="Number of test runs.")
-def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool, env: str, retrain: bool, offline: bool, test: bool, random_input_weights: bool, neurons: bool, random_host: bool, himode: str, sigma_value: float, runs: int) -> None:
+def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: bool, dijkstra: bool, gaussian: bool, activation: str, init: bool, env: str, retrain: bool, offline: bool, test: bool, random_input_weights: bool, neurons: bool, random_host: bool, himode: str, sigma_value: float, runs: int, rr_value: float) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -120,6 +121,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
         himode (str): Whether to run in hi or genesis mode.
         sigma_value (float): The sigma value for hyperparameter tuning.
         runs (int): Number of test runs.
+        rr_value (float): The rejection rate value for hyperparameter tuning.
 
     Returns:
         None
@@ -129,14 +131,18 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
     individualProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     crossoverProbabilities: list[float] = [0.2, 0.5, 0.7, 1.0]
     rejectionRates: list[float] = [0.0, 0.05, 0.07, 0.1]
-    sigmas: list[float] = [1.0, 2.0, 4.0] # should be 0.0, 1.0, 2.0, 4.0
+    sigmas: list[float] = [0.0, 1.0, 2.0, 4.0] # should be 0.0, 1.0, 2.0, 4.0
     if sigma_value != -1.0:
         sigmas = [sigma_value]
+    if rr_value != -1.0:
+        rejectionRates = [rr_value]
     activations: list[str] = ["tanh", "sin", "relu", "linear"]
     initLimit: list[float] = [1, 2, np.pi, 2 * np.pi]
     noOfNeurons: list[int] = [1, 4, 6]
     delay: int = 1
     selectedExperiments: list[tuple[int, float, bool, float, float]] = []
+    dirName: str = "genesis"
+    minAR: float = 0.95
 
     experiments: list[tuple[int, float, bool, float, float]] = [
         (15, 0.23, False, 5, 0.5), # Used for ablation and DC.
@@ -147,13 +153,79 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
         (15, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Easy,
         (17, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Medium,
         (19, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Hard,
+        (21, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Harder,
+        (23, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Hardest,
+        (25, 0.3, False, 5, 0.25), # Used for hyperparameter tuning in HiGENESIS Beast,
     ]
 
     if env == "milan":
         if (rr or sigma) and himode == "easy":
             selectedExperiments = [experiments[5]] # HiGENESIS sigma and rr tuning
-        elif (rr or sigma) and himode == "hard":
+            if sigma_value == -1.0:
+                sigmas = [1.0, 8.0, 16.0]
+            if rr:
+                dirName = "genesis_easy_rr"
+                if rr_value == -1.0:
+                    rejectionRates = [0.05, 0.1, 0.0]
+            else:
+                dirName = "genesis_easy_sigma"
+            minAR = 0.95
+        elif (rr or sigma) and himode == "medium":
             selectedExperiments = [experiments[6]] # HiGENESIS sigma and rr tuning
+            if sigma_value == -1.0:
+                sigmas = [1.0, 8.0, 16.0]
+            if rr:
+                dirName = "genesis_medium_rr"
+                if rr_value == -1.0:
+                    rejectionRates = [0.05, 0.1, 0.0]
+            else:
+                dirName = "genesis_medium_sigma"
+            minAR = 1.0
+        elif (rr or sigma) and himode == "hard":
+            selectedExperiments = [experiments[7]] # HiGENESIS sigma and rr tuning
+            if sigma_value == -1.0:
+                sigmas = [1.0, 8.0, 16.0]
+            if rr:
+                dirName = "genesis_hard_rr"
+                if rr_value == -1.0:
+                    rejectionRates = [0.05, 0.1, 0.0]
+            else:
+                dirName = "genesis_hard_sigma"
+            minAR = 0.90
+        elif (rr or sigma) and himode == "harder":
+            selectedExperiments = [experiments[8]] # HiGENESIS sigma and rr tuning
+            if sigma_value == -1.0:
+                sigmas = [1.0, 8.0, 16.0]
+            if rr:
+                dirName = "genesis_harder_rr"
+                if rr_value == -1.0:
+                    rejectionRates = [0.05, 0.1, 0.0]
+            else:
+                dirName = "genesis_harder_sigma"
+        elif (rr or sigma) and himode == "hardest":
+            selectedExperiments = [experiments[9]] # HiGENESIS sigma and rr tuning
+            if sigma_value == -1.0:
+                sigmas = [1.0, 8.0, 16.0]
+
+            if rr:
+                dirName = "genesis_hardest_rr"
+                if rr_value == -1.0:
+                    rejectionRates = [0.05, 0.1, 0.0]
+            else:
+                dirName = "genesis_hardest_sigma"
+
+            minAR = 0.85
+        elif (rr or sigma) and himode == "beast":
+            selectedExperiments = [experiments[10]] # HiGENESIS sigma and rr tuning
+            if sigma_value == -1.0:
+                sigmas = [1.0, 8.0, 16.0]
+            if rr:
+                dirName = "genesis_beast_rr"
+                if rr_value == -1.0:
+                    rejectionRates = [0.05, 0.1, 0.0]
+            else:
+                dirName = "genesis_beast_sigma"
+            minAR = 0.85
         else:
             selectedExperiments = [experiments[2]]
     elif env == "25n50e":
@@ -288,11 +360,12 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                             self._trafficGenerator,
                             self._orchestrator.getTelemetry(),
                             topology,
-                            "genesis",
+                            dirName,
                             f"{exp['name']}_{i}",
                             retrain=retrain,
                             evaluateOnline = not offline,
-                            linesToWrite=linesToWrite
+                            linesToWrite=linesToWrite,
+                            minimumAR=minAR
                         )
                 except Exception as e:
                     TUI.appendToSolverLog(str(e), True)
@@ -319,7 +392,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                                 None,
                                 None,
                                 topology,
-                                "genesis",
+                                dirName,
                                 f"{exp['name']}_mutPb_{mutPb}_indPb_{indPb}_{i}",
                                 mutPb=mutPb,
                                 indPb=indPb,
@@ -342,7 +415,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                             None,
                             None,
                             topology,
-                            "genesis",
+                            dirName,
                             f"{exp['name']}_cxPb_{cxPb}_{i}",
                             cxPb=cxPb,
                             evaluateOnline=False,
@@ -363,11 +436,12 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                                 None,
                                 None,
                                 topology,
-                                "genesis",
+                                dirName,
                                 f"{exp['name']}_sigma_{sigmaVal}_{i}",
                                 sigma=sigmaVal,
                                 evaluateOnline=False,
-                                linesToWrite=linesToWrite
+                                linesToWrite=linesToWrite,
+                                minimumAR=minAR
                             )
             elif rr:
                 for rejectionRate in rejectionRates:
@@ -385,11 +459,12 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                             None,
                             None,
                             topology,
-                            "genesis",
+                            dirName,
                             f"{exp['name']}_rejectionRate_{rejectionRate}_{i}",
                             rejectionRate=rejectionRate,
                             evaluateOnline=False,
-                            linesToWrite=linesToWrite
+                            linesToWrite=linesToWrite,
+                            minimumAR=minAR
                         )
             elif activation:
                 for activationFunction in activations:
@@ -407,7 +482,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                             None,
                             None,
                             topology,
-                            "genesis",
+                            dirName,
                             f"{exp['name']}_activation_{activationFunction}_{i}",
                             activation=activationFunction,
                             evaluateOnline=False,
@@ -429,7 +504,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                             None,
                             None,
                             topology,
-                            "genesis",
+                            dirName,
                             f"{exp['name']}_initLimit_{initLimitValue}_{i}",
                             initLimit=initLimitValue,
                             evaluateOnline=False,
@@ -449,7 +524,7 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                         None,
                         None,
                         topology,
-                        "genesis",
+                        dirName,
                         f"{exp['name']}_chain_{chain}_dijkstra_{dijkstra}_gaussian_{gaussian}_random_input_weights_{random_input_weights}_{i}",
                         staticChain=chain,
                         dijkstra=dijkstra,
@@ -473,11 +548,12 @@ def run(headless: bool, mutation: bool, cx: bool, rr: bool, sigma: bool, chain: 
                         None,
                         None,
                         topology,
-                        "genesis",
+                        dirName,
                         f"{exp['name']}_{i}",
                         retrain=False,
                         evaluateOnline = False,
-                        linesToWrite=linesToWrite
+                        linesToWrite=linesToWrite,
+                        minimumAR=minAR
                     )
             elif neurons:
                 for noOfNeuronsValue in noOfNeurons:

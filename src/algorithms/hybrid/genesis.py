@@ -31,7 +31,7 @@ INDPB: float = 0.7 # Experimentally determined gene mutation probability for the
 CXPB: float = 1.0 # Experimentally determined crossover probability for the GA
 ACTIVATION: str = "sin"
 INIT_LIMIT: float = np.pi # Experimentally determined limit
-
+MIN_AR: float = 0.95
 
 def solve(
     sfcrs: "list[SFCRequest]",
@@ -59,7 +59,8 @@ def solve(
     retrain: bool = False,
     randomInputWeights: bool = False,
     noOfNeurons: int = NO_OF_NEURONS,
-    linesToWrite: list[str] = []
+    linesToWrite: list[str] = [],
+    minimumAR: float = MIN_AR
 ) -> None:
     """
     Evolves the weights of the Neural Network.
@@ -91,6 +92,7 @@ def solve(
         randomInputWeights (bool): whether to use random input weights or not.
         noOfNeurons (int): the number of neurons in the neural network.
         linesToWrite (list[str]): the lines to write to the log file.
+        minimumAR (float): the minimum acceptance rate for the individuals.
 
     Returns:
         None
@@ -164,6 +166,8 @@ def solve(
         f"Rejection Rate: {rejectionRate}",
         f"Sigma: {sigma}",
         f"Retrain: {retrain}",
+        f"Random Input Weights: {randomInputWeights}",
+        f"Number of Neurons: {noOfNeurons}",
     ] + linesToWrite
 
     hybridEvolution: HybridEvolution = HybridEvolution(
@@ -177,7 +181,8 @@ def solve(
         cxPb,
         indPb,
         evaluateOnline=evaluateOnline,
-        retrain=retrain
+        retrain=retrain,
+        minimumAR=minimumAR
     )
 
     hybridEvolution.hybridSolve(

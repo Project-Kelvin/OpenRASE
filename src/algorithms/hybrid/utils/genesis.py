@@ -154,9 +154,9 @@ class GenesisUtils:
                     sfcrs, ccPDWeights, ccWeights, GenesisUtils.noOfNeurons, activation=activation
                 )
             endTime: float = timeit.default_timer()
-            TUI.appendToSolverLog(
-                f"Solved VNF-CC in {endTime - startTime:.2f} seconds."
-            )
+            # TUI.appendToSolverLog(
+            #     f"Solved VNF-CC in {endTime - startTime:.2f} seconds."
+            # )
 
             startTime: float = timeit.default_timer()
             egs, nodes, embedData = generateEGs(
@@ -171,9 +171,9 @@ class GenesisUtils:
                 activation=activation
             )
             endTime: float = timeit.default_timer()
-            TUI.appendToSolverLog(
-                f"Solved VNF-EM in {endTime - startTime:.2f} seconds."
-            )
+            # TUI.appendToSolverLog(
+            #     f"Solved VNF-EM in {endTime - startTime:.2f} seconds."
+            # )
 
             starTime: float = timeit.default_timer()
             embedLinks: Optional[EmbedLinks] = None
@@ -185,9 +185,9 @@ class GenesisUtils:
                 egs = embedLinks.embedLinks(nodes, dijkstra=dijkstra)
                 linkData = embedLinks.getLinkData()
             endTime: float = timeit.default_timer()
-            TUI.appendToSolverLog(
-                f"Solved VL-EM in {endTime - starTime:.2f} seconds."
-            )
+            # TUI.appendToSolverLog(
+            #     f"Solved VL-EM in {endTime - starTime:.2f} seconds."
+            # )
             ar: float = len(egs) / len(sfcrs)
         except Exception as e:
             TUI.appendToSolverLog(f"Error decoding individual {index}: {e}")
