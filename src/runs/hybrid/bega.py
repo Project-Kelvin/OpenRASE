@@ -118,10 +118,10 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, test: bool, online: 
 
     #(15, 0.1, False, 10, 0.1) works
     experiments: list[tuple[int, float, bool, float, float]] = [
-        (15, 0.23, False, 5, 0.5), # Used for ablation and DC
+        (15, 0.23, False, 5, 0.5), # Used for ablation and DC in GENESIS
         (20, 0.1, False, 10, 1), # Used for hyperparameter tuning in GENESIS (DC)
-        (20, 0.1, False, 10, 1), # Used VNF embedding only experiment (Milan)
-        (10, 0.1, False, 10, 1), # Used VNF embedding only experiment (25N50E)
+        (20, 0.1, False, 10, 1), # Used for GENESIS experiment (Milan)
+        (10, 0.1, False, 10, 1), # Used for GENESIS experiment (25N50E)
         (4, 0.1, False, 10, 2), # Used for BEGA BENNS DC,
         (6, 0.1, False, 10, 1), # Used for BEGA BENNS Milan,
         (5, 0.1, False, 10, 1), # Used for BEGA BENNS 25n50e,
