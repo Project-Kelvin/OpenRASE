@@ -140,12 +140,14 @@ MAX_CALCULATED_DELAY: float = 10_000.0
 @click.option("--static", is_flag=True, default=False, help="Run static embedding instead of MTDRL.")
 @click.option("--paper", type=click.Choice(["benns", "thesis"]), default="benns", help="The paper for which the experiment should be run.")
 @click.option("--offline", is_flag=True, default=False, help="Run experiment offline.")
+@click.option("--exp", type=click.Choice(["0", "1", "2", "3", "4"]), default="-1", help="Experiment number to run.")
 def run(
     headless: bool,
     topology: str,
     static: bool,
     paper: bool,
-    offline: bool
+    offline: bool,
+    exp: str
 ) -> None:
     """
     Run MTDRL-based SFCR embedding experiments.
@@ -155,6 +157,7 @@ def run(
         topology (str): Topology to use for the experiment.
         paper (str): The paper for which the experiment should be run.
         offline (bool): Run experiment offline.
+        exp (str): Experiment number to run.
 
     Returns:
         None
@@ -171,6 +174,8 @@ def run(
     topos: list[str] = []
     experimentConfig: list[tuple[int, float, bool, int, int]] = []
     delay: int = 1
+
+    expToRun: int = int(exp)
 
     if static:
         topology = "fat-tree"
@@ -207,7 +212,9 @@ def run(
     else:
         topos = ["fat-tree"]
 
-    for expConfig in experimentConfig:
+    for expIndex, expConfig in enumerate(experimentConfig):
+        if expToRun != -1 and expToRun != expIndex:
+            continue
         for topoName in topos:
             config = getConfig()
             experimentName: str = (
@@ -658,15 +665,24 @@ def run(
                 def generateEmbeddingGraphs(self) -> None:
                     TUI.appendToSolverLog(f"Generating embedding graphs for topology '{topoName}'...")
                     try:
-                        while self._requests.empty():
-                            sleep(0.05)
+                        if offline:
+                            with open(sfcrPath, "r", encoding="utf8") as sfcrFile:
+                                originalRequests: list[SFCRequest] = json.load(sfcrFile)
+                                for i, req in enumerate(originalRequests):
+                                    req["sfcrID"] = f"sfcr{i}"
+                        else:
+                            while self._requests.empty():
+                                sleep(0.05)
 
-                        originalRequests: list[SFCRequest] = []
-                        while not self._requests.empty():
-                            originalRequests.append(self._requests.get())
-                            sleep(0.05)
+                            originalRequests: list[SFCRequest] = []
+                            while not self._requests.empty():
+                                originalRequests.append(self._requests.get())
+                                sleep(0.05)
 
-                        topologyToUse: Topology = copy.deepcopy(self._orchestrator.getTopology())
+                        if offline:
+                            topologyToUse: Topology = copy.deepcopy(topo)
+                        else:
+                            topologyToUse: Topology = copy.deepcopy(self._orchestrator.getTopology())
                         allRequests: list[SFCRequest] = []
                         removedHosts: list[str] = []
                         randomizer = random.Random(seed)
@@ -694,6 +710,7 @@ def run(
 
             print(f"Starting MTDRL solver run for topology '{topoName}'...")
             if offline:
+                TUI.disable()
                 solver = DRLSolver(None, None)
                 try:
                     solver.generateEmbeddingGraphs()
