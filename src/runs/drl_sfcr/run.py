@@ -81,18 +81,18 @@ def generateSFCRsFromTemplates(sfcrTemplates: list[SFCRequest], segment: int, to
     allRequests: list[SFCRequest] = []
 
     if topo == "mec":
-        copies: int = 1
+        copiesToMake: int = copies
         step: int = 4
         remainder: int = segment % step
         for request in sfcrTemplates[remainder::step]:
-            for copyIndex in range(copies):
+            for copyIndex in range(copiesToMake):
                 requestCopy: SFCRequest = copy.deepcopy(request)
                 requestCopy["sfcrID"] = f"{request['sfcrID']}-{segment}-{copyIndex}"
                 allRequests.append(requestCopy)
     elif topo == "fat-tree":
         for request in sfcrTemplates:
-            copies: int = copies if segment == 0 else 1
-            for c in range(copies):
+            copiesToMake: int = copies if segment == 0 else 1
+            for c in range(copiesToMake):
                 requestCopy: SFCRequest = copy.deepcopy(request)
                 requestCopy["sfcrID"] = f"{request['sfcrID']}-{c}-{segment}"
                 allRequests.append(requestCopy)
@@ -138,10 +138,14 @@ MAX_CALCULATED_DELAY: float = 10_000.0
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
 @click.option("--topology", type=str, default="fat-tree", help="Topology to use for the experiment.")
 @click.option("--static", is_flag=True, default=False, help="Run static embedding instead of MTDRL.")
+@click.option("--paper", type=click.Choice(["benns", "thesis"]), default="benns", help="The paper for which the experiment should be run.")
+@click.option("--offline", is_flag=True, default=False, help="Run experiment offline.")
 def run(
     headless: bool,
     topology: str,
-    static: bool
+    static: bool,
+    paper: bool,
+    offline: bool
 ) -> None:
     """
     Run MTDRL-based SFCR embedding experiments.
@@ -149,6 +153,8 @@ def run(
     Parameters:
         headless (bool): Whether to run the emulator in headless mode.
         topology (str): Topology to use for the experiment.
+        paper (str): The paper for which the experiment should be run.
+        offline (bool): Run experiment offline.
 
     Returns:
         None
@@ -164,21 +170,35 @@ def run(
 
     topos: list[str] = []
     experimentConfig: list[tuple[int, float, bool, int, int]] = []
+    delay: int = 1
 
     if static:
         topology = "fat-tree"
-        for noOfCopy in [8, 12]:
-            for trafficScale in [0.1, 0.2]:
-                for trafficPattern in [False, True]:
-                    for linkBandwidth in [10, 5]:
-                        for noOfCPUs in [2, 1, 0.5]:
-                            experimentConfig.append(
-                                (noOfCopy, trafficScale, trafficPattern, linkBandwidth, noOfCPUs)
-                            )
-    else:
         experimentConfig = [
-            (20, 0.1, False, 10, 2),
+            (8, 0.1, False, 10, 2),
+            (8, 0.2, False, 10, 2),
+            (8, 0.1, True, 10, 2),
+            (8, 0.1, False, 5, 2),
+            (8, 0.1, False, 10, 1),
         ]
+    else:
+        if topology == "fat-tree":
+            experimentConfig = [
+                (1, 1, False, 10, 1),
+            ]
+        else:
+            experimentConfig = [
+                (1, 0.1, False, 10, 1),
+            ]
+
+    maxEpisodes: int = 200 if not static else 500
+    acceptanceThreshold: float = 1.0
+    latencyThreshold: float = 150.0
+
+    if paper == "thesis":
+        maxEpisodes: int = 100
+        acceptanceThreshold: float = 0.95
+        latencyThreshold: float = 100.0
 
     print(f"Running MTDRL SFCR embedding experiments with topology '{topology}'...")
 
@@ -191,7 +211,7 @@ def run(
         for topoName in topos:
             config = getConfig()
             experimentName: str = (
-                f"RL_{expConfig[1]}_{expConfig[2]}_{expConfig[3]}_{expConfig[4]}_{topoName}"
+                f"RL_{expConfig[0]}_{expConfig[1]}_{expConfig[2]}_{expConfig[3]}_{expConfig[4]}_{topoName}"
             )
             artifactsDir: str = os.path.join(
                 config["repoAbsolutePath"],
@@ -209,7 +229,7 @@ def run(
 
             artifactsDir: str = os.path.join(
                 experimentLogDir,
-                f"rl_dc_{static}",
+                f"rl_dc_{'static' if static else ''}",
             )
             sfcrPath = os.path.join(
                 config["repoAbsolutePath"],
@@ -230,13 +250,13 @@ def run(
 
             baseTrafficDesign: TrafficDesign = generateTrafficDesignFromFile(
                 requestsPath,
-                expConfig[0] * 10,
+                expConfig[1],
                 4 if static else 20,
                 False,
                 expConfig[2],
             )
 
-            topo: Topology = generateFatTreeTopology(4, expConfig[3], expConfig[4], 5120, 10)
+            topo: Topology = generateFatTreeTopology(4, expConfig[3], expConfig[4], 5120, delay)
 
             segments: int = 10
 
@@ -289,10 +309,7 @@ def run(
             if len(baseTrafficDesign) == 0:
                 raise ValueError("Traffic design is empty.")
 
-            maxEpisodes: int = 200 if not static else 500
-            acceptanceThreshold: float = 1.0
-            latencyThreshold: float = 150.0
-            seed: int = 42
+            seed: int = random.randint(0, 100000)
             trafficSegments: list[TrafficDesign] = (
                 splitTrafficDesign(baseTrafficDesign, segments, static)
             )
@@ -325,8 +342,6 @@ def run(
                     for index, template in enumerate(self._sfcrTemplates):
                         sfcr: SFCRequest = copy.deepcopy(template)
                         sfcr["sfcrID"] = f"sfcr{index}"
-                        sfcr.setdefault("latency", 200)
-                        sfcr.setdefault("strictOrder", [])
                         requests.append(sfcr)
                     requestPayload: list[Union[SFCRequest, EmbeddingGraph]] = cast(
                         list[Union[SFCRequest, EmbeddingGraph]],
@@ -598,7 +613,7 @@ def run(
                     if not math.isfinite(calculatedDelay):
                         calculatedDelay = MAX_CALCULATED_DELAY
 
-                    if len(accepted) > 0:
+                    if len(accepted) > 0 and acceptanceRatio >= acceptanceThreshold:
                         self._trafficGenerator.setDesign([segmentDesign])
                         self._orchestrator.sendEmbeddingGraphs(accepted)
                         try:
@@ -658,8 +673,8 @@ def run(
 
                         TUI.appendToSolverLog(f"Starting segment processing for topology '{topoName}'...")
                         for segment, segmentDesign in enumerate(trafficSegments):
-                            allRequests = generateSFCRsFromTemplates(originalRequests, segment, topology, expConfig[0])
-
+                            allRequests.extend(generateSFCRsFromTemplates(originalRequests, segment, topology, expConfig[0]))
+                            TUI.appendToSolverLog(f"Embedding {len(allRequests)} SFCRs.")
                             if segment > failureStartSegment and len(topologyToUse["hosts"]) > 1:
                                 remainingHosts: list[str] = [
                                     host["id"] for host in topologyToUse["hosts"] if host["id"] not in removedHosts
@@ -678,10 +693,17 @@ def run(
                     TUI.appendToSolverLog("Finished MTDRL solver run.")
 
             print(f"Starting MTDRL solver run for topology '{topoName}'...")
-            sfcEmulator = SFCEmulator(SFCRGen, DRLSolver, headless)
-            try:
-                print(f"Starting test for topology '{topoName}'...")
-                sfcEmulator.startTest(topo, [trafficSegments[0]])
-            finally:
-                TUI.appendToSolverLog("Ending SFC emulator.")
-                sfcEmulator.end()
+            if offline:
+                solver = DRLSolver(None, None)
+                try:
+                    solver.generateEmbeddingGraphs()
+                finally:
+                    TUI.appendToSolverLog("Experiment finished.")
+            else:
+                sfcEmulator = SFCEmulator(SFCRGen, DRLSolver, headless)
+                try:
+                    print(f"Starting test for topology '{topoName}'...")
+                    sfcEmulator.startTest(topo, [trafficSegments[0]])
+                finally:
+                    TUI.appendToSolverLog("Ending SFC emulator.")
+                    sfcEmulator.end()

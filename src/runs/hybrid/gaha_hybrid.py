@@ -47,7 +47,6 @@ def setRandomSeed() -> int:
 @click.option("--offline", is_flag=True, default=False, help="Run in offline mode.")
 @click.option("--retrain", is_flag=True, default=False, help="Retrain the surrogate model.")
 @click.option("--test", is_flag=True, default=False, help="Run in test mode.")
-
 def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retrain: bool, test: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
@@ -77,11 +76,11 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retra
 
     #(15, 0.1, False, 10, 0.1) works
     experiments: list[tuple[int, float, bool, float, float]] = [
-        (15, 0.23, False, 5, 0.5), # Used for ablation (DC)
-        (20, 0.1, False, 10, 1), # Used for hyperparameter tuning (DC),
-        (20, 0.1, False, 10, 1), # Used VNF embedding only experiment (Milan)
-        (10, 0.1, False, 10, 1), # Used VNF embedding only experiment (25N50E)
-        (8, 0.1, False, 10, 2), # Used for hyperparameter tuning in BEGA,
+        (15, 0.23, False, 5, 0.5), # Used for ablation and in DC
+        (20, 0.1, False, 10, 1), # Used for hyperparameter tuning GENESIS,
+        (20, 0.1, False, 10, 1), # Used in Milan
+        (10, 0.1, False, 10, 1), # Used in 25N50E
+        (8, 0.1, False, 10, 2), # Used for hyperparameter tuning,
         (3, 0.1, False, 10, 1), # Used for BEGA tuning in pop 2,
     ]
 
@@ -89,7 +88,7 @@ def run(headless: bool, mutation: bool, cx: bool, env: str, offline: bool, retra
         selectedExperiments = [experiments[5]]
 
     elif env == "dc":
-        selectedExperiments = [experiments[4]]
+        selectedExperiments = [experiments[0]]
 
     elif env == "milan":
         selectedExperiments = [experiments[2]]

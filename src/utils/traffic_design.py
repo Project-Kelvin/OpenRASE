@@ -30,13 +30,13 @@ def generateTrafficDesign(start: int, end: int, duration: int) -> "TrafficDesign
 
     return rate
 
-def generateTrafficDesignFromFile(dataFile: str, scale: int = 1, hourDuration: int = 4, minimal: bool = False, type2: bool = False) -> "TrafficDesign":
+def generateTrafficDesignFromFile(dataFile: str, scale: float = 1, hourDuration: int = 4, minimal: bool = False, type2: bool = False) -> "TrafficDesign":
     """
     Generate the Traffic Design.
 
     Parameters:
         dataFile (str): the CSV data file.
-        scale (int): the scale factor.
+        scale (float): the scale factor.
         hourDuration (int): the simulated duration of the hour in seconds.
         minimal (bool): whether to generate minimal traffic design.
         type2 (bool): whether to generate type 2 traffic design.

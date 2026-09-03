@@ -38,6 +38,8 @@ def run(headless: bool) -> None:
         None
     """
 
+    noOfRuns: int = 20
+
     design: TrafficDesign = generateTrafficDesignFromFile(
         os.path.join(
             f"{getConfig()['repoAbsolutePath']}",
@@ -138,11 +140,9 @@ def run(headless: bool) -> None:
             Generate the embedding graphs.
             """
 
-            allRequestsReceived: "list[SFCRequest]" = []
-            originalRequests: "list[SFCRequest]" = []
-            removedHosts: "list[int]" = []
             try:
-                topologyToUse: Topology = copy.deepcopy(topology)
+                originalRequests: "list[SFCRequest]" = []
+
                 while self._requests.empty():
                     pass
 
@@ -150,35 +150,40 @@ def run(headless: bool) -> None:
                     originalRequests.append(self._requests.get())
                     sleep(0.1)
 
-                for segment in range(segments):
-                    for request in originalRequests:
-                        copies: int = 20 if segment == 0 else 1
-                        for c in range(copies):
-                            requestCopy: SFCRequest = copy.deepcopy(request)
-                            requestCopy["sfcrID"] = f"{request['sfcrID']}-{c}-{segment}"
-                            allRequestsReceived.append(requestCopy)
+                for expRun in range(noOfRuns):
+                    allRequestsReceived: "list[SFCRequest]" = []
+                    removedHosts: "list[int]" = []
+                    topologyToUse: Topology = copy.deepcopy(topology)
+                    for segment in range(segments):
+                        for request in originalRequests:
+                            copies: int = 1 if segment == 0 else 1
+                            for c in range(copies):
+                                requestCopy: SFCRequest = copy.deepcopy(request)
+                                requestCopy["sfcrID"] = f"{request['sfcrID']}-{c}-{segment}"
+                                allRequestsReceived.append(requestCopy)
 
-                    if segment > 5:
-                        # Simulate a host failure
-                        hosts: list[int] = [i for i in range(len(topologyToUse["hosts"])) if i not in removedHosts]
-                        hostIdToRemove: int = random.choice(hosts)
-                        hostToRemove: str = f"host{hostIdToRemove}"
-                        removedHosts.append(hostIdToRemove)
-                        topologyToUse = removeHost(topologyToUse, hostToRemove)
-                        TUI.appendToSolverLog(f"Simulated failure of host {hostToRemove}.")
+                        if segment > 5:
+                            # Simulate a host failure
+                            hosts: list[int] = [i for i in range(len(topologyToUse["hosts"])) if i not in removedHosts]
+                            hostIdToRemove: int = random.choice(hosts)
+                            hostToRemove: str = f"host{hostIdToRemove}"
+                            removedHosts.append(hostIdToRemove)
+                            topologyToUse = removeHost(topologyToUse, hostToRemove)
+                            TUI.appendToSolverLog(f"Simulated failure of host {hostToRemove}.")
 
-                    self._trafficGenerator.setDesign([trafficSegments[segment]])
-                    solve(
-                        allRequestsReceived,
-                        self._orchestrator.sendEmbeddingGraphs,
-                        self._orchestrator.deleteEmbeddingGraphs,
-                        [trafficSegments[segment]],
-                        self._trafficGenerator,
-                        self._orchestrator.getTelemetry(),
-                        topologyToUse,
-                        "genesis_dynamic",
-                        f"{len(allRequestsReceived)}_0.1_False_10_2_{segment}",
-                    )
+                        self._trafficGenerator.setDesign([trafficSegments[segment]])
+                        solve(
+                            allRequestsReceived,
+                            self._orchestrator.sendEmbeddingGraphs,
+                            self._orchestrator.deleteEmbeddingGraphs,
+                            [trafficSegments[segment]],
+                            self._trafficGenerator,
+                            self._orchestrator.getTelemetry(),
+                            topologyToUse,
+                            f"genesis_dc_dynamic_{expRun}",
+                            f"{len(allRequestsReceived)}_{1}_False_{10}_{1}_{segment}",
+                            retainPopulation=True
+                        )
 
             except Exception as e:
                 TUI.appendToSolverLog(str(e), True)
