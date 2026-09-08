@@ -104,7 +104,7 @@ def solve(
         for sfcr in shuffledSFCRs:
             random.shuffle(sfcr["vnfs"])
 
-    GenesisUtils.init(shuffledSFCRs, topology, noOfNeurons, rejectionRate, sigma, retainWeights=retainPopulation, initLimit=initLimit)
+    GenesisUtils.init(shuffledSFCRs, topology, noOfNeurons, rejectionRate, sigma, retainWeights=False, initLimit=initLimit)
 
     def decodePopWrapper(
         pop: list[Individual],

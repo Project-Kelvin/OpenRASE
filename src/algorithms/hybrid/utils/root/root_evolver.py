@@ -16,7 +16,6 @@ class RootEvolver:
     It provides methods to generate a random root, select a neighbour, and set the fitness of the root individual.
     """
 
-    _rootIndividual: RootIndividual = RootIndividual()
     def __init__(self, popSize: int, isClientMode: bool = False):
         """
         Initializes the RootEvolver with the given mode (client or server).
@@ -26,6 +25,7 @@ class RootEvolver:
             isClientMode (bool): If True, the RootEvolver operates in client mode; otherwise, it operates in server mode.
         """
 
+        self._rootIndividual: RootIndividual = RootIndividual()
         self._rootInterface: RootInterface = RootClient() if isClientMode else RootSearchSpace(popSize)
 
         if isClientMode:
@@ -40,12 +40,11 @@ class RootEvolver:
         """
 
         root: int = self._rootInterface.generateRandomRoot()
-        RootEvolver._rootIndividual.setRoot(root)
+        self._rootIndividual.setRoot(root)
 
         return root
 
-    @classmethod
-    def getRoot(cls) -> int:
+    def getRoot(self) -> int:
         """
         Returns the root.
 
@@ -53,10 +52,10 @@ class RootEvolver:
             int: the root.
         """
 
-        return RootEvolver._rootIndividual.getRoot()
+        return self._rootIndividual.getRoot()
 
-    @classmethod
-    def setRoot(cls, root: int) -> None:
+
+    def setRoot(self, root: int) -> None:
         """
         Sets the root.
 
@@ -64,7 +63,7 @@ class RootEvolver:
             root (int): The new root value to set.
         """
 
-        RootEvolver._rootIndividual.setRoot(root)
+        self._rootIndividual.setRoot(root)
 
     def setRootFitness(self, root: int, fitness: float) -> None:
         """
@@ -93,6 +92,6 @@ class RootEvolver:
         """
 
         root: int = self._rootInterface.selectNextRoot(currentRoot, radius)
-        RootEvolver._rootIndividual.setRoot(root)
+        self._rootIndividual.setRoot(root)
 
         return root

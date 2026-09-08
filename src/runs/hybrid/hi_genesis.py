@@ -16,6 +16,7 @@ from shared.utils.config import getConfig
 from algorithms.hybrid.constants.genesis_objective import LATENCY
 from algorithms.hybrid.hi_genesis import solve
 from algorithms.hybrid.genesis import solve as genesisSolve
+from algorithms.hybrid.utils.hierarchical_evolution import HierarchicalEvolution
 from mano.orchestrator import Orchestrator
 from sfc.sfc_emulator import SFCEmulator
 from sfc.sfc_request_generator import SFCRequestGenerator
@@ -78,7 +79,7 @@ def generateSFCRsFromTemplates(sfcrTemplates: list[SFCRequest], segment: int, to
 @click.command()
 @click.option("--headless", is_flag=True, default=False, help="Run in headless mode.")
 @click.option("--client", is_flag=True, default=False, help="Run in client mode.")
-@click.option("--env", type=click.Choice(["dc", "milan", "25n50e"]), default="dc", help="Environment to run the algorithm in.")
+@click.option("--env", type=click.Choice(["dc", "milan", "25n50e"]), default="milan", help="Environment to run the algorithm in.")
 @click.option("--static-root" , is_flag=True, default=False, help="Run the experiment with a static root individual.")
 @click.option("--genesis", is_flag=True, default=False, help="Run the experiment with GENESIS.")
 def run(headless: bool, client: bool, env: str, static_root: bool, genesis: bool) -> None:
@@ -103,7 +104,7 @@ def run(headless: bool, client: bool, env: str, static_root: bool, genesis: bool
     dominanceThreshold: float = 0.5
 
     noOfRuns: int = 20
-    absSFCRsToEmbed: int = 70
+    absSFCRsToEmbed: int = 80
 
     if env == "dc":
         noOfCopies: int = 20
@@ -158,10 +159,10 @@ def run(headless: bool, client: bool, env: str, static_root: bool, genesis: bool
         ) as f:
             requests = json.load(f)
     else:
-        noOfCopies: int = 13
-        trafficScale: float = 0.3
-        cpus: float = 0.25
-        bandwidth: int = 5
+        noOfCopies: int = 15
+        trafficScale: float = 0.1
+        cpus: float = 1
+        bandwidth: int = 10
         delay: int = 1
         memory: int = 5120
 
@@ -301,6 +302,7 @@ def run(headless: bool, client: bool, env: str, static_root: bool, genesis: bool
                 for i in range(noOfRuns):
                     removedHosts: "list[int]" = []
                     allRequestsReceived: "list[SFCRequest]" = []
+                    HierarchicalEvolution.resetPopulation()
 
                     for segment in range(segments):
                         for request in originalRequests:
@@ -334,7 +336,7 @@ def run(headless: bool, client: bool, env: str, static_root: bool, genesis: bool
                                 self._trafficGenerator,
                                 self._orchestrator.getTelemetry(),
                                 topology,
-                                f"genesis_{env}_{i}",
+                                f"genesis_dynamic_{env}_{i}",
                                 f"{len(allRequestsReceived)}_{trafficScale}_False_{bandwidth}_{cpus}_{segment}",
                                 retainPopulation=True,
                                 minimumAR=minimumAR
@@ -348,7 +350,7 @@ def run(headless: bool, client: bool, env: str, static_root: bool, genesis: bool
                                 self._trafficGenerator,
                                 self._orchestrator.getTelemetry(),
                                 topologyToUse,
-                                f"hi_genesis_{env}_{i}",
+                                f"hi_genesis_dynamic_{env}_{i}",
                                 f"{len(allRequestsReceived)}_{trafficScale}_False_{bandwidth}_{cpus}_{segment}",
                                 LATENCY,
                                 retainPopulation=True,

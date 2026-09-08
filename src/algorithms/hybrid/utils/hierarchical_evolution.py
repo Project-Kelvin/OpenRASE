@@ -7,7 +7,7 @@ from copy import deepcopy
 import os
 import random
 import timeit
-from typing import Callable, cast
+from typing import Callable, Union, cast
 from uuid import UUID, uuid4
 from deap import base, tools
 import numpy as np
@@ -36,7 +36,7 @@ class HierarchicalEvolution:
 
     _metaPopulation: list[Individual] = []
     _genesisPopulation: list[GenesisIndividual] = []
-    _rootEvolver: RootEvolver
+    _rootEvolver: Union[RootEvolver, None] = None
 
 
     def __init__(
@@ -1058,7 +1058,7 @@ s
                     qualifiedIndividuals[i].fitness.values = (ar, latency)
 
                     for p in genesisNewPop:
-                        if p.id == qualifiedIndividuals[i].id:
+                        if p.id == qualifiedIndividuals[i].id and p.metaIndividual.id == qualifiedIndividuals[i].metaIndividual.id:
                             p.fitness.values = (ar, latency)
                             break
 
@@ -1124,6 +1124,19 @@ s
 
         return newPop
 
+    @staticmethod
+    def resetPopulation() -> None:
+        """
+        Resets the meta and genesis populations.
+
+        Returns:
+            None
+        """
+
+        HierarchicalEvolution._metaPopulation = []
+        HierarchicalEvolution._genesisPopulation = []
+        HierarchicalEvolution._rootEvolver = None
+
     def evolve(self) -> None:
         """
         Evolves the meta-individuals.
@@ -1138,26 +1151,26 @@ s
             self._experimentName,
             "latency" if self._objectiveType == LATENCY else "power",
         )
-        GenesisUtils.init(self._sfcrs, self._topology, self._noOfNeurons, 0.0, 0.0, retainWeights=self._retainPopulation)
+        GenesisUtils.init(self._sfcrs, self._topology, self._noOfNeurons, 0.0, 0.0, retainWeights=False)
         self._initialiseMetaEvolver()
 
         if not self._retainPopulation or HierarchicalEvolution._rootEvolver is None:
-            HierarchicalEvolution._rootEvolver: RootEvolver = RootEvolver(self._popSize, isClientMode=self._isClientMode)
+            HierarchicalEvolution._rootEvolver = RootEvolver(self._popSize, isClientMode=self._isClientMode)
 
         if self._retainPopulation:
-            if RootEvolver.getRoot() == -1:
+            if HierarchicalEvolution._rootEvolver.getRoot() == -1:
                 TUI.appendToSolverLog("Root not retained. Generating random root.")
-                self._rootEvolver.generateRandomRoot()
+                HierarchicalEvolution._rootEvolver.generateRandomRoot()
         else:
             if self._rootIndividual == -1:
                 TUI.appendToSolverLog("Root not predefined. Generating random root.")
-                self._rootEvolver.generateRandomRoot()
+                HierarchicalEvolution._rootEvolver.generateRandomRoot()
             else:
                 TUI.appendToSolverLog(f"Root predefined. Using root: {self._rootIndividual}.")
-                RootEvolver.setRoot(self._rootIndividual)
+                HierarchicalEvolution._rootEvolver.setRoot(self._rootIndividual)
 
-        TUI.appendToSolverLog(f"Root is: {RootEvolver.getRoot()}.")
-        self._metaPopSize, self._genesisPopSize = self._computeMetaAndGenesisPopSize(RootEvolver.getRoot())
+        TUI.appendToSolverLog(f"Root is: {HierarchicalEvolution._rootEvolver.getRoot()}.")
+        self._metaPopSize, self._genesisPopSize = self._computeMetaAndGenesisPopSize(HierarchicalEvolution._rootEvolver.getRoot())
         TUI.appendToSolverLog(f"Meta pop size: {self._metaPopSize}, Genesis pop size: {self._genesisPopSize}")
 
         if (
@@ -1346,6 +1359,7 @@ s
                     newMetaPF: tools.ParetoFront = tools.ParetoFront()
                     newMetaPF.update(HierarchicalEvolution._genesisPopulation)
                     improvement: float = self._calculateParetoDominatedPercentage(newMetaPF, metaPF)
+                    HierarchicalEvolution._metaPopulation = metaOffspring
 
                     TUI.appendToSolverLog(
                         f"Meta generation {metaGen} of root generation {rootGen} has improvement of {improvement:.2f}."
@@ -1417,7 +1431,7 @@ s
                 TUI.appendToSolverLog(
                     f"Meta generation {metaGen} of root generation {rootGen} has improvement of {improvement:.2f}."
                 )
-                self._writeMetaLog(rootGen, metaGen, metaOffspring, improvement)
+                self._writeMetaLog(rootGen, metaGen, HierarchicalEvolution._metaPopulation, improvement)
 
                 shouldMetaGenContinue = self._isParetoDominated(
                     newMetaPF, metaPF
@@ -1430,19 +1444,25 @@ s
             newRootPF.update(HierarchicalEvolution._genesisPopulation)
 
             improvement: float = self._calculateParetoDominatedPercentage(newRootPF, rootPF)
-            self._rootEvolver.setRootFitness(RootEvolver.getRoot(), improvement)
-            self._writeRootLog(rootGen, improvement)
+
+            if gen != 1:
+                if self._rootEvolver is not None:
+                    self._rootEvolver.setRootFitness(HierarchicalEvolution._rootEvolver.getRoot(), improvement)
+
+                self._writeRootLog(rootGen, improvement)
 
             if len(qualifiedIndividuals) >= self._minQualInd or gen >= self._maxGen:
                 break
             TUI.appendToSolverLog("Exiting meta evolution and moving to the next generation of root.")
 
-            prevRoot: int = RootEvolver.getRoot()
-            self._rootEvolver.selectNextRoot(RootEvolver.getRoot(), 1 - improvement)
+            prevRoot: int = HierarchicalEvolution._rootEvolver.getRoot()
+
+            if self._rootEvolver is not None:
+                self._rootEvolver.selectNextRoot(HierarchicalEvolution._rootEvolver.getRoot(), 1 - improvement)
             # self._rootEvolver.selectNextRoot(RootEvolver.getRoot(), 1)
 
-            TUI.appendToSolverLog(f"New root: {RootEvolver.getRoot()}")
-            self._metaPopSize, self._genesisPopSize = self._computeMetaAndGenesisPopSize(RootEvolver.getRoot())
+            TUI.appendToSolverLog(f"New root: {HierarchicalEvolution._rootEvolver.getRoot()}")
+            self._metaPopSize, self._genesisPopSize = self._computeMetaAndGenesisPopSize(HierarchicalEvolution._rootEvolver.getRoot())
             TUI.appendToSolverLog(f"Meta pop size: {self._metaPopSize}, Genesis pop size: {self._genesisPopSize}")
             self._recomposeEvolvers(prevRoot)
 

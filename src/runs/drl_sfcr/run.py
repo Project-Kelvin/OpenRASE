@@ -140,7 +140,7 @@ MAX_CALCULATED_DELAY: float = 10_000.0
 @click.option("--static", is_flag=True, default=False, help="Run static embedding instead of MTDRL.")
 @click.option("--paper", type=click.Choice(["benns", "thesis"]), default="benns", help="The paper for which the experiment should be run.")
 @click.option("--offline", is_flag=True, default=False, help="Run experiment offline.")
-@click.option("--exp", type=click.Choice(["0", "1", "2", "3", "4"]), default="-1", help="Experiment number to run.")
+@click.option("--exp", type=click.Choice(["-1", "0", "1", "2", "3", "4"]), default="-1", help="Experiment number to run.")
 def run(
     headless: bool,
     topology: str,

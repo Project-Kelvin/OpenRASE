@@ -304,7 +304,8 @@ def run(headless: bool, mutation: bool, cx: bool, root: bool, test: bool, himode
                             minimumAR=minAR,
                             cxPb=metaCxPb,
                             indPb=metaGenePb,
-                            mutPb=metaIndPb
+                            mutPb=metaIndPb,
+                            dominanceThreshold=dom_thresh,
                         )
                 except Exception as e:
                     TUI.appendToSolverLog(str(e), True)

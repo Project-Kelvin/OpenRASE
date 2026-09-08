@@ -3,13 +3,15 @@ This defines the API service for the root node of the HiGENESIS algorithm.
 """
 
 
+from typing import Union
+
 from algorithms.hybrid.constants.root_evolver import GENERATE_RANDOM_ROOT_PATH, INIT, SELECT_NEIGHBOUR_PATH, SERVICE_PORT, SET_ROOT_FITNESS_PATH
 from flask import Flask, jsonify, request
 from algorithms.hybrid.utils.root.root_search_space import RootSearchSpace
 
 
 app: Flask = Flask(__name__)
-rootSearchSpace: RootSearchSpace # = RootSearchSpace(100)  # Initialize with a default population size of 100
+rootSearchSpace: Union[RootSearchSpace, None] = None # = RootSearchSpace(100)  # Initialize with a default population size of 100
 
 @app.route(INIT, methods=["POST"])
 def init() -> tuple:
@@ -42,6 +44,9 @@ def generateRandomRoot() -> tuple:
         int: The newly generated root individual.
     """
 
+    if rootSearchSpace is None:
+        return jsonify({"error": "Root search space is not initialized. Please call the init endpoint first."}), 400
+
     newRoot: int = rootSearchSpace.generateRandomRoot()
 
     return jsonify(newRoot), 201
@@ -57,6 +62,9 @@ def setRootNeighbour() -> tuple:
     """
 
     payload = request.get_json(silent=True) or {}
+
+    if rootSearchSpace is None:
+        return jsonify({"error": "Root search space is not initialized. Please call the init endpoint first."}), 400
 
     if "root" not in payload or "radius" not in payload:
         return jsonify({"error": "Fields 'root' and 'radius' are required."}), 400
@@ -82,6 +90,9 @@ def setRootFitness() -> tuple:
     """
 
     payload = request.get_json(silent=True) or {}
+
+    if rootSearchSpace is None:
+        return jsonify({"error": "Root search space is not initialized. Please call the init endpoint first."}), 400
 
     if "root" not in payload or "fitness" not in payload:
         return jsonify({"error": "Fields 'root' and 'fitness' are required."}), 400

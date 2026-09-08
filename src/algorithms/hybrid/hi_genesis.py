@@ -94,7 +94,7 @@ def solve(
         f"Meta Max Generations: {META_MAX_GEN}",
         f"Genesis Max Generations: {GENESIS_MAX_GEN}",
         f"Max Memory Demand: {MAX_MEMORY_DEMAND}",
-        f"Min Acceptance Rate: {MIN_AR}",
+        f"Min Acceptance Rate: {minimumAR}",
         f"Max Latency: {MAX_LATENCY}",
         f"Max Power: {MAX_POWER}",
         f"Min Qualification Individual: {MIN_QUAL_IND}",
