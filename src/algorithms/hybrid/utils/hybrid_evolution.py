@@ -548,6 +548,15 @@ class HybridEvolution:
 
         return pop, qualifiedIndividuals
 
+    @staticmethod
+    def resetPopulation() -> None:
+        """
+        Resets the genesis population.
+        """
+
+        HybridEvolution._population = []
+
+
     def hybridSolve(
         self,
         topology: Topology,

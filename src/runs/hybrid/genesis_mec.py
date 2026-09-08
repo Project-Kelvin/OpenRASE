@@ -8,6 +8,7 @@ import os
 import random
 from time import sleep
 from typing import Any
+from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution
 import click
 from shared.models.sfc_request import SFCRequest
 from shared.models.topology import Topology
@@ -38,6 +39,7 @@ def run(headless: bool) -> None:
     """
 
     mecTopos: list[str] = ["milan", "25N50E"]
+    noOfRuns: int = 20
 
     for mecTopo in mecTopos:
 
@@ -151,59 +153,65 @@ def run(headless: bool) -> None:
                 Generate the embedding graphs.
                 """
 
-                allRequestsReceived: "list[SFCRequest]" = []
+
                 originalRequests: "list[SFCRequest]" = []
-                removedHosts: "list[int]" = []
+
                 COPIES: int = 1
                 try:
-                    topologyToUse: Topology = copy.deepcopy(topology)
+
                     while self._requests.empty():
                         pass
 
                     while not self._requests.empty():
                         originalRequests.append(self._requests.get())
                         sleep(0.1)
-                        
-                    for segment in range(segments):
-                        step: int = 4
-                        remainder: int = segment % step
-                        for request in originalRequests[remainder::step]:
-                            for copyIndex in range(COPIES):
-                                requestCopy: SFCRequest = copy.deepcopy(request)
-                                requestCopy["sfcrID"] = f"{request['sfcrID']}-{segment}-{copyIndex}"
-                                allRequestsReceived.append(requestCopy)
 
-                        if segment > int(segments * 0.75):
-                            # Simulate a host failure
-                            hosts: list[int] = [
-                                i
-                                for i in range(len(topologyToUse["hosts"]))
-                                if i not in removedHosts
-                            ]
-                            hostIdToRemove: int = random.choice(hosts)
-                            hostToRemove: str = f"host{hostIdToRemove}"
-                            removedHosts.append(hostIdToRemove)
-                            topologyToUse = removeHost(topologyToUse, hostToRemove)
-                            TUI.appendToSolverLog(
-                                f"Simulated failure of host {hostToRemove} during segment {segment}."
-                            )
+                    for i in range(noOfRuns):
+                        allRequestsReceived: "list[SFCRequest]" = []
+                        removedHosts: "list[int]" = []
+                        topologyToUse: Topology = copy.deepcopy(topology)
+                        HybridEvolution.resetPopulation()
 
-                        self._trafficGenerator.setDesign([trafficSegments[segment]])
-                        try:
-                            solve(
-                                allRequestsReceived,
-                                self._orchestrator.sendEmbeddingGraphs,
-                                self._orchestrator.deleteEmbeddingGraphs,
-                                [trafficSegments[segment]],
-                                self._trafficGenerator,
-                                self._orchestrator.getTelemetry(),
-                                topologyToUse,
-                                "genesis_mec",
-                                f"{len(allRequestsReceived)}_0.1_False_10_1_{segment}_{mecTopo}",
-                                retainPopulation=True
-                            )
-                        except Exception as e:
-                            TUI.appendToSolverLog(str(e), True)
+                        for segment in range(segments):
+                            step: int = 4
+                            remainder: int = segment % step
+                            for request in originalRequests[remainder::step]:
+                                for copyIndex in range(COPIES):
+                                    requestCopy: SFCRequest = copy.deepcopy(request)
+                                    requestCopy["sfcrID"] = f"{request['sfcrID']}-{segment}-{copyIndex}"
+                                    allRequestsReceived.append(requestCopy)
+
+                            if segment > int(segments * 0.75):
+                                # Simulate a host failure
+                                hosts: list[int] = [
+                                    i
+                                    for i in range(len(topologyToUse["hosts"]))
+                                    if i not in removedHosts
+                                ]
+                                hostIdToRemove: int = random.choice(hosts)
+                                hostToRemove: str = f"host{hostIdToRemove}"
+                                removedHosts.append(hostIdToRemove)
+                                topologyToUse = removeHost(topologyToUse, hostToRemove)
+                                TUI.appendToSolverLog(
+                                    f"Simulated failure of host {hostToRemove} during segment {segment}."
+                                )
+
+                            self._trafficGenerator.setDesign([trafficSegments[segment]])
+                            try:
+                                solve(
+                                    allRequestsReceived,
+                                    self._orchestrator.sendEmbeddingGraphs,
+                                    self._orchestrator.deleteEmbeddingGraphs,
+                                    [trafficSegments[segment]],
+                                    self._trafficGenerator,
+                                    self._orchestrator.getTelemetry(),
+                                    topologyToUse,
+                                    f"genesis_dynamic_{mecTopo}_{i}",
+                                    f"{len(allRequestsReceived)}_0.1_False_10_1_{mecTopo}_{segment}",
+                                    retainPopulation=True
+                                )
+                            except Exception as e:
+                                TUI.appendToSolverLog(str(e), True)
 
                 except Exception as e:
                     TUI.appendToSolverLog(str(e), True)

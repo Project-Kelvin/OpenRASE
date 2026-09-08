@@ -206,7 +206,7 @@ def run(
         latencyThreshold: float = 100.0
 
     print(f"Running MTDRL SFCR embedding experiments with topology '{topology}'...")
-
+    print(f"Min AR: {acceptanceThreshold}. Max Latency: {latencyThreshold}. Max Episodes: {maxEpisodes}.")
     if topology == "mec":
         topos =["milan", "25N50E"]
     else:

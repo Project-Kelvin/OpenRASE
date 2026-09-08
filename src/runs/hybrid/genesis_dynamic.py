@@ -8,6 +8,7 @@ import os
 import random
 from time import sleep
 from typing import Any
+from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution
 import click
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
@@ -154,6 +155,8 @@ def run(headless: bool) -> None:
                     allRequestsReceived: "list[SFCRequest]" = []
                     removedHosts: "list[int]" = []
                     topologyToUse: Topology = copy.deepcopy(topology)
+                    HybridEvolution.resetPopulation()
+
                     for segment in range(segments):
                         for request in originalRequests:
                             copies: int = 1 if segment == 0 else 1
