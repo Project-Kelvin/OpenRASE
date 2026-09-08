@@ -40,6 +40,7 @@ def run(headless: bool) -> None:
     """
 
     mecTopos: list[str] = ["milan", "25N50E"]
+    noOfRuns: int = 20
 
     for mecTopo in mecTopos:
 
@@ -114,7 +115,7 @@ def run(headless: bool) -> None:
             1,
             5 * 1024,
             10,
-            10
+            1 # delay was set to 10ms in the TIDS workshop paper.
         )
 
         def removeHost(topology: Topology, hostID: str) -> Topology:
@@ -152,12 +153,11 @@ def run(headless: bool) -> None:
                 Generate the embedding graphs.
                 """
 
-                allRequestsReceived: "list[SFCRequest]" = []
+
                 originalRequests: "list[SFCRequest]" = []
-                removedHosts: "list[int]" = []
+
                 COPIES: int = 1
                 try:
-                    topologyToUse: Topology = copy.deepcopy(topology)
                     while self._requests.empty():
                         pass
 
@@ -165,43 +165,49 @@ def run(headless: bool) -> None:
                         originalRequests.append(self._requests.get())
                         sleep(0.1)
 
-                    for segment in range(segments):
-                        remainder: int = segment % 2
-                        for request in originalRequests[remainder::2]:
-                            for copyIndex in range(COPIES):
-                                requestCopy: SFCRequest = copy.deepcopy(request)
-                                requestCopy["sfcrID"] = f"{request['sfcrID']}-{segment}-{copyIndex}"
-                                allRequestsReceived.append(requestCopy)
+                    for exp in range(noOfRuns):
+                        allRequestsReceived: "list[SFCRequest]" = []
+                        removedHosts: "list[int]" = []
+                        topologyToUse: Topology = copy.deepcopy(topology)
 
-                        if segment > int(segments * 0.75):
-                            # Simulate a host failure
-                            hosts: list[int] = [
-                                i
-                                for i in range(len(topologyToUse["hosts"]))
-                                if i not in removedHosts
-                            ]
-                            hostIdToRemove: int = random.choice(hosts)
-                            hostToRemove: str = f"host{hostIdToRemove}"
-                            removedHosts.append(hostIdToRemove)
-                            topologyToUse = removeHost(topologyToUse, hostToRemove)
-                            TUI.appendToSolverLog(
-                                f"Simulated failure of host {hostToRemove}."
+                        for segment in range(segments):
+                            step: int = 4
+                            remainder: int = segment % step
+                            for request in originalRequests[remainder::step]:
+                                for copyIndex in range(COPIES):
+                                    requestCopy: SFCRequest = copy.deepcopy(request)
+                                    requestCopy["sfcrID"] = f"{request['sfcrID']}-{segment}-{copyIndex}"
+                                    allRequestsReceived.append(requestCopy)
+
+                            if segment > int(segments * 0.75):
+                                # Simulate a host failure
+                                hosts: list[int] = [
+                                    i
+                                    for i in range(len(topologyToUse["hosts"]))
+                                    if i not in removedHosts
+                                ]
+                                hostIdToRemove: int = random.choice(hosts)
+                                hostToRemove: str = f"host{hostIdToRemove}"
+                                removedHosts.append(hostIdToRemove)
+                                topologyToUse = removeHost(topologyToUse, hostToRemove)
+                                TUI.appendToSolverLog(
+                                    f"Simulated failure of host {hostToRemove}."
+                                )
+
+                            self._trafficGenerator.setDesign([trafficSegments[segment]])
+                            solve(
+                                allRequestsReceived,
+                                self._orchestrator.sendEmbeddingGraphs,
+                                self._orchestrator.deleteEmbeddingGraphs,
+                                [trafficSegments[segment]],
+                                self._trafficGenerator,
+                                self._orchestrator.getTelemetry(),
+                                topologyToUse,
+                                f"genesis_power_{mecTopo}_{exp}",
+                                f"{len(allRequestsReceived)}_0.1_False_10_1_{segment}_{mecTopo}",
+                                POWER,
+                                retainPopulation=True
                             )
-
-                        self._trafficGenerator.setDesign([trafficSegments[segment]])
-                        solve(
-                            allRequestsReceived,
-                            self._orchestrator.sendEmbeddingGraphs,
-                            self._orchestrator.deleteEmbeddingGraphs,
-                            [trafficSegments[segment]],
-                            self._trafficGenerator,
-                            self._orchestrator.getTelemetry(),
-                            topologyToUse,
-                            "genesis_power",
-                            f"{len(allRequestsReceived)}_0.1_False_10_1_{segment}_{mecTopo}",
-                            POWER,
-                            retainPopulation=True
-                        )
 
                 except Exception as e:
                     TUI.appendToSolverLog(str(e), True)
