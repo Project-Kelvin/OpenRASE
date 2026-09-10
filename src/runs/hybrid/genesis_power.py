@@ -8,6 +8,7 @@ import os
 import random
 from time import sleep
 from typing import Any
+from algorithms.hybrid.utils.hybrid_evolution import HybridEvolution
 import click
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.sfc_request import SFCRequest
@@ -59,7 +60,7 @@ def run(headless: bool) -> None:
         )
 
         steps: int = len(design)
-        segments: int = steps // segmentDuration
+        segments: int = steps // (2 * segmentDuration)
         stepsPerSegment: int = steps // segments
         trafficSegments: "list[TrafficDesign]" = []
         for segment in range(segments):
@@ -169,6 +170,7 @@ def run(headless: bool) -> None:
                         allRequestsReceived: "list[SFCRequest]" = []
                         removedHosts: "list[int]" = []
                         topologyToUse: Topology = copy.deepcopy(topology)
+                        HybridEvolution.resetPopulation()
 
                         for segment in range(segments):
                             step: int = 4

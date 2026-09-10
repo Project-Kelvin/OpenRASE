@@ -29,7 +29,7 @@ from utils.tui import TUI
 
 MAX_MEMORY_DEMAND: int = 100
 MAX_LATENCY: int = 100
-MAX_POWER: int = 300
+MAX_POWER: int = 50
 MIN_AR: float = 0.95
 MIN_QUAL_IND: int = 1
 NGEN: int = 100
@@ -732,6 +732,7 @@ class HybridEvolution:
             expFile.write(f"Qualified Individuals: {len(qualifiedIndividuals)}\n")
             expFile.write(f"Minimum Acceptance Rate: {self._minimumAR}\n")
             expFile.write(f"Maximum Latency: {MAX_LATENCY}\n")
+            expFile.write(f"Maximum Power: {MAX_POWER}\n")
             expFile.write(f"Minimum Qualified Individuals: {MIN_QUAL_IND}\n")
             expFile.write(f"Population Size: {popSize}\n")
             expFile.write(f"Maximum Number of Generations: {NGEN}\n")
