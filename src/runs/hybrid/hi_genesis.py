@@ -328,19 +328,29 @@ def run(headless: bool, client: bool, env: str, static_root: bool, genesis: bool
                         )
 
                         if genesis:
-                            genesisSolve(
-                                allRequestsReceived,
-                                self._orchestrator.sendEmbeddingGraphs,
-                                self._orchestrator.deleteEmbeddingGraphs,
-                                [trafficSegments[segment]],
-                                self._trafficGenerator,
-                                self._orchestrator.getTelemetry(),
-                                topology,
-                                f"genesis_dynamic_{env}_{i}",
-                                f"{len(allRequestsReceived)}_{trafficScale}_False_{bandwidth}_{cpus}_{segment}",
-                                retainPopulation=True,
-                                minimumAR=minimumAR
-                            )
+                            runExperiment: bool = True
+
+                            while runExperiment:
+                                try:
+                                    genesisSolve(
+                                        allRequestsReceived,
+                                        self._orchestrator.sendEmbeddingGraphs,
+                                        self._orchestrator.deleteEmbeddingGraphs,
+                                        [trafficSegments[segment]],
+                                        self._trafficGenerator,
+                                        self._orchestrator.getTelemetry(),
+                                        topology,
+                                        f"genesis_hi_dynamic_{env}_{i}",
+                                        f"{len(allRequestsReceived)}_{trafficScale}_False_{bandwidth}_{cpus}_{segment}",
+                                        retainPopulation=True,
+                                        minimumAR=minimumAR
+                                    )
+
+                                    runExperiment = False
+                                except Exception as e:
+                                    TUI.appendToSolverLog(str(e), True)
+                                    TUI.appendToSolverLog(f"Run {i} segment {segment} failed for GENESIS. Restarting the experiment.")
+                                    runExperiment = True
                         else:
                             solve(
                                 allRequestsReceived,

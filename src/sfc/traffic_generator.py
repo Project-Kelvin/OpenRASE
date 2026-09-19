@@ -180,14 +180,22 @@ class TrafficGenerator(Subscriber):
         self._sfcIdUUIDs[sfcID] = uuid
         name: str = f"{sfcID}-{K6}-{uuid}"
         TUI.appendToLog(f"  Starting to generate traffic using k6 for SFC {sfcID}.")
-        self._tgClient.containers.run(f"{TAG}/k6:latest", cap_add="NET_ADMIN", name=name,
-                                    detach=True, environment={
-                                        "K6_OUT": f"xk6-influxdb=http://{influxDBhost}:8086",
-                                        "K6_INFLUXDB_ORGANIZATION": INFLUX_DB_CONFIG["ORG"],
-                                        "K6_INFLUXDB_BUCKET": INFLUX_DB_CONFIG["BUCKET"],
-                                        "K6_INFLUXDB_INSECURE": "true",
-                                        "K6_INFLUXDB_TOKEN": INFLUX_DB_CONFIG["TOKEN"]
-                                    })
+        try:
+            self._tgClient.containers.run(
+                f"{TAG}/k6:latest",
+                cap_add="NET_ADMIN",
+                name=name,
+                detach=True,
+                environment={
+                    "K6_OUT": f"xk6-influxdb=http://{influxDBhost}:8086",
+                    "K6_INFLUXDB_ORGANIZATION": INFLUX_DB_CONFIG["ORG"],
+                    "K6_INFLUXDB_BUCKET": INFLUX_DB_CONFIG["BUCKET"],
+                    "K6_INFLUXDB_INSECURE": "true",
+                    "K6_INFLUXDB_TOKEN": INFLUX_DB_CONFIG["TOKEN"]
+                }
+            )
+        except Exception as e:
+            TUI.appendToLog(f"  Error starting k6 container for SFC {sfcID}: {e}", True)
         try:
             self._tgClient.containers.get(name).exec_run(
                 ["sh", "-c", f"echo '{outputFileContent}' > script.js"])
@@ -198,10 +206,13 @@ class TrafficGenerator(Subscriber):
             # Ignoring this issue as the script is created fine nevertheless.
             pass
 
-        self._tgClient.containers.get(name).exec_run(
-            f"k6 run -e MY_HOSTNAME={getContainerIP(SFCC)} -e SFC_ID={sfcID} script.js", detach=True)
+        try:
+            self._tgClient.containers.get(name).exec_run(
+                f"k6 run -e MY_HOSTNAME={getContainerIP(SFCC)} -e SFC_ID={sfcID} script.js", detach=True)
 
-        TUI.appendToLog(f"  Traffic generation started for SFC {sfcID}.")
+            TUI.appendToLog(f"  Traffic generation started for SFC {sfcID}.")
+        except Exception as e:
+            TUI.appendToLog(f"  Error starting traffic generation for SFC {sfcID}: {e}", True)
 
     def _stopTrafficGeneration(self, sfcID: str) -> None:
         """
