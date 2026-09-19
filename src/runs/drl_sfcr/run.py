@@ -80,7 +80,7 @@ def generateSFCRsFromTemplates(sfcrTemplates: list[SFCRequest], segment: int, to
 
     allRequests: list[SFCRequest] = []
 
-    if topo == "mec":
+    if topo in ["milan", "25n50e"]:
         copiesToMake: int = copies
         step: int = 4
         remainder: int = segment % step
@@ -88,6 +88,13 @@ def generateSFCRsFromTemplates(sfcrTemplates: list[SFCRequest], segment: int, to
             for copyIndex in range(copiesToMake):
                 requestCopy: SFCRequest = copy.deepcopy(request)
                 requestCopy["sfcrID"] = f"{request['sfcrID']}-{segment}-{copyIndex}"
+                allRequests.append(requestCopy)
+    if topo == "hi":
+        for request in sfcrTemplates:
+            copiesToMake: int = copies if segment == 0 else 1
+            for c in range(copiesToMake):
+                requestCopy: SFCRequest = copy.deepcopy(request)
+                requestCopy["sfcrID"] = f"{request['sfcrID']}-{c}-{segment}"
                 allRequests.append(requestCopy)
     elif topo == "fat-tree":
         for request in sfcrTemplates:
@@ -140,13 +147,15 @@ MAX_CALCULATED_DELAY: float = 10_000.0
 @click.option("--static", is_flag=True, default=False, help="Run static embedding instead of MTDRL.")
 @click.option("--paper", type=click.Choice(["benns", "thesis"]), default="benns", help="The paper for which the experiment should be run.")
 @click.option("--offline", is_flag=True, default=False, help="Run experiment offline.")
+@click.option("--hi", is_flag=True, default=False, help="Run experiment for HiGENESIS.")
 @click.option("--exp", type=click.Choice(["-1", "0", "1", "2", "3", "4"]), default="-1", help="Experiment number to run.")
 def run(
     headless: bool,
     topology: str,
     static: bool,
-    paper: bool,
+    paper: str,
     offline: bool,
+    hi: bool,
     exp: str
 ) -> None:
     """
@@ -155,8 +164,10 @@ def run(
     Parameters:
         headless (bool): Whether to run the emulator in headless mode.
         topology (str): Topology to use for the experiment.
+        static (bool): Run static embedding instead of MTDRL.
         paper (str): The paper for which the experiment should be run.
         offline (bool): Run experiment offline.
+        hi (bool): Run experiment for HiGENESIS.
         exp (str): Experiment number to run.
 
     Returns:
@@ -196,21 +207,27 @@ def run(
                 (1, 0.1, False, 10, 1),
             ]
 
-    maxEpisodes: int = 200 if not static else 500
+            if hi:
+                experimentConfig = [
+                    (15, 0.1, False, 10, 1)
+                ]
+
+    maxEpisodes: int = 100 if hi else 200 if not static else 500
     acceptanceThreshold: float = 1.0
     latencyThreshold: float = 150.0
+    absSFCRsToEmbed: int = 80
 
     if paper == "thesis":
         maxEpisodes: int = 100
         acceptanceThreshold: float = 0.95
         latencyThreshold: float = 100.0
 
+    if hi:
+        latencyThreshold: float = 100.0
+
     print(f"Running MTDRL SFCR embedding experiments with topology '{topology}'...")
     print(f"Min AR: {acceptanceThreshold}. Max Latency: {latencyThreshold}. Max Episodes: {maxEpisodes}.")
-    if topology == "mec":
-        topos =["milan", "25N50E"]
-    else:
-        topos = ["fat-tree"]
+    topos = [topology]
 
     for expIndex, expConfig in enumerate(experimentConfig):
         if expToRun != -1 and expToRun != expIndex:
@@ -269,7 +286,7 @@ def run(
 
             failureStartSegment: int = 5
 
-            if topology == "mec":
+            if topology in ["milan", "25n50e"]:
                 topo = generateTopologyFromEdgeList(
                     os.path.join(
                         getConfig()["repoAbsolutePath"], "src", "runs", "hybrid", "data", f"{topoName}.txt"
@@ -280,7 +297,7 @@ def run(
                     1
                 )
 
-                segmentDuration: int = 60
+                segmentDuration: int = 30 if hi else 60
                 baseTrafficDesign = generateTrafficDesignFromIoTTrace(
                     os.path.join(
                         f"{getConfig()['repoAbsolutePath']}",
@@ -288,7 +305,7 @@ def run(
                         "runs",
                         "hybrid",
                         "data",
-                        "iot-trace.csv",
+                        "iot-trace.csv" if topoName == "milan" else "iot-trace-2.csv",
                     ),
                     segmentDuration,
                     10000,
@@ -307,7 +324,7 @@ def run(
 
                 artifactsDir: str = os.path.join(
                     experimentLogDir,
-                    f"rl_mec_{topoName}",
+                    f"rl_mec_{topoName}{'_hi' if hi else ''}",
                 )
 
                 failureStartSegment = int(segments * 0.75)
@@ -612,6 +629,7 @@ def run(
                     acceptanceRatio = (
                         float(len(accepted)) / float(len(requests)) if len(requests) > 0 else 0.0
                     )
+
                     calculatedDelay = DRLSolver._calculateDelay(
                         topologyToUse,
                         accepted,
@@ -620,7 +638,16 @@ def run(
                     if not math.isfinite(calculatedDelay):
                         calculatedDelay = MAX_CALCULATED_DELAY
 
-                    if len(accepted) > 0 and acceptanceRatio >= acceptanceThreshold:
+                    if hi:
+                        arThresh = absSFCRsToEmbed / float(len(requests))
+                    else:
+                        arThresh = acceptanceThreshold
+
+                    TUI.appendToSolverLog(
+                        f"Segment {segment}: AR Threshold={arThresh:.4f}, Latency Threshold={latencyThreshold}"
+                    )
+
+                    if len(accepted) > 0 and acceptanceRatio >= arThresh:
                         self._trafficGenerator.setDesign([segmentDesign])
                         self._orchestrator.sendEmbeddingGraphs(accepted)
                         try:
@@ -635,7 +662,7 @@ def run(
 
                     hasLatency: bool = not math.isnan(measuredLatency)
                     converged = (
-                        acceptanceRatio >= acceptanceThreshold
+                        acceptanceRatio >= arThresh
                         and hasLatency
                         and measuredLatency <= latencyThreshold
                     )
@@ -689,7 +716,7 @@ def run(
 
                         TUI.appendToSolverLog(f"Starting segment processing for topology '{topoName}'...")
                         for segment, segmentDesign in enumerate(trafficSegments):
-                            allRequests.extend(generateSFCRsFromTemplates(originalRequests, segment, topology, expConfig[0]))
+                            allRequests.extend(generateSFCRsFromTemplates(originalRequests, segment, topology if not hi else "hi", expConfig[0]))
                             TUI.appendToSolverLog(f"Embedding {len(allRequests)} SFCRs.")
                             if segment > failureStartSegment and len(topologyToUse["hosts"]) > 1:
                                 remainingHosts: list[str] = [
