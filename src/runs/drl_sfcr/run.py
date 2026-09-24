@@ -188,6 +188,8 @@ def run(
 
     expToRun: int = int(exp)
 
+    runs: int = 20
+
     if static:
         topology = "fat-tree"
         experimentConfig = [
@@ -333,7 +335,6 @@ def run(
             if len(baseTrafficDesign) == 0:
                 raise ValueError("Traffic design is empty.")
 
-            seed: int = random.randint(0, 100000)
             trafficSegments: list[TrafficDesign] = (
                 splitTrafficDesign(baseTrafficDesign, segments, static)
             )
@@ -348,7 +349,7 @@ def run(
             if not os.path.exists(metricsPath):
                 with open(metricsPath, "w", encoding="utf8") as metricsFile:
                     metricsFile.write(
-                        "experiment,segment,acceptance_ratio,calculated_delay,measured_latency,total_execution_time,episodes_used,converged,termination_reason\n"
+                        "experiment,segment,acceptance_ratio,calculated_delay,measured_latency,total_execution_time,episodes_used,converged,termination_reason,run,seed\n"
                     )
 
             class SFCRGen(SFCRequestGenerator):
@@ -571,12 +572,14 @@ def run(
                     acceptedCount: int,
                     failedCount: int,
                     topologyUsed: Topology,
+                    run: int,
+                    seed: int
                 ) -> None:
                     with open(metricsPath, "a", encoding="utf8") as metricsFile:
                         metricsFile.write(
                             f"{experimentName},{segment},{acceptanceRatio},{calculatedDelay},"
                             f"{measuredLatency},{totalExecutionTime},{episodesUsed},"
-                            f"{str(converged).lower()},{terminationReason}\n"
+                            f"{str(converged).lower()},{terminationReason},{run},{seed}\n"
                         )
                     timestamp: str = datetime.now().isoformat()
                     logLine: str = (
@@ -585,6 +588,7 @@ def run(
                         f"measured_latency={measuredLatency} total_execution_time={totalExecutionTime} "
                         f"episodes_used={episodesUsed} converged={str(converged).lower()} "
                         f"termination_reason={terminationReason}"
+                        f" run={run} seed={seed}"
                     )
                     with open(summaryLogPath, "a", encoding="utf8") as summaryLogFile:
                         summaryLogFile.write(f"{logLine}\n")
@@ -601,6 +605,8 @@ def run(
                     topologyToUse: Topology,
                     segmentDesign: TrafficDesign,
                     segment: int,
+                    run: int,
+                    seed: int
                 ) -> None:
                     startTime: float = default_timer()
                     episodeStep: int = maxEpisodes
@@ -681,6 +687,8 @@ def run(
                         len(accepted),
                         len(failed),
                         topologyToUse,
+                        run,
+                        seed
                     )
                     TUI.appendToSolverLog(
                         f"Segment {segment}: AR={acceptanceRatio:.4f}, "
@@ -706,31 +714,36 @@ def run(
                                 originalRequests.append(self._requests.get())
                                 sleep(0.05)
 
-                        if offline:
-                            topologyToUse: Topology = copy.deepcopy(topo)
-                        else:
-                            topologyToUse: Topology = copy.deepcopy(self._orchestrator.getTopology())
-                        allRequests: list[SFCRequest] = []
-                        removedHosts: list[str] = []
-                        randomizer = random.Random(seed)
+                        for run in range(runs):
+                            TUI.appendToSolverLog(f"Starting run {run + 1}/{runs} for topology '{topoName}'...")
+                            if run < 1:
+                                continue
+                            if offline:
+                                topologyToUse: Topology = copy.deepcopy(topo)
+                            else:
+                                topologyToUse: Topology = copy.deepcopy(self._orchestrator.getTopology())
+                            allRequests: list[SFCRequest] = []
+                            removedHosts: list[str] = []
+                            seed: int = random.randint(0, 100000)
+                            randomizer = random.Random(seed)
 
-                        TUI.appendToSolverLog(f"Starting segment processing for topology '{topoName}'...")
-                        for segment, segmentDesign in enumerate(trafficSegments):
-                            allRequests.extend(generateSFCRsFromTemplates(originalRequests, segment, topology if not hi else "hi", expConfig[0]))
-                            TUI.appendToSolverLog(f"Embedding {len(allRequests)} SFCRs.")
-                            if segment > failureStartSegment and len(topologyToUse["hosts"]) > 1:
-                                remainingHosts: list[str] = [
-                                    host["id"] for host in topologyToUse["hosts"] if host["id"] not in removedHosts
-                                ]
-                                if len(remainingHosts) > 0:
-                                    hostToRemove: str = randomizer.choice(remainingHosts)
-                                    removedHosts.append(hostToRemove)
-                                    topologyToUse = removeHost(topologyToUse, hostToRemove)
-                                    TUI.appendToSolverLog(
-                                        f"Segment {segment}: simulated failure of host {hostToRemove}."
-                                    )
+                            TUI.appendToSolverLog(f"Starting segment processing for topology '{topoName}'...")
+                            for segment, segmentDesign in enumerate(trafficSegments):
+                                allRequests.extend(generateSFCRsFromTemplates(originalRequests, segment, topology if not hi else "hi", expConfig[0]))
+                                TUI.appendToSolverLog(f"Embedding {len(allRequests)} SFCRs.")
+                                if segment > failureStartSegment and len(topologyToUse["hosts"]) > 1:
+                                    remainingHosts: list[str] = [
+                                        host["id"] for host in topologyToUse["hosts"] if host["id"] not in removedHosts
+                                    ]
+                                    if len(remainingHosts) > 0:
+                                        hostToRemove: str = randomizer.choice(remainingHosts)
+                                        removedHosts.append(hostToRemove)
+                                        topologyToUse = removeHost(topologyToUse, hostToRemove)
+                                        TUI.appendToSolverLog(
+                                            f"Segment {segment}: simulated failure of host {hostToRemove}."
+                                        )
 
-                            self._runSegment(allRequests, topologyToUse, segmentDesign, segment)
+                                self._runSegment(allRequests, topologyToUse, segmentDesign, segment, run, seed)
                     except Exception as e:
                         TUI.appendToSolverLog(str(e), True)
                     TUI.appendToSolverLog("Finished MTDRL solver run.")
