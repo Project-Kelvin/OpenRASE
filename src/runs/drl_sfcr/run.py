@@ -80,7 +80,7 @@ def generateSFCRsFromTemplates(sfcrTemplates: list[SFCRequest], segment: int, to
 
     allRequests: list[SFCRequest] = []
 
-    if topo in ["milan", "25n50e"]:
+    if topo in ["milan", "25N50E"]:
         copiesToMake: int = copies
         step: int = 4
         remainder: int = segment % step
@@ -288,7 +288,7 @@ def run(
 
             failureStartSegment: int = 5
 
-            if topology in ["milan", "25n50e"]:
+            if topology in ["milan", "25N50E"]:
                 topo = generateTopologyFromEdgeList(
                     os.path.join(
                         getConfig()["repoAbsolutePath"], "src", "runs", "hybrid", "data", f"{topoName}.txt"
