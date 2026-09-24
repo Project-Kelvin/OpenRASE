@@ -716,8 +716,6 @@ def run(
 
                         for run in range(runs):
                             TUI.appendToSolverLog(f"Starting run {run + 1}/{runs} for topology '{topoName}'...")
-                            if run < 1:
-                                continue
                             if offline:
                                 topologyToUse: Topology = copy.deepcopy(topo)
                             else:
