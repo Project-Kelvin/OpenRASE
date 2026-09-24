@@ -639,7 +639,7 @@ def run(
                         calculatedDelay = MAX_CALCULATED_DELAY
 
                     if hi:
-                        arThresh = absSFCRsToEmbed / float(len(requests))
+                        arThresh = min(absSFCRsToEmbed / float(len(requests)), 1.0)
                     else:
                         arThresh = acceptanceThreshold
 
