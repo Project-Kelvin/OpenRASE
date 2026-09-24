@@ -3,6 +3,7 @@ Defines functions to generate surrogate model training data.
 """
 
 import os
+import random
 
 import pandas as pd
 
@@ -51,6 +52,7 @@ def combineData() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         dataset["max_cpu"] = dataset["max_cpu"].astype(float)
         dataset["total_link_score"] = dataset["total_link_score"].astype(float)
         dataset["max_link_score"] = dataset["max_link_score"].astype(float)
+        dataset["generation"] = dataset["generation"].astype(int)
 
         dataset = dataset.dropna()
         dataset = dataset[dataset[OUTPUT] != 0]
@@ -67,6 +69,7 @@ def combineData() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
                 total_link_score=("total_link_score", "median"),
                 max_link_score=("max_link_score", "median"),
                 total_delay=("total_delay", "median"),
+                generation=("generation", "first"),
             )
 
             q1: float = genData[OUTPUT].quantile(0.25)
@@ -79,9 +82,18 @@ def combineData() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
                 (genData[OUTPUT] > lowerBound) & (genData[OUTPUT] < upperBound)
             ]
 
-            dataToTrain: pd.DataFrame = genData.sample(frac=0.8, random_state=0)
             allData = pd.concat([allData, genData])
-            trainingData = pd.concat([trainingData, dataToTrain])
-            testData = pd.concat([testData, genData.drop(dataToTrain.index)])
+            allDataset = pd.concat([allDataset, genData])
+
+        generations: list[int] = allDataset["generation"].unique().tolist()
+        randomGenerations: list[int] = random.sample(generations, int(len(generations) * 0.8))
+        dataToTrain: pd.DataFrame = allDataset[allDataset["generation"].isin(randomGenerations)]
+        trainingData = pd.concat([trainingData, dataToTrain])
+        testData = pd.concat([testData, allDataset[~allDataset["generation"].isin(randomGenerations)]])
+        # dataToTrain: pd.DataFrame = genData.sample(frac=0.8, random_state=0)
+        # trainingData = pd.concat([trainingData, dataToTrain])
+        # testData = pd.concat([testData, genData.drop(dataToTrain.index)])
+
+        print(trainingData.shape, testData.shape, allData.shape)
 
     return trainingData, testData, allData

@@ -14,9 +14,9 @@ from deap import base, creator, tools
 from shared.models.traffic_design import TrafficDesign
 from shared.models.embedding_graph import EmbeddingGraph
 from shared.models.topology import Topology
-from algorithms.ga_dijkstra_algorithm.ga_utils import decodePop, generateRandomIndividual
+from algorithms.ga_dijkstra_algorithm.bega_individual import generateRandomIndividual
+from algorithms.ga_dijkstra_algorithm.ga_utils import decodePop
 from algorithms.models.embedding import DecodedIndividual
-from algorithms.hybrid.utils.extract_weights import getPredefinedWeightsLength
 from algorithms.hybrid.constants.surrogate import SURROGACY_PATH, SURROGATE_DATA_PATH, SURROGATE_PATH
 from algorithms.hybrid.utils.hybrid_evaluation import HybridEvaluation
 from algorithms.hybrid.utils.scorer import Scorer

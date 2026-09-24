@@ -97,7 +97,7 @@ def train() -> None:
         loss="mse",
         metrics=["mape"],
     )
-    history: Any = model.fit(xTrain, yTrain, epochs=75, verbose=1, validation_split=0.1)
+    history: Any = model.fit(xTrain, yTrain, epochs=200, verbose=1, validation_split=0.1)
 
     with open(surrogateFile, "a", encoding="utf8") as f:
         f.write(f"[{time.time()}] Validation Error: {model.evaluate(xTest, yTest)}\n")
