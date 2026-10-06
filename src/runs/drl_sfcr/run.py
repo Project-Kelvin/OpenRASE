@@ -149,6 +149,7 @@ MAX_CALCULATED_DELAY: float = 10_000.0
 @click.option("--offline", is_flag=True, default=False, help="Run experiment offline.")
 @click.option("--hi", is_flag=True, default=False, help="Run experiment for HiGENESIS.")
 @click.option("--exp", type=click.Choice(["-1", "0", "1", "2", "3", "4"]), default="-1", help="Experiment number to run.")
+@click.option("--run", type=int, default=-1, help="Run number to execute.")
 def run(
     headless: bool,
     topology: str,
@@ -156,7 +157,8 @@ def run(
     paper: str,
     offline: bool,
     hi: bool,
-    exp: str
+    exp: str,
+    run: int
 ) -> None:
     """
     Run MTDRL-based SFCR embedding experiments.
@@ -169,6 +171,7 @@ def run(
         offline (bool): Run experiment offline.
         hi (bool): Run experiment for HiGENESIS.
         exp (str): Experiment number to run.
+        run (int): Run number to execute.
 
     Returns:
         None
@@ -253,8 +256,15 @@ def run(
             if not os.path.exists(experimentLogDir):
                 os.makedirs(experimentLogDir)
 
-            artifactsDir: str = os.path.join(
+            rlExperimentDir: str = os.path.join(
                 experimentLogDir,
+                "rl"
+            )
+            if not os.path.exists(rlExperimentDir):
+                os.makedirs(rlExperimentDir)
+
+            artifactsDir: str = os.path.join(
+                rlExperimentDir,
                 f"rl_dc_{'static' if static else ''}",
             )
             sfcrPath = os.path.join(
@@ -325,8 +335,8 @@ def run(
                 segments = len(baseTrafficDesign) // (2 * segmentDuration)
 
                 artifactsDir: str = os.path.join(
-                    experimentLogDir,
-                    f"rl_mec_{topoName}{'_hi' if hi else ''}",
+                    rlExperimentDir,
+                    f"rl_mec_{topoName}{'_hi' if hi else ''}{'_run_'+str(run) if run != -1 else ''}",
                 )
 
                 failureStartSegment = int(segments * 0.75)
@@ -715,6 +725,8 @@ def run(
                                 sleep(0.05)
 
                         for run in range(runs):
+                            if run != -1 and run != run:
+                                continue
                             TUI.appendToSolverLog(f"Starting run {run + 1}/{runs} for topology '{topoName}'...")
                             if offline:
                                 topologyToUse: Topology = copy.deepcopy(topo)
