@@ -99,106 +99,106 @@ def run(headless: bool) -> None:
 
     topologies: list[Topology] = [abilene, dfnBwin, nobelUs]
 
-    design: TrafficDesign = generateTrafficDesignFromIoTTrace(
-        os.path.join(
-            f"{getConfig()['repoAbsolutePath']}",
-            "src",
-            "runs",
-            "hybrid",
-            "data",
-            "iot-trace-2.csv",
-        ),
-        2,
-        750,
-    )
 
+    for scale in [750, 10000, 500, 300]:
+        for topoIndex, topology in enumerate(topologies):
+            design: TrafficDesign = generateTrafficDesignFromIoTTrace(
+                os.path.join(
+                    f"{getConfig()['repoAbsolutePath']}",
+                    "src",
+                    "runs",
+                    "hybrid",
+                    "data",
+                    "iot-trace-2.csv",
+                ),
+                2,
+                scale,
+            )
 
-    for topoIndex, topology in enumerate(topologies):
-
-        class SFCRGen(SFCRequestGenerator):
-            """
-            Class to generate FG Requests.
-            """
-
-            def generateRequests(self) -> None:
+            class SFCRGen(SFCRequestGenerator):
                 """
-                Generate the FG Requests.
+                Class to generate FG Requests.
                 """
 
-                sfcrsToSend: list[SFCRequest] = []
+                def generateRequests(self) -> None:
+                    """
+                    Generate the FG Requests.
+                    """
 
-                for i, sfcr in enumerate(sfcrs):
-                    for copy in range(noOfCopies):
-                        sfcrToSend: SFCRequest = deepcopy(sfcr)
-                        sfcrToSend["sfcrID"] = f"sfcr{i}_{copy}"
-                        sfcrsToSend.append(sfcrToSend)
+                    sfcrsToSend: list[SFCRequest] = []
 
-                self._orchestrator.sendRequests(sfcrsToSend)
+                    for i, sfcr in enumerate(sfcrs):
+                        for copy in range(noOfCopies):
+                            sfcrToSend: SFCRequest = deepcopy(sfcr)
+                            sfcrToSend["sfcrID"] = f"sfcr{i}_{copy}"
+                            sfcrsToSend.append(sfcrToSend)
 
-        class EvalSolver(Solver):
-            """
-            Class to run the BENNS evaluation.
-            """
+                    self._orchestrator.sendRequests(sfcrsToSend)
 
-            def generateEmbeddingGraphs(self):
+            class EvalSolver(Solver):
                 """
-                Generate the embedding graphs.
+                Class to run the BENNS evaluation.
                 """
 
-                try:
-                    while self._requests.empty():
-                        pass
-                    requests: "list[SFCRequest]" = []
-                    while not self._requests.empty():
-                        requests.append(self._requests.get())
-                        sleep(0.1)
+                def generateEmbeddingGraphs(self):
+                    """
+                    Generate the embedding graphs.
+                    """
 
-                    topologyName: str = "abilene"
+                    try:
+                        while self._requests.empty():
+                            pass
+                        requests: "list[SFCRequest]" = []
+                        while not self._requests.empty():
+                            requests.append(self._requests.get())
+                            sleep(0.1)
 
-                    if topoIndex == 1:
-                        topologyName = "dfn-bwin"
-                    elif topoIndex == 2:
-                        topologyName = "nobel-us"
+                        topologyName: str = "abilene"
 
-                    for run in range(noOfRuns):
-                        noOfSFCRsToEmbed: int = random.randint(15, len(requests))
-                        sfcrsToEmbed: list[SFCRequest] = random.sample(requests, noOfSFCRsToEmbed)
-                        print(f"Embedding graphs: {len(sfcrsToEmbed)}")
-                        print(f"Running BENNS evaluation for topology {topologyName} run {run + 1}/{noOfRuns}...")
+                        if topoIndex == 1:
+                            topologyName = "dfn-bwin"
+                        elif topoIndex == 2:
+                            topologyName = "nobel-us"
 
-                        GenesisUtils.init(sfcrsToEmbed, topology, 6, 0.0, 1)
-                        ind: Individual = GenesisUtils.generateRandomGenesisIndividual(Individual, topology, sfcrsToEmbed)
-                        decodedInd: list[DecodedIndividual] = [GenesisUtils.decodeIndividual(cast(GenesisIndividual, ind), 0, topology, sfcrsToEmbed)]
+                        for run in range(noOfRuns):
+                            noOfSFCRsToEmbed: int = random.randint(15, len(requests))
+                            sfcrsToEmbed: list[SFCRequest] = random.sample(requests, noOfSFCRsToEmbed)
+                            print(f"Embedding graphs: {len(sfcrsToEmbed)}")
+                            print(f"Running BENNS evaluation for topology {topologyName} run {run + 1}/{noOfRuns}...")
 
-                        makGAUtils = MakGAUtils(topology, design, sfcrsToEmbed)
-                        makGAUtils.cacheDemand(decodedInd)
-                        HybridEvaluation.cacheForOffline(
-                            decodedInd, [design], topology, 0, isAvgOnly=True
-                        )
+                            GenesisUtils.init(sfcrsToEmbed, topology, 6, 0.0, 1)
+                            ind: Individual = GenesisUtils.generateRandomGenesisIndividual(Individual, topology, sfcrsToEmbed)
+                            decodedInd: list[DecodedIndividual] = [GenesisUtils.decodeIndividual(cast(GenesisIndividual, ind), 0, topology, sfcrsToEmbed)]
 
-                        bennsStartTime: float = timeit.default_timer()
-                        bennsEval: tuple[int, float, float] = HybridEvaluation.evaluationOnSurrogate(decodedInd[0], 0, 1, topology, [design], 1000000000000)
-                        bennsEndTime: float = timeit.default_timer()
-                        bennsTime: float = round(bennsEndTime - bennsStartTime, 2)
+                            makGAUtils = MakGAUtils(topology, design, sfcrsToEmbed)
+                            makGAUtils.cacheDemand(decodedInd)
+                            HybridEvaluation.cacheForOffline(
+                                decodedInd, [design], topology, 0, isAvgOnly=True
+                            )
 
-                        gahaStartTime: float = timeit.default_timer()
-                        gahaEval: tuple[int, float, float] = makGAUtils.getTotalDelay(decodedInd[0])
-                        gahaEndTime: float = timeit.default_timer()
-                        gahaTime: float = round(gahaEndTime - gahaStartTime, 2)
+                            bennsStartTime: float = timeit.default_timer()
+                            bennsEval: tuple[int, float, float] = HybridEvaluation.evaluationOnSurrogate(decodedInd[0], 0, 1, topology, [design], 1000000000000)
+                            bennsEndTime: float = timeit.default_timer()
+                            bennsTime: float = round(bennsEndTime - bennsStartTime, 2)
 
-                        openRaseStartTime: float = timeit.default_timer()
-                        openRaseEval: tuple[float, float] = HybridEvaluation.evaluationOnEmulator(decodedInd[0], sfcrsToEmbed, 0, 1, self._orchestrator.sendEmbeddingGraphs, self._orchestrator.deleteEmbeddingGraphs, [design], self._trafficGenerator,topology, 1000000000000)
-                        openRaseEndTime: float = timeit.default_timer()
-                        openRaseTime: float = round(openRaseEndTime - openRaseStartTime, 2)
+                            gahaStartTime: float = timeit.default_timer()
+                            gahaEval: tuple[int, float, float] = makGAUtils.getTotalDelay(decodedInd[0])
+                            gahaEndTime: float = timeit.default_timer()
+                            gahaTime: float = round(gahaEndTime - gahaStartTime, 2)
 
-                        with open(dataFile, "a") as f:
-                            f.write(f"{topologyName},{run + 1},{len(decodedInd[0][1])},{openRaseEval[0]},{bennsEval[2]},{gahaEval[2]},{openRaseEval[1]},{bennsTime},{gahaTime},{openRaseTime}\n")
-                except Exception as e:
-                    TUI.appendToSolverLog(f"Error while generating embedding graphs: {e}")
+                            openRaseStartTime: float = timeit.default_timer()
+                            openRaseEval: tuple[float, float] = HybridEvaluation.evaluationOnEmulator(decodedInd[0], sfcrsToEmbed, 0, 1, self._orchestrator.sendEmbeddingGraphs, self._orchestrator.deleteEmbeddingGraphs, [design], self._trafficGenerator,topology, 1000000000000)
+                            openRaseEndTime: float = timeit.default_timer()
+                            openRaseTime: float = round(openRaseEndTime - openRaseStartTime, 2)
 
-        sfcEm: SFCEmulator = SFCEmulator(SFCRGen, EvalSolver, headless)
-        sfcEm.startTest(
-            topology,
-            [design],
-        )
-        sfcEm.end()
+                            with open(dataFile, "a") as f:
+                                f.write(f"{topologyName},{run + 1},{len(decodedInd[0][1])},{openRaseEval[0]},{bennsEval[2]},{gahaEval[2]},{openRaseEval[1]},{bennsTime},{gahaTime},{openRaseTime}\n")
+                    except Exception as e:
+                        TUI.appendToSolverLog(f"Error while generating embedding graphs: {e}")
+
+            sfcEm: SFCEmulator = SFCEmulator(SFCRGen, EvalSolver, headless)
+            sfcEm.startTest(
+                topology,
+                [design],
+            )
+            sfcEm.end()
