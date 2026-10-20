@@ -724,10 +724,10 @@ def run(
                                 originalRequests.append(self._requests.get())
                                 sleep(0.05)
 
-                        for run in range(runs):
-                            if run != -1 and run != run:
+                        for runIndex in range(runs):
+                            if run != -1 and run != runIndex:
                                 continue
-                            TUI.appendToSolverLog(f"Starting run {run + 1}/{runs} for topology '{topoName}'...")
+                            TUI.appendToSolverLog(f"Starting run {runIndex + 1}/{runs} for topology '{topoName}'...")
                             if offline:
                                 topologyToUse: Topology = copy.deepcopy(topo)
                             else:
@@ -753,7 +753,7 @@ def run(
                                             f"Segment {segment}: simulated failure of host {hostToRemove}."
                                         )
 
-                                self._runSegment(allRequests, topologyToUse, segmentDesign, segment, run, seed)
+                                self._runSegment(allRequests, topologyToUse, segmentDesign, segment, runIndex, seed)
                     except Exception as e:
                         TUI.appendToSolverLog(str(e), True)
                     TUI.appendToSolverLog("Finished MTDRL solver run.")
