@@ -100,7 +100,7 @@ def run(headless: bool) -> None:
     topologies: list[Topology] = [abilene, dfnBwin, nobelUs]
 
 
-    for scale in [750, 10000, 500, 300]:
+    for scale in [10000, 300]:
         for topoIndex, topology in enumerate(topologies):
             design: TrafficDesign = generateTrafficDesignFromIoTTrace(
                 os.path.join(
@@ -171,17 +171,17 @@ def run(headless: bool) -> None:
                             decodedInd: list[DecodedIndividual] = [GenesisUtils.decodeIndividual(cast(GenesisIndividual, ind), 0, topology, sfcrsToEmbed)]
 
                             makGAUtils = MakGAUtils(topology, design, sfcrsToEmbed)
-                            makGAUtils.cacheDemand(decodedInd)
+
+                            bennsStartTime: float = timeit.default_timer()
                             HybridEvaluation.cacheForOffline(
                                 decodedInd, [design], topology, 0, isAvgOnly=True
                             )
-
-                            bennsStartTime: float = timeit.default_timer()
                             bennsEval: tuple[int, float, float] = HybridEvaluation.evaluationOnSurrogate(decodedInd[0], 0, 1, topology, [design], 1000000000000)
                             bennsEndTime: float = timeit.default_timer()
                             bennsTime: float = round(bennsEndTime - bennsStartTime, 2)
 
                             gahaStartTime: float = timeit.default_timer()
+                            makGAUtils.cacheDemand(decodedInd)
                             gahaEval: tuple[int, float, float] = makGAUtils.getTotalDelay(decodedInd[0])
                             gahaEndTime: float = timeit.default_timer()
                             gahaTime: float = round(gahaEndTime - gahaStartTime, 2)
