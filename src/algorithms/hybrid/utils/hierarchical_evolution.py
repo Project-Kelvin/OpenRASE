@@ -258,7 +258,7 @@ s
 
         for ind2 in newPF:
             for ind1 in oldPF:
-                if ind2.id == ind1.id:
+                if ind2.id == ind1.id and ind2.metaIndividual.id == ind1.metaIndividual.id:
                     oldCount += 1
                     break
 
@@ -1438,6 +1438,7 @@ s
                 ) or self._rootIndividual != -1
 
                 metaPF = newMetaPF
+                genesisPF = newMetaPF
                 shouldGenesisGenContinue = True
 
             newRootPF: tools.ParetoFront = tools.ParetoFront()
