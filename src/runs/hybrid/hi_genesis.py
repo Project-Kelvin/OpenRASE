@@ -82,7 +82,8 @@ def generateSFCRsFromTemplates(sfcrTemplates: list[SFCRequest], segment: int, to
 @click.option("--env", type=click.Choice(["dc", "milan", "25n50e"]), default="milan", help="Environment to run the algorithm in.")
 @click.option("--static-root" , is_flag=True, default=False, help="Run the experiment with a static root individual.")
 @click.option("--genesis", is_flag=True, default=False, help="Run the experiment with GENESIS.")
-def run(headless: bool, client: bool, env: str, static_root: bool, genesis: bool) -> None:
+@click.option("--offline", is_flag=True, default=False, help="Run the experiment in offline mode.")
+def run(headless: bool, client: bool, env: str, static_root: bool, genesis: bool, offline: bool) -> None:
     """
     Run the hybrid online-offline algorithm.
 
@@ -92,6 +93,7 @@ def run(headless: bool, client: bool, env: str, static_root: bool, genesis: bool
         env (str): The environment to run the algorithm in.
         static_root (bool): Whether to run the experiment with a static root individual.
         genesis (bool): Whether to run the experiment with GENESIS.
+        offline (bool): Whether to run the experiment in offline mode.
 
     Returns:
         None
@@ -343,7 +345,8 @@ def run(headless: bool, client: bool, env: str, static_root: bool, genesis: bool
                                         f"genesis_hi_dynamic_{env}_{i}",
                                         f"{len(allRequestsReceived)}_{trafficScale}_False_{bandwidth}_{cpus}_{segment}",
                                         retainPopulation=True,
-                                        minimumAR=minimumAR
+                                        minimumAR=minimumAR,
+                                        evaluateOnline=not offline
                                     )
 
                                     runExperiment = False
@@ -370,7 +373,8 @@ def run(headless: bool, client: bool, env: str, static_root: bool, genesis: bool
                                 cxPb=crossPb,
                                 dominanceThreshold=dominanceThreshold,
                                 minimumAR=minimumAR,
-                                rootIndividual=1 if static_root else -1
+                                rootIndividual=1 if static_root else -1,
+                                evaluateOnline=not offline
                             )
 
             except Exception as e:

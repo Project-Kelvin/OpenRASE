@@ -199,7 +199,7 @@ class HierarchicalEvolution:
         Parameters:
             newPF (tools.ParetoFront): The new Pareto front.
             oldPF (tools.ParetoFront): The old Pareto front.
-s
+
         Returns:
             float: The difference in Euclidean distance between the two Pareto fronts.
         """
@@ -253,16 +253,28 @@ s
             float: The percentage of individuals in the first Pareto front that are dominated by the second Pareto front.
         """
 
-        newPFLength: int = len(newPF)
-        oldCount: int = 0
+        oldInds: int = 0
+        combinedPFs: list[Individual] = list(oldPF)
 
-        for ind2 in newPF:
-            for ind1 in oldPF:
-                if ind2.id == ind1.id and ind2.metaIndividual.id == ind1.metaIndividual.id:
-                    oldCount += 1
+        for ind in newPF:
+            doesExist: bool = False
+            for oldInd in oldPF:
+                if ind.id == oldInd.id and ind.metaIndividual.id == oldInd.metaIndividual.id:
+                    doesExist = True
+                    break
+            if not doesExist:
+                combinedPFs.append(ind)
+
+        pf: tools.ParetoFront = tools.ParetoFront()
+        pf.update(combinedPFs)
+
+        for cPF in pf:
+            for ind in oldPF:
+                if ind.id == cPF.id and ind.metaIndividual.id == cPF.metaIndividual.id:
+                    oldInds += 1
                     break
 
-        return (newPFLength - oldCount) / newPFLength if newPFLength > 0 else 0
+        return (len(pf) - oldInds) / len(pf) if len(pf) > 0 else 0.0
 
     def _isParetoDominated(self, newPF: tools.ParetoFront, oldPF: tools.ParetoFront, threshold: float = -1.0) -> bool:
         """
